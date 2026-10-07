@@ -30,8 +30,8 @@
       </div>
       <div class="hero-board" aria-label="빠른 탐색">
         <a href="#finder" class="hero-board-card blue"><span>☕</span><strong>카페·맛집</strong><small>지역과 동행으로 찾기</small></a>
-        <a href="{{ url_for('news_list') }}?category=행사·축제" class="hero-board-card green"><span>🎪</span><strong>행사·축제</strong><small>오늘 갈 곳 확인하기</small></a>
-        <a href="{{ url_for('news_list') }}?category=전시" class="hero-board-card orange"><span>🖼️</span><strong>전시·문화</strong><small>제주의 새로운 소식</small></a>
+        <a href="{{ url_for('news_list') }}?category={{ news_category_labels.events }}" class="hero-board-card green"><span>🎪</span><strong>{{ news_category_labels.events }}</strong><small>오늘 갈 곳 확인하기</small></a>
+        <a href="{{ url_for('news_list') }}?category={{ news_category_labels.exhibitions }}" class="hero-board-card orange"><span>🖼️</span><strong>{{ news_category_labels.exhibitions }}</strong><small>제주의 새로운 소식</small></a>
         <a href="{{ url_for('partnership') }}" class="hero-board-card dark"><span>📣</span><strong>홍보·제휴</strong><small>제주노와 함께 알리기</small></a>
       </div>
     </div>
@@ -39,7 +39,7 @@
 
   <section class="section wrap news-home" id="today">
     <div class="section-head editorial-section-head">
-      <div><p class="kicker">JEJUNO TODAY</p><h2>이번 주 제주에서 뭐 하지?</h2><p class="section-copy">행사·전시·마켓·교육·지역 소식을 제주노가 확인한 정보와 출처 기준으로 정리합니다.</p></div>
+      <div><p class="kicker">JEJUNO TODAY</p><h2>제주 이슈</h2><p class="section-copy">{{ news_categories|join(', ') }}을 제주노가 확인한 정보와 출처 기준으로 정리합니다.</p></div>
       <a class="text-btn" href="{{ url_for('news_list') }}">제주 소식 전체보기 →</a>
     </div>
     {% if news_items %}
@@ -48,7 +48,7 @@
       <article class="news-card {% if item.is_featured %}featured{% endif %}">
         <a href="{{ url_for('news_detail', slug=item.slug) }}" class="news-card-link">
           <div class="news-thumb {% if item.image_url %}has-image{% endif %}" {% if item.image_url %}style="background-image:url('{{ item.image_url }}')"{% endif %}>
-            {% if not item.image_url %}<span>{{ '🎪' if item.category == '행사·축제' else '📰' }}</span>{% endif %}
+            {% if not item.image_url %}<span>{{ '🎪' if item.category == news_category_labels.events else '📰' }}</span>{% endif %}
             <div class="news-overlay-badges"><span class="news-category">{{ item.category }}</span>{% if item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div>
           </div>
           <div class="news-card-body">

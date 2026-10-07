@@ -26,7 +26,22 @@ CATEGORIES = ["맛집", "카페", "가볼 곳"]
 COMPANIONS = ["혼자", "연인", "친구", "부모님", "아이", "반려동물", "단체"]
 FEATURES = ["감성", "뷰", "비오는날", "사진", "힐링", "로컬", "전통", "이색", "가성비", "포장", "예약"]
 STATUS_OPTIONS = ["미확인", "가능", "불가", "제한"]
-NEWS_CATEGORIES = ["행사·축제", "전시", "마켓", "체험·교육", "공모·지원", "지역소식"]
+NEWS_CATEGORY_LABELS = {
+    "events": "행사•축제",
+    "exhibitions": "전시•팝업",
+    "activities": "체험•교육",
+    "local": "지역소식",
+    "opportunities": "공모•지원",
+}
+NEWS_CATEGORIES = list(NEWS_CATEGORY_LABELS.values())
+# Read compatibility only: never rewrite existing rows on startup or during reads.
+# Ambiguous legacy values such as 마켓 remain unchanged until an editor chooses.
+NEWS_CATEGORY_ALIASES = {
+    "행사·축제": NEWS_CATEGORY_LABELS["events"],
+    "전시": NEWS_CATEGORY_LABELS["exhibitions"],
+    "체험·교육": NEWS_CATEGORY_LABELS["activities"],
+    "공모·지원": NEWS_CATEGORY_LABELS["opportunities"],
+}
 
 SEED_PLACES = [
     {
@@ -146,7 +161,10 @@ def create_app(test_config=None):
         if "csrf_token" not in request.session:
             request.session["csrf_token"] = secrets.token_urlsafe(32)
         flashes = request.session.pop("flashes", [])
-        return {"csrf_token": request.session["csrf_token"], "flashes": flashes}
+        return {
+            "csrf_token": request.session["csrf_token"], "flashes": flashes,
+            "news_categories": NEWS_CATEGORIES, "news_category_labels": NEWS_CATEGORY_LABELS,
+        }
 
     templates = Jinja2Templates(directory=BASE_DIR / "templates", context_processors=[context_processor])
 
@@ -301,6 +319,8 @@ def create_app(test_config=None):
 
     def row_to_news(row):
         item = dict(row)
+        item["stored_category"] = item["category"]
+        item["category"] = NEWS_CATEGORY_ALIASES.get(item["category"], item["category"])
         item["is_featured"] = bool(item.get("is_featured"))
         item["is_sponsored"] = bool(item.get("is_sponsored"))
         item["published"] = bool(item.get("published"))
@@ -415,7 +435,6 @@ def create_app(test_config=None):
             "companions": COMPANIONS,
             "features": FEATURES,
             "status_options": STATUS_OPTIONS,
-            "news_categories": NEWS_CATEGORIES,
         }
 
     def admin_guard(request: Request):
@@ -455,12 +474,14 @@ def create_app(test_config=None):
     @app.get("/news", response_class=HTMLResponse)
     async def news_list(request: Request):
         category = (request.query_params.get("category") or "").strip()
+        category = NEWS_CATEGORY_ALIASES.get(category, category)
         q = (request.query_params.get("q") or "").strip()
         clauses = ["published=1"]
         params = []
-        if category and category in NEWS_CATEGORIES:
-            clauses.append("category=?")
-            params.append(category)
+        if category:
+            category_values = [category] + [old for old, new in NEWS_CATEGORY_ALIASES.items() if new == category]
+            clauses.append(f"category IN ({','.join('?' for _ in category_values)})")
+            params.extend(category_values)
         if q:
             clauses.append("(title LIKE ? OR summary LIKE ? OR venue LIKE ?)")
             token = f"%{q}%"
@@ -476,7 +497,6 @@ def create_app(test_config=None):
             name="news_list.html",
             context={
                 "news_items": [row_to_news(row) for row in rows],
-                "news_categories": NEWS_CATEGORIES,
                 "active_category": category,
                 "q": q,
             },
