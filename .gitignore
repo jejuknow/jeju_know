@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+data/jejuno.db
+data/secret_key.txt
+.env

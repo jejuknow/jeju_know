@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} | JEJUNO{% endblock %}
+{% block body %}
+<header class="site-header editorial-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>jeju_know</span></a><nav class="nav"><a href="{{ url_for('news_list') }}">제주 소식</a><a href="{{ url_for('home') }}#finder">장소 찾기</a><a href="{{ url_for('partnership') }}">광고·제휴</a></nav></div></header>
+<main class="article-page wrap">
+  <a class="article-back" href="{{ url_for('news_list') }}">← 제주 소식으로</a>
+  <article class="article-shell">
+    <div class="article-hero {% if item.image_url %}has-image{% endif %}" {% if item.image_url %}style="background-image:url('{{ item.image_url }}')"{% endif %}>{% if not item.image_url %}<span>🗓️</span>{% endif %}</div>
+    <div class="article-content">
+      <div class="article-badges"><span class="news-category">{{ item.category }}</span><span class="status {{ 'draft' if item.event_status == '종료' else 'published' }}">{{ item.event_status }}</span>{% if item.is_sponsored %}<span class="sponsor-badge">광고·협찬{% if item.sponsor_name %} · {{ item.sponsor_name }}{% endif %}</span>{% endif %}</div>
+      <h1>{{ item.title }}</h1><p class="article-summary">{{ item.summary }}</p>
+      <dl class="article-facts"><div><dt>일정</dt><dd>{{ item.date_label }}</dd></div>{% if item.venue %}<div><dt>장소</dt><dd>{{ item.venue }}</dd></div>{% endif %}{% if item.source_name %}<div><dt>정보 출처</dt><dd>{{ item.source_name }}</dd></div>{% endif %}{% if item.checked_at %}<div><dt>확인일</dt><dd>{{ item.checked_at }}</dd></div>{% endif %}</dl>
+      {% if item.body %}<div class="article-body">{{ item.body|replace('\n','<br>')|safe }}</div>{% endif %}
+      <div class="article-actions">{% if item.external_url %}<a class="hero-primary" href="{{ item.external_url }}" target="_blank" rel="noreferrer">공식 정보/신청 페이지 →</a>{% endif %}<button class="hero-secondary" type="button" onclick="navigator.clipboard.writeText(location.href).then(()=>alert('링크를 복사했습니다.'))">링크 공유</button></div>
+      <p class="article-disclaimer">일정·운영 정보는 변경될 수 있습니다. 신청·방문 전 연결된 공식 출처에서 최종 확인해 주세요.</p>
+    </div>
+  </article>
+</main>
+{% endblock %}

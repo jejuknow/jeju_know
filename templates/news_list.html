@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}제주 소식 | JEJUNO{% endblock %}
+{% block body %}
+<header class="site-header editorial-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>jeju_know</span></a><nav class="nav"><a class="active" href="{{ url_for('news_list') }}">제주 소식</a><a href="{{ url_for('home') }}#finder">장소 찾기</a><a href="{{ url_for('partnership') }}">광고·제휴</a><a href="https://www.instagram.com/jeju_know/" target="_blank" rel="noreferrer">Instagram</a></nav></div></header>
+<main class="news-page">
+  <section class="news-page-hero"><div class="wrap"><p class="kicker">JEJUNO TODAY</p><h1>제주의 지금을<br>한눈에 확인하세요.</h1><p>행사·축제·전시·마켓·체험과 지역 소식을 출처·확인일과 함께 관리합니다.</p></div></section>
+  <section class="wrap news-browser">
+    <div class="category-tabs"><a class="{% if not active_category %}active{% endif %}" href="{{ url_for('news_list') }}">전체</a>{% for category in news_categories %}<a class="{% if active_category == category %}active{% endif %}" href="{{ url_for('news_list') }}?category={{ category }}">{{ category }}</a>{% endfor %}</div>
+    <form class="news-search" method="get" action="{{ url_for('news_list') }}">{% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}<input type="search" name="q" value="{{ q }}" placeholder="행사명·장소·키워드 검색"><button type="submit">검색</button></form>
+    {% if news_items %}<div class="news-grid news-list-grid">{% for item in news_items %}<article class="news-card"><a class="news-card-link" href="{{ url_for('news_detail', slug=item.slug) }}"><div class="news-thumb {% if item.image_url %}has-image{% endif %}" {% if item.image_url %}style="background-image:url('{{ item.image_url }}')"{% endif %}>{% if not item.image_url %}<span>{{ '🎪' if item.category == '행사·축제' else '📰' }}</span>{% endif %}<div class="news-overlay-badges"><span class="news-category">{{ item.category }}</span>{% if item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div></div><div class="news-card-body"><div class="news-date">{{ item.event_status }} · {{ item.date_label }}</div><h3>{{ item.title }}</h3><p>{{ item.summary }}</p>{% if item.venue %}<div class="news-venue">📍 {{ item.venue }}</div>{% endif %}</div></a></article>{% endfor %}</div>{% else %}<div class="empty-state"><div class="empty-emoji">🗓️</div><h3>조건에 맞는 제주 소식이 없습니다.</h3><p>다른 카테고리나 검색어로 확인해보세요.</p></div>{% endif %}
+  </section>
+</main>
+<footer><div class="wrap footer-inner"><div class="brand footer-brand"><strong>JEJUNO</strong><span>jeju_know</span></div><p><a href="{{ url_for('partnership') }}">광고·제휴 안내</a></p></div></footer>
+{% endblock %}

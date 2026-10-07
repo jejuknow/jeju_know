@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}관리자 로그인 | JEJUNO{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+{% block body %}
+<main class="auth-wrap"><section class="auth-card"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>관리자 로그인</span></a><h1>관리자 로그인</h1><p class="auth-copy">로그인 후 장소를 바로 등록·수정·게시·삭제할 수 있습니다.</p>{% include '_flashes.html' %}<form method="post" class="admin-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>아이디<input name="username" required autocomplete="username"></label><label>비밀번호<input type="password" name="password" required autocomplete="current-password"></label><button class="primary-btn" type="submit">로그인</button></form><a class="back-link" href="{{ url_for('home') }}">← 사이트로 돌아가기</a></section></main>
+{% endblock %}

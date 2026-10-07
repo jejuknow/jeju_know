@@ -1,0 +1,14 @@
+services:
+  web:
+    build: .
+    container_name: jejuno-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      JEJUNO_DATA_DIR: /data
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
