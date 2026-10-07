@@ -67,20 +67,29 @@
 
   <section class="finder-section" id="finder">
     <div class="wrap finder-layout">
-      <div class="finder-intro"><p class="kicker">PLACE FINDER</p><h2>오늘 제주 어디가지?</h2><p>제주노가 기록한 장소를 지역·카테고리·동행·상황으로 좁혀보세요. 조건에 맞는 장소가 없으면 임의로 추천하지 않습니다.</p><div class="finder-note">TIP · 먼저 지역과 누구와 가는지를 고르면 빠릅니다.</div></div>
+      <div class="finder-intro"><p class="kicker">PLACE FINDER</p><h2>오늘 제주 어디가지?</h2><p>어디로, 누구와 떠나나요?<br>지역부터 취향까지 차근차근 골라보세요.</p><div class="finder-note">TIP · 원하는 조건만 선택해도 좋아요.<br>직접 기록하고 확인한 정보로 찾아드려요.</div></div>
       <div class="finder-card compact-finder">
-        <div class="filter-group"><p class="filter-label">어디로 갈까요?</p><div class="chips" data-filter="region" id="regionChips"></div></div>
-        <div class="filter-group"><p class="filter-label">무엇을 찾나요?</p><div class="chips" data-filter="category" id="categoryChips"></div></div>
-        <div class="filter-group"><p class="filter-label">누구와 가나요?</p><div class="chips" data-filter="withWhom" id="companionChips"></div></div>
-        <details class="more-filters"><summary>분위기·상황 조건 더보기</summary><div class="chips compact" data-filter="feature" id="featureChips"></div></details>
-        <button class="primary-btn" id="findBtn">이 조건으로 장소 보기 →</button>
+        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">1</span>어디로 갈까요?</legend><div class="chips" data-filter="region" id="regionChips"></div></fieldset>
+        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">2</span>무엇을 찾나요?</legend><div class="chips" data-filter="category" id="categoryChips"></div></fieldset>
+        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">3</span>누구와 가나요?</legend><p class="filter-help">함께 가는 사람을 모두 골라주세요.</p><div class="chips" data-filter="companions" id="companionChips"></div></fieldset>
+        <fieldset class="filter-group preference-group"><legend class="filter-label"><span class="filter-step">4</span>어떤 곳이 좋아요?</legend><div class="filter-help-row"><p class="filter-help">고른 취향 중 하나 이상에 맞는 곳을 찾아요.</p><span id="preferenceCount" class="filter-count">0/3 선택</span></div><div class="chips" data-filter="preferences" id="preferenceChips"></div><p class="filter-feedback" id="filterFeedback" role="status" aria-live="polite"></p></fieldset>
+        <details class="more-filters" id="moreFilters">
+          <summary><span class="filter-step">5</span>메뉴·이용 조건 더보기 <span class="filter-count" id="detailCount"></span></summary>
+          <div class="filter-details-body">
+            <fieldset class="filter-subgroup" id="menuGroup" hidden><legend id="menuLabel">메뉴</legend><p class="filter-help">고른 항목 중 하나 이상을 포함해요.</p><div class="chips" data-filter="menu" id="menuChips"></div></fieldset>
+            <p class="filter-help" id="menuHint">맛집·카페·가볼 곳을 선택하면 맞춤 메뉴와 활동을 고를 수 있어요.</p>
+            <fieldset class="filter-subgroup"><legend>이용 조건</legend><p class="filter-help">고른 조건을 모두 만족하는 곳을 찾아요.</p><div class="chips" data-filter="conditions" id="conditionChips"></div></fieldset>
+            <details class="taste-details"><summary>세부 취향 더보기</summary><p class="filter-help">고른 세부 취향 중 하나 이상을 포함해요.</p><div id="detailChips"></div></details>
+          </div>
+        </details>
+        <button class="primary-btn" id="findBtn" type="button" disabled>이 조건으로 장소 보기 →</button>
       </div>
     </div>
   </section>
 
   <section class="section wrap" id="places">
     <div class="section-head">
-      <div><p class="kicker">SEARCH RESULT</p><h2>조건에 맞는 장소</h2><p id="resultSummary" class="section-copy">장소 데이터를 불러오는 중입니다.</p></div>
+      <div><p class="kicker">SEARCH RESULT</p><h2>조건에 맞는 장소</h2><p id="resultSummary" class="section-copy" role="status">장소 데이터를 불러오는 중입니다.</p></div>
       <button class="text-btn" id="resetBtn">필터 초기화</button>
     </div>
     <div id="placeGrid" class="place-grid" aria-live="polite"></div>
@@ -104,4 +113,4 @@
 </main>
 <footer><div class="wrap footer-inner"><div class="brand footer-brand"><strong>JEJUNO</strong><span>jeju_know</span></div><p>제주노가 기록하는 이유 있는 제주 추천 · <a href="{{ url_for('admin_dashboard') }}">관리자</a></p></div></footer>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', path='app.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-filters.js?v=20261007"></script><script src="/static/app.js?v=20261007"></script>{% endblock %}

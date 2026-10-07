@@ -60,7 +60,7 @@ class JejunoAppTest(unittest.TestCase):
             "category": "카페",
             "emoji": "☕",
             "companions": ["혼자", "친구"],
-            "features": ["감성"],
+            "features": ["감성", "커피", "오션뷰", "기존 사용자 태그"],
             "parking_status": "가능",
             "pet_status": "미확인",
             "child_status": "미확인",
@@ -76,12 +76,17 @@ class JejunoAppTest(unittest.TestCase):
         self.assertEqual(len(api), 1)
         self.assertEqual(api[0]["name"], "테스트 카페")
         self.assertIn("주차", api[0]["features_public"])
+        self.assertEqual(api[0]["features"], ["감성", "커피", "오션뷰", "기존 사용자 태그"])
 
         conn = sqlite3.connect(self.db_path)
         place_id = conn.execute("SELECT id FROM places WHERE slug='test-cafe'").fetchone()[0]
         conn.close()
 
         token = self.get_csrf_from_cookie_session(f"/admin/places/{place_id}/edit")
+        edit_html = self.client.get(f"/admin/places/{place_id}/edit").text
+        self.assertIn('value="커피" checked', edit_html)
+        self.assertIn('value="기존 사용자 태그" checked', edit_html)
+        self.assertIn('/static/admin-place-filters.js', edit_html)
         res = self.client.post(f"/admin/places/{place_id}/edit", data={
             "csrf_token": token,
             "name": "수정 카페",
