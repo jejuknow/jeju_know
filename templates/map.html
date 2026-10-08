@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}제주 지도 | JEJUNO{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261008">{% endblock %}
+{% block body_class %}map-body{% endblock %}
+{% block body %}
+<header class="map-header"><a class="brand" href="/"><strong>JEJUNO</strong><span>jeju_know</span></a><nav aria-label="주요 메뉴"><a href="/news">제주 이슈</a><a href="/#finder">장소 찾기</a><a href="/map" aria-current="page">제주 지도</a></nav></header>
+<main class="map-workspace" id="mapWorkspace" data-kakao-key="{{ kakao_map_key }}">
+  <section class="map-tools" aria-label="장소 검색"><div class="map-title"><p class="kicker">JEJU MAP</p><h1>지도로 만나는 제주</h1></div><form id="mapSearch" role="search"><label class="map-sr-only" for="mapQuery">장소명·지역·키워드 검색</label><input type="search" id="mapQuery" placeholder="장소명·지역·키워드 검색" autocomplete="off"><button type="submit" class="primary-inline">검색</button></form></section>
+  <nav class="map-categories" aria-label="장소 카테고리"><button type="button" class="map-category is-selected" data-category="" aria-pressed="true">전체</button>{% for category in categories %}<button type="button" class="map-category" data-category="{{ category.slug }}" aria-pressed="false">{{ category.name }}</button>{% endfor %}</nav>
+  <section class="map-canvas-panel" aria-label="제주 장소 지도"><div id="kakaoMap" aria-label="장소 위치 지도"></div><p id="mapNotice" class="map-notice" role="status">지도를 불러오고 있어요.</p><button id="mapFit" class="map-fit" type="button" disabled>장소 전체 범위</button><aside id="mapSelected" class="map-selected" aria-label="선택한 장소" hidden></aside></section>
+  <section class="map-results" aria-label="장소 결과"><button class="map-sheet-toggle" id="mapSheetToggle" type="button" aria-expanded="false" aria-controls="mapResultsList">목록 펼치기 <span aria-hidden="true">⌃</span></button><div class="map-result-heading"><h2 id="mapResultCount" aria-live="polite">장소를 불러오고 있어요.</h2><p id="mapCoordinateCount"></p></div><div id="mapResultsList" class="map-results-list" aria-busy="true"></div><noscript><p>지도와 검색을 이용하려면 JavaScript를 켜 주세요.</p><a href="/">장소 목록으로</a></noscript></section>
+</main>
+<script id="mapCategoriesData" type="application/json">{{ categories|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/map.js?v=20261008"></script>{% endblock %}

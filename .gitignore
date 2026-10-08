@@ -4,3 +4,4 @@ __pycache__/
 data/jejuno.db
 data/secret_key.txt
 .env
+data/backups/

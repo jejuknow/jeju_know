@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}제주 소식 | JEJUNO{% endblock %}
 {% block body %}
-<header class="site-header editorial-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>jeju_know</span></a><nav class="nav"><a class="active" href="{{ url_for('news_list') }}">제주 소식</a><a href="{{ url_for('home') }}#finder">장소 찾기</a><a href="{{ url_for('partnership') }}">광고·제휴</a><a href="https://www.instagram.com/jeju_know/" target="_blank" rel="noreferrer">Instagram</a></nav></div></header>
+<header class="site-header editorial-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>jeju_know</span></a><nav class="nav"><a class="active" href="{{ url_for('news_list') }}">제주 소식</a><a href="{{ url_for('home') }}#finder">장소 찾기</a><a href="/map">제주 지도</a><a href="{{ url_for('partnership') }}">광고·제휴</a><a href="https://www.instagram.com/jeju_know/" target="_blank" rel="noreferrer">Instagram</a></nav></div></header>
 <main class="news-page">
   <section class="news-page-hero"><div class="wrap"><p class="kicker">JEJUNO TODAY</p><h1>제주의 지금을<br>한눈에 확인하세요.</h1><p>{{ news_categories|join(', ') }}을 출처·확인일과 함께 관리합니다.</p></div></section>
   <section class="wrap news-browser">

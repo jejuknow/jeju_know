@@ -1,4 +1,5 @@
 let places = [];
+let placeCategories = [];
 const filters = window.PlaceFilters;
 const state = filters.defaultState();
 const placeGrid = document.getElementById('placeGrid');
@@ -10,7 +11,7 @@ function escapeHtml(value=''){return String(value).replace(/[&<>'"]/g, ch=>({'&'
 function chip(label,value,selected=false){return `<button type="button" class="chip ${selected?'is-selected':''}" data-value="${escapeHtml(value)}" aria-pressed="${selected}">${escapeHtml(label)}</button>`;}
 function buildFilters(){
   document.getElementById('regionChips').innerHTML=chip('전체','전체',true)+filters.regions.map(v=>chip(v,v)).join('');
-  document.getElementById('categoryChips').innerHTML=chip('전체','전체',true)+filters.categories.map(v=>chip(v,v)).join('');
+  document.getElementById('categoryChips').innerHTML=chip('전체','전체',true)+placeCategories.map(v=>chip(v.name,v.name)).join('');
   document.getElementById('companionChips').innerHTML=chip('상관없음','전체',true)+filters.companions.map(v=>chip(v,v)).join('');
   document.getElementById('preferenceChips').innerHTML=filters.preferences.map(v=>chip(v.label,v.id)).join('');
   document.getElementById('conditionChips').innerHTML=filters.conditions.map(v=>chip(v.label,v.id)).join('');
@@ -82,16 +83,22 @@ document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListen
   e.preventDefault();resetFilters();
   const type=e.currentTarget.dataset.collection;
   if(type==='parents')state.companions=['부모님'];
-  if(type==='soloCafe'){state.companions=['혼자'];state.category='카페';}
+  if(type==='soloCafe'){state.companions=['혼자'];state.category=placeCategories.find(c=>c.slug==='cafe')?.name||'카페';}
   if(type==='rain')state.conditions=['rain'];
   renderMenu();syncSelections();renderResults(true);
 }));
 document.getElementById('navToggle')?.addEventListener('click',()=>document.querySelector('.nav')?.classList.toggle('is-open'));
 async function boot(){
   try{
-    const response=await fetch('/api/places',{headers:{'Accept':'application/json'}});
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    const [response,categoryResponse]=await Promise.all([
+      fetch('/api/places',{headers:{'Accept':'application/json'}}),
+      fetch('/api/categories',{headers:{'Accept':'application/json'}})
+    ]);
+    if(!response.ok||!categoryResponse.ok) throw new Error('장소 데이터를 불러오지 못했습니다.');
     places=await response.json();
+    placeCategories=await categoryResponse.json();
+    const menuKinds={food:'맛집',cafe:'카페',attraction:'가볼 곳'};
+    placeCategories.forEach(category=>{if(menuKinds[category.slug])filters.menus[category.name]=filters.menus[menuKinds[category.slug]];});
     buildFilters();renderPick();renderResults();
     document.getElementById('findBtn').disabled=false;
   }catch(error){

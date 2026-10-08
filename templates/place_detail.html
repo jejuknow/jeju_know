@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ place.name }} | JEJUNO{% endblock %}
 {% block body %}
-<header class="site-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>오늘 제주 어디가지?</span></a><nav class="nav detail-nav"><a href="{{ url_for('home') }}#places">← 장소 찾기</a></nav></div></header>
+<header class="site-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>오늘 제주 어디가지?</span></a><nav class="nav detail-nav"><a href="{{ url_for('home') }}#places">← 장소 찾기</a><a href="/map">제주 지도</a></nav></div></header>
 <main class="detail-page wrap">
   <article class="detail-shell">
     <div class="detail-visual {% if place.image_url %}has-image{% endif %}" {% if place.image_url %}style="background-image:url('{{ place.image_url }}')"{% endif %}>{% if not place.image_url %}<span>{{ place.emoji }}</span>{% endif %}</div>

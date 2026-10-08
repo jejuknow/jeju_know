@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}장소 카테고리 관리 | JEJUNO{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+{% block body %}
+<header class="admin-header"><div class="admin-wide"><a class="brand" href="/admin"><strong>JEJUNO</strong><span>관리자</span></a><div class="admin-header-actions"><a class="secondary-btn" href="/map" target="_blank">제주 지도 보기</a><a class="ghost-btn" href="/admin">콘텐츠 관리</a></div></div></header>
+<main class="admin-wide admin-main">
+  <div class="admin-title-row"><div><p class="kicker">PLACE CATEGORIES</p><h1>장소 카테고리 관리</h1><p>순서가 작은 분류부터 표시됩니다. 비활성화해도 기존 장소와 상세 주소는 유지됩니다.</p></div></div>
+  {% include '_flashes.html' %}
+  <section class="form-card"><h2>새 카테고리</h2><form method="post" action="/admin/categories/new" class="admin-form category-editor">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>이름<input name="name" maxlength="40" required placeholder="예: 베이커리"></label>
+    <label>슬러그<input name="slug" maxlength="80" pattern="[a-z0-9]+(-[a-z0-9]+)*" required placeholder="예: bakery"><small>생성 후 유지되는 영문 식별자입니다.</small></label>
+    <label>노출 순서<input name="sort_order" type="number" min="0" max="9999" value="{{ categories|length + 1 }}" required></label>
+    <label class="check"><input type="checkbox" name="is_active" value="1" checked>활성</label><button class="primary-inline" type="submit">추가하기</button>
+  </form></section>
+  <section class="form-card"><h2>등록된 카테고리 <small>{{ categories|length }}개</small></h2>
+    {% for item in categories %}<article class="category-admin-row">
+      <form method="post" action="/admin/categories/{{ item.id }}/edit" class="admin-form category-editor">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="slug" value="{{ item.slug }}">
+        <label>이름<input name="name" value="{{ item.name }}" maxlength="40" required></label>
+        <div><span class="badge">{{ item.slug }}</span><p>{{ item.place_count }}개 장소에서 사용 중</p></div>
+        <label>노출 순서<input name="sort_order" type="number" min="0" max="9999" value="{{ item.sort_order }}" required></label>
+        <label class="check"><input type="checkbox" name="is_active" value="1" {% if item.is_active %}checked{% endif %}>활성</label><button class="secondary-btn" type="submit">저장</button>
+      </form>
+      <form method="post" action="/admin/categories/{{ item.id }}/delete" onsubmit="return confirm('사용하지 않는 카테고리를 삭제할까요?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="mini-btn danger" type="submit" {% if item.place_count %}disabled title="사용 중인 카테고리는 삭제할 수 없습니다. 비활성화를 이용하세요."{% endif %}>삭제</button></form>
+    </article>{% else %}<p>아직 등록된 카테고리가 없습니다. 새 분류를 추가해 주세요.</p>{% endfor %}
+  </section>
+</main>
+{% endblock %}

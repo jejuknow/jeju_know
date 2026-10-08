@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ item.title }} | JEJUNO{% endblock %}
 {% block body %}
-<header class="site-header editorial-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>jeju_know</span></a><nav class="nav"><a href="{{ url_for('news_list') }}">제주 소식</a><a href="{{ url_for('home') }}#finder">장소 찾기</a><a href="{{ url_for('partnership') }}">광고·제휴</a></nav></div></header>
+<header class="site-header editorial-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>jeju_know</span></a><nav class="nav"><a href="{{ url_for('news_list') }}">제주 소식</a><a href="{{ url_for('home') }}#finder">장소 찾기</a><a href="/map">제주 지도</a><a href="{{ url_for('partnership') }}">광고·제휴</a></nav></div></header>
 <main class="article-page wrap">
   <a class="article-back" href="{{ url_for('news_list') }}">← 제주 소식으로</a>
   <article class="article-shell">

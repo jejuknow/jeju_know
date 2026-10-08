@@ -2,7 +2,9 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import os
+import re
 import secrets
 import sqlite3
 import uuid
@@ -14,6 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.templating import Jinja2Templates
+from place_migrations import backup_before_migration, migrate_place_categories
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = BASE_DIR / "data"
@@ -22,7 +25,6 @@ REGIONS = [
     "제주시", "애월", "한림", "한경", "구좌", "조천", "성산", "표선",
     "남원", "서귀포시", "대정", "안덕", "기타",
 ]
-CATEGORIES = ["맛집", "카페", "가볼 곳"]
 COMPANIONS = ["혼자", "연인", "친구", "부모님", "아이", "반려동물", "단체"]
 FEATURES = ["감성", "뷰", "비오는날", "사진", "힐링", "로컬", "전통", "이색", "가성비", "포장", "예약"]
 STATUS_OPTIONS = ["미확인", "가능", "불가", "제한"]
@@ -149,6 +151,7 @@ def create_app(test_config=None):
     app = FastAPI(title="JEJUNO")
     app.state.database = str(database_path)
     app.state.testing = bool(test_config.get("TESTING"))
+    app.state.kakao_map_key = os.environ.get("KAKAO_MAP_JS_KEY", "").strip()
     app.add_middleware(
         SessionMiddleware,
         secret_key=secret_key,
@@ -175,7 +178,9 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        backup_path = backup_before_migration(app.state.database)
         conn = connect_db()
+        had_places_table = conn.execute("SELECT 1 FROM sqlite_master WHERE name='places'").fetchone()
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS admins (
@@ -237,7 +242,7 @@ def create_app(test_config=None):
             """
         )
         count = conn.execute("SELECT COUNT(*) FROM places").fetchone()[0]
-        if count == 0 and os.environ.get("JEJUNO_SKIP_SEED") != "1":
+        if count == 0 and not had_places_table and os.environ.get("JEJUNO_SKIP_SEED") != "1":
             for item in SEED_PLACES:
                 conn.execute(
                     """
@@ -262,6 +267,7 @@ def create_app(test_config=None):
                 )
         conn.commit()
         conn.close()
+        migrate_place_categories(app.state.database, backup_path)
 
     init_db()
 
@@ -304,6 +310,11 @@ def create_app(test_config=None):
 
     def row_to_place(row):
         place = dict(row)
+        place["has_coordinates"] = (
+            place.get("latitude") is not None and place.get("longitude") is not None
+            and math.isfinite(place["latitude"]) and math.isfinite(place["longitude"])
+            and -90 <= place["latitude"] <= 90 and -180 <= place["longitude"] <= 180
+        )
         place["companions"] = parse_json_list(place.get("companions"))
         place["features"] = parse_json_list(place.get("features"))
         place["is_pick"] = bool(place.get("is_pick"))
@@ -386,6 +397,9 @@ def create_app(test_config=None):
             "name": str(form.get("name", "")).strip(),
             "region": str(form.get("region", "")).strip(),
             "category": str(form.get("category", "")).strip(),
+            "category_id": str(form.get("category_id", "")).strip(),
+            "latitude": str(form.get("latitude", existing["latitude"] if existing and existing["latitude"] is not None else "")).strip(),
+            "longitude": str(form.get("longitude", existing["longitude"] if existing and existing["longitude"] is not None else "")).strip(),
             "emoji": str(form.get("emoji", "📍")).strip() or "📍",
             "image_url": str(form.get("image_url", "")).strip(),
             "is_pick": 1 if form.get("is_pick") == "1" else 0,
@@ -428,10 +442,45 @@ def create_app(test_config=None):
             "published": 1 if form.get("published") == "1" else 0,
         }
 
-    def form_options():
+    def place_categories(current_id=None, active_only=True):
+        conn = connect_db()
+        rows = conn.execute(
+            "SELECT * FROM categories" + (" WHERE is_active=1 OR id=?" if active_only else "") + " ORDER BY sort_order,id",
+            (current_id,) if active_only else (),
+        ).fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def validate_place(data, existing=None):
+        if not data["name"] or not data["region"]:
+            return "장소명과 지역을 확인해 주세요."
+        conn = connect_db()
+        if data["category_id"]:
+            category = conn.execute("SELECT * FROM categories WHERE id=?", (data["category_id"],)).fetchone()
+        else:  # Preserve the existing category-name POST contract.
+            category = conn.execute("SELECT * FROM categories WHERE name=?", (data["category"],)).fetchone()
+        conn.close()
+        if not category or (not category["is_active"] and (not existing or existing["category_id"] != category["id"])):
+            return "활성 카테고리를 선택해 주세요. 기존 장소의 비활성 분류는 유지할 수 있습니다."
+        data["category_id"], data["category"] = category["id"], category["name"]
+        lat, lng = data["latitude"], data["longitude"]
+        if not lat and not lng:
+            data["latitude"] = data["longitude"] = None
+        else:
+            try:
+                lat, lng = float(lat), float(lng)
+                if not (math.isfinite(lat) and math.isfinite(lng) and -90 <= lat <= 90 and -180 <= lng <= 180):
+                    raise ValueError
+            except (TypeError, ValueError):
+                return "위도(-90~90)와 경도(-180~180)를 모두 입력하거나 두 칸을 비워 주세요."
+            data["latitude"], data["longitude"] = lat, lng
+        return None
+
+    def form_options(current_id=None):
         return {
             "regions": REGIONS,
-            "categories": CATEGORIES,
+            "categories": place_categories(current_id),
+            "kakao_map_key": app.state.kakao_map_key,
             "companions": COMPANIONS,
             "features": FEATURES,
             "status_options": STATUS_OPTIONS,
@@ -465,11 +514,29 @@ def create_app(test_config=None):
         return templates.TemplateResponse(request=request, name="place_detail.html", context={"place": row_to_place(row)})
 
     @app.get("/api/places")
-    async def api_places():
+    async def api_places(category: str = "", q: str = ""):
         conn = connect_db()
-        rows = conn.execute("SELECT * FROM places WHERE published=1 ORDER BY is_pick DESC, updated_at DESC, id DESC").fetchall()
+        # Existing unfiltered response is preserved. Map search reuses this public-only API.
+        clauses, params = ["p.published=1"], []
+        if category:
+            clauses.append("c.slug=? AND c.is_active=1")
+            params.append(category)
+        if q.strip():
+            clauses.append("instr(lower(p.name || ' ' || p.one_line || ' ' || p.region || ' ' || p.address || ' ' || p.features),lower(?))>0")
+            params.append(q.strip())
+        rows = conn.execute("SELECT p.*, c.slug AS category_slug FROM places p LEFT JOIN categories c ON c.id=p.category_id WHERE " + " AND ".join(clauses) + " ORDER BY p.is_pick DESC,p.updated_at DESC,p.id DESC", params).fetchall()
         conn.close()
-        return JSONResponse([row_to_place(row) for row in rows])
+        return JSONResponse([row_to_place(row) for row in rows], headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/categories")
+    async def api_categories():
+        return JSONResponse(place_categories(), headers={"Cache-Control": "no-store"})
+
+    @app.get("/map", response_class=HTMLResponse)
+    async def map_page(request: Request):
+        return templates.TemplateResponse(request=request, name="map.html", context={
+            "categories": place_categories(), "kakao_map_key": app.state.kakao_map_key,
+        })
 
     @app.get("/news", response_class=HTMLResponse)
     async def news_list(request: Request):
@@ -746,6 +813,83 @@ def create_app(test_config=None):
         flash(request, f"‘{row['title']}’ 소식을 삭제했습니다.", "success")
         return RedirectResponse(url="/admin#news-admin", status_code=303)
 
+    @app.get("/admin/categories", response_class=HTMLResponse)
+    async def admin_categories(request: Request):
+        guard = admin_guard(request)
+        if guard:
+            return guard
+        conn = connect_db()
+        rows = conn.execute("SELECT c.*,COUNT(p.id) AS place_count FROM categories c LEFT JOIN places p ON p.category_id=c.id GROUP BY c.id ORDER BY c.sort_order,c.id").fetchall()
+        conn.close()
+        return templates.TemplateResponse(request=request, name="admin_categories.html", context={"categories": [dict(r) for r in rows]})
+
+    async def save_category(request, category_id=None):
+        guard = admin_guard(request)
+        if guard:
+            return guard
+        form = await request.form()
+        if not require_csrf(request, form):
+            return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
+        name = str(form.get("name", "")).strip()
+        slug = str(form.get("slug", "")).strip().lower()
+        try:
+            order = int(str(form.get("sort_order", "0")))
+            if not 0 <= order <= 9999:
+                raise ValueError
+        except ValueError:
+            order = -1
+        if not name or len(name) > 40 or name == "전체" or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) or len(slug) > 80 or order < 0:
+            flash(request, "이름(1~40자, ‘전체’ 제외), 영문 슬러그(소문자·숫자·하이픈), 순서(0~9999)를 확인해 주세요.", "error")
+            return RedirectResponse("/admin/categories", status_code=303)
+        conn = connect_db()
+        try:
+            with conn:
+                conn.execute("BEGIN IMMEDIATE")
+                if category_id is None:
+                    conn.execute("INSERT INTO categories(name,slug,sort_order,is_active) VALUES (?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1")))
+                else:
+                    if not conn.execute("SELECT id FROM categories WHERE id=?", (category_id,)).fetchone():
+                        return HTMLResponse("카테고리를 찾을 수 없습니다.", status_code=404)
+                    # The stable slug survives renaming so shared map URLs continue to work.
+                    conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), category_id))
+                    conn.execute("UPDATE places SET category=? WHERE category_id=?", (name, category_id))
+            flash(request, "카테고리를 저장했습니다. 방문자 화면에 바로 반영됩니다.")
+        except sqlite3.IntegrityError:
+            flash(request, "이미 사용 중인 카테고리 이름 또는 슬러그입니다.", "error")
+        finally:
+            conn.close()
+        return RedirectResponse("/admin/categories", status_code=303)
+
+    @app.post("/admin/categories/new")
+    async def admin_category_new(request: Request):
+        return await save_category(request)
+
+    @app.post("/admin/categories/{category_id}/edit")
+    async def admin_category_edit(request: Request, category_id: int):
+        return await save_category(request, category_id)
+
+    @app.post("/admin/categories/{category_id}/delete")
+    async def admin_category_delete(request: Request, category_id: int):
+        guard = admin_guard(request)
+        if guard:
+            return guard
+        form = await request.form()
+        if not require_csrf(request, form):
+            return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
+        conn = connect_db()
+        try:
+            with conn:
+                conn.execute("BEGIN IMMEDIATE")
+                count = conn.execute("SELECT COUNT(*) FROM places WHERE category_id=?", (category_id,)).fetchone()[0]
+                if count:
+                    flash(request, f"현재 {count}개 장소에서 사용 중인 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
+                else:
+                    conn.execute("DELETE FROM categories WHERE id=?", (category_id,))
+                    flash(request, "사용하지 않는 카테고리를 삭제했습니다.")
+        finally:
+            conn.close()
+        return RedirectResponse("/admin/categories", status_code=303)
+
     @app.get("/admin/places/new", response_class=HTMLResponse)
     async def admin_place_new_get(request: Request):
         guard = admin_guard(request)
@@ -761,9 +905,10 @@ def create_app(test_config=None):
         form, data = await parse_place_form(request)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if not data["name"] or not data["region"] or not data["category"]:
-            flash(request, "장소명, 지역, 카테고리는 필수입니다.", "error")
-            return RedirectResponse(url="/admin/places/new", status_code=303)
+        error = validate_place(data)
+        if error:
+            flash(request, error, "error")
+            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": data, "mode": "new", **form_options()}, status_code=400)
         conn = connect_db()
         conn.execute(
             """
@@ -771,8 +916,8 @@ def create_app(test_config=None):
                 slug, name, region, category, emoji, image_url, is_pick,
                 companions, features, parking_status, pet_status, child_status,
                 accessible_status, one_line, reason, note, address, map_url,
-                info_source, checked_at, is_example, published, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                info_source, checked_at, is_example, published, updated_at, category_id, latitude, longitude
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data["slug"], data["name"], data["region"], data["category"], data["emoji"], data["image_url"],
@@ -781,6 +926,7 @@ def create_app(test_config=None):
                 data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
                 data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
                 data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                data["category_id"], data["latitude"], data["longitude"],
             ),
         )
         conn.commit()
@@ -798,7 +944,7 @@ def create_app(test_config=None):
         conn.close()
         if not row:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
-        return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": row_to_place(row), "mode": "edit", **form_options()})
+        return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": row_to_place(row), "mode": "edit", **form_options(row["category_id"])})
 
     @app.post("/admin/places/{place_id}/edit")
     async def admin_place_edit_post(request: Request, place_id: int):
@@ -813,9 +959,10 @@ def create_app(test_config=None):
         form, data = await parse_place_form(request, existing)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if not data["name"] or not data["region"] or not data["category"]:
-            flash(request, "장소명, 지역, 카테고리는 필수입니다.", "error")
-            return RedirectResponse(url=f"/admin/places/{place_id}/edit", status_code=303)
+        error = validate_place(data, existing)
+        if error:
+            flash(request, error, "error")
+            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": data, "mode": "edit", **form_options(existing["category_id"])}, status_code=400)
         conn = connect_db()
         conn.execute(
             """
@@ -823,7 +970,7 @@ def create_app(test_config=None):
                 slug=?, name=?, region=?, category=?, emoji=?, image_url=?, is_pick=?,
                 companions=?, features=?, parking_status=?, pet_status=?, child_status=?,
                 accessible_status=?, one_line=?, reason=?, note=?, address=?, map_url=?,
-                info_source=?, checked_at=?, is_example=?, published=?, updated_at=?
+                info_source=?, checked_at=?, is_example=?, published=?, updated_at=?, category_id=?, latitude=?, longitude=?
             WHERE id=?
             """,
             (
@@ -832,7 +979,7 @@ def create_app(test_config=None):
                 json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
                 data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
                 data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
-                data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"), place_id,
+                data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"), data["category_id"], data["latitude"], data["longitude"], place_id,
             ),
         )
         conn.commit()
