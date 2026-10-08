@@ -2,6 +2,9 @@ let places = [];
 let placeCategories = [];
 const filters = window.PlaceFilters;
 const state = filters.defaultState();
+const cards = window.HomeCards;
+let currentResults = [];
+const resultsDialog = document.getElementById('allResultsDialog');
 const placeGrid = document.getElementById('placeGrid');
 const pickGrid = document.getElementById('pickGrid');
 const emptyState = document.getElementById('emptyState');
@@ -38,23 +41,20 @@ function syncSelections(){
   const count=state.menu.length+state.conditions.length+state.details.length;
   document.getElementById('detailCount').textContent=count?`${count}개 선택`:'';
 }
-function cardMarkup(place){
-  const region=filters.regionLabel(place.region);
-  const featureList=place.features_public||place.features||[];
-  const tags=[...(place.companions||[]).slice(0,2),...featureList.slice(0,2)].slice(0,4);
-  const visual=place.image_url
-    ? `<div class="place-thumb has-image" style="background-image:url('${escapeHtml(place.image_url)}')"></div>`
-    : `<div class="place-thumb">${escapeHtml(place.emoji||'📍')}</div>`;
-  return `<article class="place-card">${visual}<div class="place-body"><div class="meta-row"><span class="badge primary">${escapeHtml(region)}</span><span class="badge">${escapeHtml(place.category)}</span>${place.is_pick?'<span class="badge pick">JEJUNO PICK</span>':''}${place.is_example?'<span class="badge example">예시</span>':''}</div><h3>${escapeHtml(place.name)}</h3><p class="location">📍 ${escapeHtml(region)}</p><p class="one-line">${escapeHtml(place.one_line||'')}</p><div class="tag-row">${tags.map(t=>`<span class="tag">#${escapeHtml(t)}</span>`).join('')}</div><div class="card-bottom"><span class="recommend">제주노 추천 기록</span><a class="detail-link" href="/place/${encodeURIComponent(place.slug)}">상세보기 →</a></div></div></article>`;
-}
+function cardMarkup(place){return cards.placeCard(place,filters.regionLabel(place.region));}
 function renderPick(){
   const picks=places.filter(p=>p.is_pick).slice(0,3);
-  pickGrid.innerHTML=picks.length?picks.map(cardMarkup).join(''):'<div class="empty-state"><p>아직 공개된 JEJUNO PICK이 없습니다.</p></div>';
+  pickGrid.innerHTML=picks.length?picks.map(place=>cards.pickCard(place,filters.regionLabel(place.region))).join(''):'<div class="empty-state"><p>아직 공개된 JEJUNO PICK이 없습니다.</p></div>';
 }
-function filteredPlaces(){return places.filter(p=>filters.matches(p,state));}
 function renderResults(scroll=false){
-  const results=filteredPlaces();
-  placeGrid.innerHTML=results.map(cardMarkup).join('');
+  const {all:results,preview}=cards.searchResults(places,state,filters);
+  currentResults=results;
+  placeGrid.innerHTML=preview.map(cardMarkup).join('');
+  const allButton=document.getElementById('allResultsBtn');
+  allButton.hidden=results.length<=5;
+  allButton.textContent=`전체 결과 ${results.length}곳 보기 →`;
+  document.getElementById('allResultsGrid').replaceChildren();
+  if(resultsDialog.open)resultsDialog.close();
   emptyState.hidden=results.length!==0;
   placeGrid.hidden=results.length===0;
   const selected=filters.selectedLabels(state);
@@ -87,7 +87,12 @@ document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListen
   if(type==='rain')state.conditions=['rain'];
   renderMenu();syncSelections();renderResults(true);
 }));
-document.getElementById('navToggle')?.addEventListener('click',()=>document.querySelector('.nav')?.classList.toggle('is-open'));
+document.getElementById('allResultsBtn')?.addEventListener('click',()=>{
+  document.getElementById('allResultsGrid').innerHTML=currentResults.map(cardMarkup).join('');
+  document.getElementById('allResultsSummary').textContent=resultSummary.textContent;
+  resultsDialog.showModal();
+});
+resultsDialog?.addEventListener('click',event=>{if(event.target===resultsDialog)resultsDialog.close();});
 async function boot(){
   try{
     const [response,categoryResponse]=await Promise.all([

@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from place_migrations import backup_before_migration, migrate_place_categories
 from user_migrations import backup_before_user_migration, migrate_users
+from home_migrations import backup_before_home_migration, migrate_home
 from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
 from member_routes import register_member_routes, validate_news
 from starlette.concurrency import run_in_threadpool
@@ -160,6 +161,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        home_backup_path = backup_before_home_migration(app.state.database)
         user_backup_path = backup_before_user_migration(app.state.database)
         backup_path = backup_before_migration(app.state.database)
         conn = connect_db()
@@ -252,6 +254,7 @@ def create_app(test_config=None):
         conn.close()
         migrate_place_categories(app.state.database, backup_path)
         migrate_users(app.state.database, user_backup_path)
+        migrate_home(app.state.database, home_backup_path)
 
     init_db()
 
@@ -327,6 +330,7 @@ def create_app(test_config=None):
         item["stored_category"] = item["category"]
         item["category"] = NEWS_CATEGORY_ALIASES.get(item["category"], item["category"])
         item["is_featured"] = bool(item.get("is_featured"))
+        item["is_promoted"] = bool(item.get("is_promoted"))
         item["is_sponsored"] = bool(item.get("is_sponsored"))
         item["published"] = bool(item.get("published"))
         start = item.get("event_start") or ""
@@ -431,6 +435,7 @@ def create_app(test_config=None):
             "source_name": str(form.get("source_name", "")).strip(),
             "checked_at": str(form.get("checked_at", "")).strip(),
             "is_featured": 1 if form.get("is_featured") == "1" else 0,
+            "is_promoted": 1 if form.get("is_promoted") == "1" else 0,
             "is_sponsored": 1 if form.get("is_sponsored") == "1" else 0,
             "sponsor_name": str(form.get("sponsor_name", "")).strip(),
             "published": 1 if form.get("published") == "1" else 0,
@@ -490,7 +495,7 @@ def create_app(test_config=None):
     async def home(request: Request):
         conn = connect_db()
         news_rows = conn.execute(
-            "SELECT * FROM news_posts WHERE published=1 AND deleted_at IS NULL ORDER BY is_featured DESC, event_start DESC, updated_at DESC LIMIT 4"
+            "SELECT * FROM news_posts WHERE published=1 AND deleted_at IS NULL ORDER BY is_promoted DESC, datetime(created_at) DESC, id DESC LIMIT 5"
         ).fetchall()
         conn.close()
         return templates.TemplateResponse(
@@ -708,14 +713,14 @@ def create_app(test_config=None):
             INSERT INTO news_posts (
                 slug, title, category, summary, body, image_url, venue,
                 event_start, event_end, external_url, source_name, checked_at,
-                is_featured, is_sponsored, sponsor_name, published, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                is_featured, is_sponsored, sponsor_name, published, updated_at, is_promoted
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data["slug"], data["title"], data["category"], data["summary"], data["body"],
                 data["image_url"], data["venue"], data["event_start"], data["event_end"],
                 data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
-                data["is_sponsored"], data["sponsor_name"], data["published"], now,
+                data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"],
             ),
         )
         conn.commit()
@@ -762,14 +767,14 @@ def create_app(test_config=None):
             UPDATE news_posts SET
                 slug=?, title=?, category=?, summary=?, body=?, image_url=?, venue=?,
                 event_start=?, event_end=?, external_url=?, source_name=?, checked_at=?,
-                is_featured=?, is_sponsored=?, sponsor_name=?, published=?, updated_at=?
+                is_featured=?, is_sponsored=?, sponsor_name=?, published=?, updated_at=?, is_promoted=?
             WHERE id=?
             """,
             (
                 data["slug"], data["title"], data["category"], data["summary"], data["body"],
                 data["image_url"], data["venue"], data["event_start"], data["event_end"],
                 data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
-                data["is_sponsored"], data["sponsor_name"], data["published"], now, news_id,
+                data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"], news_id,
             ),
         )
         conn.commit()
