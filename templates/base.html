@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="제주노(jeju_know) 제주 장소 추천" />
   <title>{% block title %}JEJUNO{% endblock %}</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20261008-map" />
+  <link rel="stylesheet" href="/static/styles.css?v=20261008-auth" />
+  <link rel="stylesheet" href="/static/members.css?v=20261008" />
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
+  {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% endif %}
   {% block body %}{% endblock %}
   {% block scripts %}{% endblock %}
 </body>

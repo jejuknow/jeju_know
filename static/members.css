@@ -1,0 +1,20 @@
+.member-bar{background:#fff;border-bottom:1px solid var(--line,#e7ebf4);font-size:13px}
+.member-links{display:flex;justify-content:flex-end;align-items:center;gap:20px;min-height:44px;flex-wrap:wrap;padding-top:4px;padding-bottom:4px}
+.member-links a,.member-links button{color:var(--muted,#626d85);font-weight:700;padding:8px 0}
+.member-links form{margin:0}.member-links button{border:0;background:none;font:inherit;cursor:pointer}
+.member-links .member-publish{color:var(--brand)}
+.member-auth{padding-top:48px;min-height:calc(100dvh - 45px)}
+.member-auth-footer{text-align:center;margin-top:24px;font-size:14px}.member-auth-footer a{color:var(--brand);font-weight:700}
+.member-error{background:#fff0ee;color:#a52a22;border:1px solid #f7c7c1;border-radius:12px;padding:14px;margin:18px 0}
+.member-help,.issue-author{color:var(--muted,#626d85);font-size:14px;line-height:1.7}
+.issue-author{font-size:12px;margin:8px 0}.issue-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.member-account{max-width:960px}.member-account>.form-card{margin-top:24px;scroll-margin-top:100px}
+.member-issue{margin:0 auto}.member-account h1,.article-content h1,.news-card h3{overflow-wrap:anywhere}
+.member-section-nav{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}.member-section-nav a{background:#fff;border:1px solid var(--line,#e7ebf4);border-radius:999px;padding:10px 16px;font-size:14px;font-weight:700}
+.member-post{display:flex;justify-content:space-between;align-items:center;gap:20px;border-top:1px solid var(--line,#e7ebf4);padding:20px 0}.member-post>div:first-child{min-width:0}.member-post h3{margin:0;overflow-wrap:anywhere}
+.member-check{display:flex!important;align-items:flex-start;gap:10px}.member-check input{width:20px!important;min-width:20px;margin-top:3px}
+.member-account details summary{cursor:pointer;font-weight:700;padding:14px 0}.member-account .admin-form{margin-top:14px}
+.member-account .primary-inline{align-self:flex-start}.member-account h2 small{font-size:16px;color:var(--muted,#626d85)}
+.map-body{display:flex;flex-direction:column}.map-body .member-bar,.map-body .map-header{flex-shrink:0}.map-body .map-workspace{flex:1;min-height:0;height:auto}.map-body .member-links{padding-left:24px;padding-right:24px}
+@media(max-width:700px){.member-links{gap:16px;font-size:12px}.member-post{align-items:flex-start;flex-direction:column;gap:12px}.member-account .admin-title-row{align-items:flex-start;flex-direction:column}.member-auth{padding-top:24px}.member-section-nav{gap:8px}.member-section-nav a{padding:10px 12px}.member-account .form-card{padding:20px}.member-account input,.member-account textarea{min-width:0}.member-auth .auth-card{min-width:0;max-width:100%}.member-account .form-actions>*{flex:1}}
+@media(max-width:700px){.map-body .map-canvas-panel{margin-bottom:calc((100dvh - 107px)*.29)}.map-body .is-list-expanded .map-canvas-panel{margin-bottom:calc((100dvh - 107px)*.58)}.admin-header .admin-wide{height:auto;min-height:72px;gap:12px;flex-wrap:wrap;padding-top:12px;padding-bottom:12px}.admin-header-actions{flex-wrap:wrap}}

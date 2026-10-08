@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}사용자 관리 | JEJUNO 관리자{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+{% block body %}
+<header class="admin-header"><div class="admin-wide"><a class="brand" href="/admin"><strong>JEJUNO</strong><span>관리자</span></a><div class="admin-header-actions"><a href="/admin/user-posts" class="secondary-btn">사용자 게시물 관리</a><a href="/admin" class="ghost-btn">콘텐츠 관리</a></div></div></header>
+<main class="admin-wide admin-main"><h1>사용자 관리</h1><p class="member-help">차단하면 기존 로그인이 해제되고 로그인과 게시가 제한됩니다. 기존 글의 공개 여부는 게시물 관리에서 변경하세요.</p>{% include '_flashes.html' %}
+<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>아이디</th><th>닉네임</th><th>가입일</th><th>게시물 수</th><th>상태</th><th>관리</th></tr></thead><tbody>{% for user in users %}<tr><td>{{ user.username if user.status != 'deleted' else '탈퇴' }}</td><td>{{ user.nickname }}</td><td>{{ user.created_at[:10] }}</td><td>{{ user.post_count }}</td><td>{{ {'active':'정상','blocked':'차단','deleted':'탈퇴'}[user.status] }}</td><td>{% if user.status != 'deleted' %}<form method="post" action="/admin/users/{{ user.id }}/status"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="status" value="{{ 'active' if user.status == 'blocked' else 'blocked' }}"><button class="mini-btn" type="submit">{{ '차단 해제' if user.status == 'blocked' else '차단' }}</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="6" class="empty-row">가입한 사용자가 없습니다.</td></tr>{% endfor %}</tbody></table></div></main>
+{% endblock %}

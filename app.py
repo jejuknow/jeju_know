@@ -1,5 +1,3 @@
-import base64
-import hashlib
 import hmac
 import json
 import math
@@ -14,9 +12,12 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.sessions import SessionMiddleware
 from starlette.templating import Jinja2Templates
 from place_migrations import backup_before_migration, migrate_place_categories
+from user_migrations import backup_before_user_migration, migrate_users
+from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
+from member_routes import register_member_routes, validate_news
+from starlette.concurrency import run_in_threadpool
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = BASE_DIR / "data"
@@ -112,25 +113,6 @@ SEED_PLACES = [
 ]
 
 
-def hash_password(password: str) -> str:
-    salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
-    return f"pbkdf2_sha256$200000${base64.b64encode(salt).decode()}${base64.b64encode(digest).decode()}"
-
-
-def verify_password(password: str, stored: str) -> bool:
-    try:
-        algorithm, iterations, salt_b64, digest_b64 = stored.split("$", 3)
-        if algorithm != "pbkdf2_sha256":
-            return False
-        salt = base64.b64decode(salt_b64)
-        expected = base64.b64decode(digest_b64)
-        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(iterations))
-        return hmac.compare_digest(actual, expected)
-    except Exception:
-        return False
-
-
 def create_app(test_config=None):
     test_config = test_config or {}
     data_dir = Path(os.environ.get("JEJUNO_DATA_DIR", DEFAULT_DATA_DIR))
@@ -153,10 +135,9 @@ def create_app(test_config=None):
     app.state.testing = bool(test_config.get("TESTING"))
     app.state.kakao_map_key = os.environ.get("KAKAO_MAP_JS_KEY", "").strip()
     app.add_middleware(
-        SessionMiddleware,
-        secret_key=secret_key,
-        same_site="lax",
-        https_only=os.environ.get("SESSION_COOKIE_SECURE") == "1",
+        ServerSessionMiddleware,
+        database=str(database_path),
+        secure=not app.state.testing,
     )
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
@@ -167,17 +148,19 @@ def create_app(test_config=None):
         return {
             "csrf_token": request.session["csrf_token"], "flashes": flashes,
             "news_categories": NEWS_CATEGORIES, "news_category_labels": NEWS_CATEGORY_LABELS,
+            "member": current_user(request),
         }
 
     templates = Jinja2Templates(directory=BASE_DIR / "templates", context_processors=[context_processor])
 
     def connect_db():
-        conn = sqlite3.connect(app.state.database)
+        conn = sqlite3.connect(app.state.database, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
     def init_db():
+        user_backup_path = backup_before_user_migration(app.state.database)
         backup_path = backup_before_migration(app.state.database)
         conn = connect_db()
         had_places_table = conn.execute("SELECT 1 FROM sqlite_master WHERE name='places'").fetchone()
@@ -268,6 +251,7 @@ def create_app(test_config=None):
         conn.commit()
         conn.close()
         migrate_place_categories(app.state.database, backup_path)
+        migrate_users(app.state.database, user_backup_path)
 
     init_db()
 
@@ -289,7 +273,7 @@ def create_app(test_config=None):
     def require_csrf(request: Request, form):
         sent = str(form.get("csrf_token", ""))
         expected = str(request.session.get("csrf_token", ""))
-        if not sent or not expected or not hmac.compare_digest(sent, expected):
+        if not sent or len(sent) > 256 or not expected or not hmac.compare_digest(sent.encode(), expected.encode()):
             return False
         return True
 
@@ -330,6 +314,16 @@ def create_app(test_config=None):
 
     def row_to_news(row):
         item = dict(row)
+        item["author_label"] = "사용자 등록" if item.get("author_type") == "user" else "제주노 등록"
+        item["author_name"] = "제주노"
+        if item.get("author_type") == "user":
+            conn = connect_db()
+            author = conn.execute("SELECT nickname,status FROM users WHERE id=?", (item.get("author_id"),)).fetchone()
+            conn.close()
+            item["author_name"] = author["nickname"] if author and author["status"] != "deleted" else "탈퇴한 사용자"
+        for key in ("image_url", "external_url"):
+            if not safe_external_url(item.get(key, "")):
+                item[key] = ""
         item["stored_category"] = item["category"]
         item["category"] = NEWS_CATEGORY_ALIASES.get(item["category"], item["category"])
         item["is_featured"] = bool(item.get("is_featured"))
@@ -487,7 +481,8 @@ def create_app(test_config=None):
         }
 
     def admin_guard(request: Request):
-        if not request.session.get("admin_id"):
+        member = current_user(request)
+        if not request.session.get("admin_id") and not (member and member["role"] == "admin"):
             return RedirectResponse(url=f"/admin/login?next={request.url.path}", status_code=303)
         return None
 
@@ -495,7 +490,7 @@ def create_app(test_config=None):
     async def home(request: Request):
         conn = connect_db()
         news_rows = conn.execute(
-            "SELECT * FROM news_posts WHERE published=1 ORDER BY is_featured DESC, event_start DESC, updated_at DESC LIMIT 4"
+            "SELECT * FROM news_posts WHERE published=1 AND deleted_at IS NULL ORDER BY is_featured DESC, event_start DESC, updated_at DESC LIMIT 4"
         ).fetchall()
         conn.close()
         return templates.TemplateResponse(
@@ -543,7 +538,7 @@ def create_app(test_config=None):
         category = (request.query_params.get("category") or "").strip()
         category = NEWS_CATEGORY_ALIASES.get(category, category)
         q = (request.query_params.get("q") or "").strip()
-        clauses = ["published=1"]
+        clauses = ["published=1", "deleted_at IS NULL"]
         params = []
         if category:
             category_values = [category] + [old for old, new in NEWS_CATEGORY_ALIASES.items() if new == category]
@@ -572,7 +567,7 @@ def create_app(test_config=None):
     @app.get("/news/{slug}", response_class=HTMLResponse)
     async def news_detail(request: Request, slug: str):
         conn = connect_db()
-        row = conn.execute("SELECT * FROM news_posts WHERE slug=? AND published=1", (slug,)).fetchone()
+        row = conn.execute("SELECT * FROM news_posts WHERE slug=? AND published=1 AND deleted_at IS NULL", (slug,)).fetchone()
         conn.close()
         if not row:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
@@ -600,13 +595,14 @@ def create_app(test_config=None):
         password_confirm = str(form.get("password_confirm", ""))
         if len(username) < 3:
             flash(request, "아이디는 3자 이상 입력해주세요.", "error")
-        elif len(password) < 8:
+        elif not 8 <= len(password) <= 128:
             flash(request, "비밀번호는 8자 이상 입력해주세요.", "error")
         elif password != password_confirm:
             flash(request, "비밀번호 확인이 일치하지 않습니다.", "error")
         else:
             conn = connect_db()
-            conn.execute("INSERT INTO admins(username, password_hash) VALUES (?, ?)", (username, hash_password(password)))
+            password_hash = await run_in_threadpool(hash_password, password)
+            conn.execute("INSERT INTO admins(username, password_hash) VALUES (?, ?)", (username, password_hash))
             conn.commit()
             conn.close()
             flash(request, "관리자 계정을 만들었습니다. 로그인해주세요.", "success")
@@ -630,16 +626,26 @@ def create_app(test_config=None):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         username = str(form.get("username", "")).strip()
         password = str(form.get("password", ""))
+        if rate_limited(connect_db, secret_key, "admin-login", [("ip", request.client.host if request.client else "unknown"), ("username", username[:200])]):
+            return HTMLResponse("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", status_code=429, headers={"Retry-After": "900"})
         conn = connect_db()
         admin = conn.execute("SELECT * FROM admins WHERE username=?", (username,)).fetchone()
         conn.close()
-        if admin and verify_password(password, admin["password_hash"]):
-            csrf = request.session.get("csrf_token") or secrets.token_urlsafe(32)
+        valid = await run_in_threadpool(verify_password, password, admin["password_hash"] if admin else DUMMY_HASH)
+        if admin and valid:
+            if not admin["password_hash"].startswith("$argon2id$"):
+                replacement = await run_in_threadpool(hash_password, password)
+                conn = connect_db()
+                conn.execute("UPDATE admins SET password_hash=? WHERE id=?", (replacement, admin["id"]))
+                conn.commit()
+                conn.close()
             request.session.clear()
             request.session["admin_id"] = admin["id"]
-            request.session["admin_username"] = admin["username"]
-            request.session["csrf_token"] = csrf
+            request.session["csrf_token"] = secrets.token_urlsafe(32)
+            request.scope["rotate_session"] = True
             next_url = request.query_params.get("next") or "/admin"
+            if not re.fullmatch(r"/admin(?:/[a-zA-Z0-9_/-]*)?", next_url):
+                next_url = "/admin"
             return RedirectResponse(url=next_url, status_code=303)
         flash(request, "아이디 또는 비밀번호가 올바르지 않습니다.", "error")
         return RedirectResponse(url="/admin/login", status_code=303)
@@ -662,7 +668,7 @@ def create_app(test_config=None):
             return guard
         conn = connect_db()
         rows = conn.execute("SELECT * FROM places ORDER BY updated_at DESC, id DESC").fetchall()
-        news_rows = conn.execute("SELECT * FROM news_posts ORDER BY updated_at DESC, id DESC").fetchall()
+        news_rows = conn.execute("SELECT * FROM news_posts WHERE deleted_at IS NULL ORDER BY updated_at DESC, id DESC").fetchall()
         conn.close()
         return templates.TemplateResponse(
             request=request,
@@ -692,8 +698,8 @@ def create_app(test_config=None):
         form, data = await parse_news_form(request)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if not data["title"] or data["category"] not in NEWS_CATEGORIES:
-            flash(request, "제목과 카테고리는 필수입니다.", "error")
+        if error := validate_news(data, NEWS_CATEGORIES):
+            flash(request, error, "error")
             return RedirectResponse(url="/admin/news/new", status_code=303)
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         conn = connect_db()
@@ -723,7 +729,7 @@ def create_app(test_config=None):
         if guard:
             return guard
         conn = connect_db()
-        row = conn.execute("SELECT * FROM news_posts WHERE id=?", (news_id,)).fetchone()
+        row = conn.execute("SELECT * FROM news_posts WHERE id=? AND deleted_at IS NULL", (news_id,)).fetchone()
         conn.close()
         if not row:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
@@ -739,15 +745,15 @@ def create_app(test_config=None):
         if guard:
             return guard
         conn = connect_db()
-        existing = conn.execute("SELECT * FROM news_posts WHERE id=?", (news_id,)).fetchone()
+        existing = conn.execute("SELECT * FROM news_posts WHERE id=? AND deleted_at IS NULL", (news_id,)).fetchone()
         conn.close()
         if not existing:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
         form, data = await parse_news_form(request, existing)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if not data["title"] or data["category"] not in NEWS_CATEGORIES:
-            flash(request, "제목과 카테고리는 필수입니다.", "error")
+        if error := validate_news(data, NEWS_CATEGORIES):
+            flash(request, error, "error")
             return RedirectResponse(url=f"/admin/news/{news_id}/edit", status_code=303)
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         conn = connect_db()
@@ -780,7 +786,7 @@ def create_app(test_config=None):
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         conn = connect_db()
-        row = conn.execute("SELECT published FROM news_posts WHERE id=?", (news_id,)).fetchone()
+        row = conn.execute("SELECT published FROM news_posts WHERE id=? AND deleted_at IS NULL", (news_id,)).fetchone()
         if not row:
             conn.close()
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
@@ -1026,6 +1032,8 @@ def create_app(test_config=None):
         flash(request, f"‘{row['name']}’을(를) 즉시 삭제했습니다.", "success")
         return RedirectResponse(url="/admin", status_code=303)
 
+    register_member_routes(app, templates, connect_db, require_csrf, flash,
+                           parse_news_form, row_to_news, admin_guard, NEWS_CATEGORIES, secret_key)
     return app
 
 

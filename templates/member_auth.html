@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ '회원가입' if mode == 'signup' else '로그인' }} | JEJUNO{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+{% block body %}
+<main class="auth-wrap member-auth"><section class="auth-card">
+  <a class="brand" href="/"><strong>JEJUNO</strong><span>나의 제주를 함께 기록해요</span></a>
+  <h1>{{ '회원가입' if mode == 'signup' else '로그인' }}</h1>
+  <p class="auth-copy">{{ '아이디와 닉네임으로 시작하세요. 작성한 제주 이슈는 바로 공개됩니다.' if mode == 'signup' else '제주에서 찾은 소식을 나누고 내 기록을 관리하세요.' }}</p>
+  {% include '_flashes.html' %}{% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" class="admin-form" action="/{{ mode }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>아이디<input name="username" required minlength="3" maxlength="30" autocomplete="username" autocapitalize="none" value="{{ values.username or '' }}" {% if mode == 'signup' %}pattern="[a-zA-Z0-9_]{3,30}"{% endif %}></label>
+    {% if mode == 'signup' %}<small>영문·숫자·밑줄 3~30자, 대소문자는 구분하지 않습니다.</small>{% endif %}
+    <label>비밀번호<input type="password" name="password" required maxlength="128" {% if mode == 'signup' %}minlength="12" autocomplete="new-password"{% else %}autocomplete="current-password"{% endif %}></label>
+    {% if mode == 'signup' %}
+    <small>12~128자. 길고 다른 서비스와 겹치지 않는 비밀번호를 사용하세요.</small>
+    <label>비밀번호 확인<input type="password" name="password_confirm" required minlength="12" maxlength="128" autocomplete="new-password"></label>
+    <label>닉네임<input name="nickname" required minlength="2" maxlength="30" autocomplete="nickname" value="{{ values.nickname or '' }}"></label>
+    <p class="member-help">실명·이메일·전화번호를 수집하지 않습니다. 이메일 인증 방식의 비밀번호 찾기는 제공하지 않으니 아이디와 비밀번호를 안전하게 보관해주세요.</p>
+    {% endif %}
+    <button class="primary-btn" type="submit">{{ '회원가입' if mode == 'signup' else '로그인' }}</button>
+  </form>
+  <p class="member-auth-footer">{% if mode == 'signup' %}이미 가입하셨나요? <a href="/login">로그인</a>{% else %}처음 방문하셨나요? <a href="/signup">회원가입</a>{% endif %}</p>
+</section></main>
+{% endblock %}

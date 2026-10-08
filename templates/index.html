@@ -53,7 +53,7 @@
             <div class="news-overlay-badges"><span class="news-category">{{ item.category }}</span>{% if item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div>
           </div>
           <div class="news-card-body">
-            <div class="news-date">{{ item.date_label }}{% if item.venue %} · {{ item.venue }}{% endif %}</div>
+            <p class="issue-author">{{ item.author_label }} · {{ item.author_name }}</p><div class="news-date">{{ item.date_label }}{% if item.venue %} · {{ item.venue }}{% endif %}</div>
             <h3>{{ item.title }}</h3>
             <p>{{ item.summary }}</p>
           </div>

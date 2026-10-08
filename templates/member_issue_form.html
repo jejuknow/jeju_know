@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}제주 이슈 {{ '수정' if item and item.id else '등록' }} | JEJUNO{% endblock %}
+{% block body_class %}admin-body{% endblock %}
+{% block body %}
+<header class="admin-header"><div class="admin-wide"><a class="brand" href="/"><strong>JEJUNO</strong><span>함께 나누는 제주</span></a><a class="secondary-btn" href="/account">내 활동</a></div></header>
+<main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>제주 이슈 {{ '수정' if item and item.id else '등록' }}</h1><p>새 글은 저장 즉시 공개됩니다. 본인이 확인한 정보를 요약하고 출처를 남겨주세요.</p></div></div>
+{% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
+{% if item and item.id and not item.published %}<p class="member-help">관리자가 숨긴 글입니다. 수정해도 공개 상태는 변경되지 않습니다.</p>{% endif %}
+<form class="admin-form place-form" method="post" action="{{ '/issues/' ~ item.id ~ '/edit' if item and item.id else '/issues/new' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<section class="form-card"><h2>기본 정보</h2><div class="form-grid two">
+<label class="span-2">제목 *<input name="title" required maxlength="200" value="{{ item.title if item else '' }}"></label>
+<label class="span-2">카테고리 *<select name="category" required>{% for category in news_categories %}<option value="{{ category }}" {% if item and item.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></label>
+<label class="span-2">한줄 요약<textarea name="summary" rows="3" maxlength="600">{{ item.summary if item else '' }}</textarea></label>
+<label class="span-2">상세 내용<textarea name="body" rows="10" maxlength="20000">{{ item.body if item else '' }}</textarea></label>
+<label class="span-2">대표 이미지 URL<input type="url" name="image_url" maxlength="2048" value="{{ item.image_url if item else '' }}" placeholder="https://..."></label>
+</div></section>
+<section class="form-card"><h2>일정과 출처</h2><div class="form-grid two"><label>시작일<input type="date" name="event_start" value="{{ item.event_start if item else '' }}"></label><label>종료일<input type="date" name="event_end" value="{{ item.event_end if item else '' }}"></label><label class="span-2">장소<input name="venue" maxlength="200" value="{{ item.venue if item else '' }}"></label><label>출처명<input name="source_name" maxlength="100" value="{{ item.source_name if item else '' }}"></label><label>정보 확인일<input type="date" name="checked_at" value="{{ item.checked_at if item else '' }}"></label><label class="span-2">공식 정보/신청 URL<input type="url" name="external_url" maxlength="2048" value="{{ item.external_url if item else '' }}" placeholder="https://..."></label></div></section>
+<p class="member-help">본문은 일반 텍스트로 표시됩니다. 타인의 개인정보나 허락받지 않은 콘텐츠는 등록하지 마세요.</p><div class="form-actions"><a class="secondary-btn" href="/account">취소</a><button type="submit" class="primary-inline">{{ '수정 저장' if item and item.id else '등록하고 공개하기' }}</button></div>
+</form></main>
+{% endblock %}
