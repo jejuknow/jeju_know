@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}제주 지도 | JEJUNO{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261008">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261008-map2">{% endblock %}
 {% block body_class %}map-body{% endblock %}
 {% block body %}
 <header class="map-header"><a class="brand" href="/"><strong>JEJUNO</strong><span>jeju_know</span></a><nav aria-label="주요 메뉴"><a href="/news">제주 이슈</a><a href="/#finder">장소 찾기</a><a href="/map" aria-current="page">제주 지도</a></nav></header>
@@ -12,4 +12,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ categories|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/map.js?v=20261008"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/map.js?v=20261008-map2"></script>{% endblock %}

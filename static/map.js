@@ -57,6 +57,7 @@
   const count=document.getElementById('mapResultCount');
   const coordinateCount=document.getElementById('mapCoordinateCount');
   const fitButton=document.getElementById('mapFit');
+  const sheetToggle=document.getElementById('mapSheetToggle');
   const categories=JSON.parse(document.getElementById('mapCategoriesData').textContent);
   const parameters=new URLSearchParams(location.search);
   const state={category:parameters.get('category')||'', q:parameters.get('q')||'', places:[], selected:null};
@@ -85,10 +86,20 @@
     notice.hidden=mapped>0;
     notice.textContent=state.places.length?'이 조건의 장소는 아직 지도 위치를 준비 중이에요. 목록에서 상세 정보를 확인하세요.':'현재 조건에 맞는 장소가 없습니다.';
   }
+  function setListExpanded(expanded) {
+    workspace.classList.toggle('is-list-expanded',expanded);
+    sheetToggle.setAttribute('aria-expanded',String(expanded));
+    sheetToggle.textContent=expanded?'목록 줄이기 ⌄':'목록 펼치기 ⌃';
+  }
   function selectPlace(id,fromMarker=false) {
     const place=state.places.find(p=>p.id===id);
     if(!place) return;
     state.selected=id;
+    // Make room for the selected place before panning on a resized mobile map.
+    if(workspace.classList.contains('is-list-expanded')) {
+      setListExpanded(false);
+      view?.resize();
+    }
     list.querySelectorAll('.map-place-card').forEach(card=>{
       const active=Number(card.dataset.placeId)===id;
       card.classList.toggle('is-selected',active);
@@ -158,11 +169,7 @@
   document.getElementById('mapSearch').addEventListener('submit',event=>{event.preventDefault();state.q=query.value.trim();search();});
   query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search();},250);});
   fitButton.addEventListener('click',()=>view?.fit());
-  document.getElementById('mapSheetToggle').addEventListener('click',event=>{
-    const expanded=workspace.classList.toggle('is-list-expanded');
-    event.currentTarget.setAttribute('aria-expanded',String(expanded));
-    event.currentTarget.textContent=expanded?'목록 줄이기 ⌄':'목록 펼치기 ⌃';
-  });
+  sheetToggle.addEventListener('click',()=>setListExpanded(!workspace.classList.contains('is-list-expanded')));
   search();
   root.JejunoKakao.load(workspace.dataset.kakaoKey).then(maps=>{
     view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,index,select)=>{
