@@ -11,10 +11,10 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label>아이디<input name="username" required minlength="3" maxlength="30" autocomplete="username" autocapitalize="none" value="{{ values.username or '' }}" {% if mode == 'signup' %}pattern="[a-zA-Z0-9_]{3,30}"{% endif %}></label>
     {% if mode == 'signup' %}<small>영문·숫자·밑줄 3~30자, 대소문자는 구분하지 않습니다.</small>{% endif %}
-    <label>비밀번호<input type="password" name="password" required maxlength="128" {% if mode == 'signup' %}minlength="12" autocomplete="new-password"{% else %}autocomplete="current-password"{% endif %}></label>
+    <label>비밀번호<input type="password" name="password" required {% if mode == 'signup' %}minlength="{{ signup_password_min_length }}" maxlength="{{ signup_password_max_length }}" autocomplete="new-password" aria-describedby="signup-password-help"{% else %}maxlength="128" autocomplete="current-password"{% endif %}></label>
     {% if mode == 'signup' %}
-    <small>12~128자. 길고 다른 서비스와 겹치지 않는 비밀번호를 사용하세요.</small>
-    <label>비밀번호 확인<input type="password" name="password_confirm" required minlength="12" maxlength="128" autocomplete="new-password"></label>
+    <small id="signup-password-help">8자 이상으로 입력해주세요. 다른 서비스에서 사용하지 않는 비밀번호를 권장합니다.</small>
+    <label>비밀번호 확인<input type="password" name="password_confirm" required minlength="{{ signup_password_min_length }}" maxlength="{{ signup_password_max_length }}" autocomplete="new-password" aria-describedby="signup-password-help"></label>
     <label>닉네임<input name="nickname" required minlength="2" maxlength="30" autocomplete="nickname" value="{{ values.nickname or '' }}"></label>
     <p class="member-help">실명·이메일·전화번호를 수집하지 않습니다. 이메일 인증 방식의 비밀번호 찾기는 제공하지 않으니 아이디와 비밀번호를 안전하게 보관해주세요.</p>
     {% endif %}

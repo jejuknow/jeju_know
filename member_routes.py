@@ -12,6 +12,10 @@ from starlette.concurrency import run_in_threadpool
 from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_password, rate_limited, safe_external_url, verify_password
 
 
+SIGNUP_PASSWORD_MIN_LENGTH = 8
+SIGNUP_PASSWORD_MAX_LENGTH = 64
+
+
 def validate_news(data, categories):
     limits = {"title": 200, "summary": 600, "body": 20000, "venue": 200,
               "source_name": 100, "sponsor_name": 100, "slug": 120}
@@ -37,6 +41,8 @@ def validate_news(data, categories):
 def register_member_routes(app, templates, connect_db, require_csrf, flash,
                            parse_news_form, row_to_news, admin_guard, categories, secret):
     def render(request, template, status=200, **context):
+        context.update(signup_password_min_length=SIGNUP_PASSWORD_MIN_LENGTH,
+                       signup_password_max_length=SIGNUP_PASSWORD_MAX_LENGTH)
         return templates.TemplateResponse(request=request, name=template, context=context, status_code=status)
 
     def redirect(url):
@@ -85,14 +91,16 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         username = str(form.get("username", "")).strip().lower()
         nickname = str(form.get("nickname", "")).strip()
         password = str(form.get("password", ""))
+        password_confirm = str(form.get("password_confirm", ""))
         error = None
         if not re.fullmatch(r"[a-z0-9_]{3,30}", username):
             error = "아이디는 영문 소문자·숫자·밑줄로 3~30자 입력해주세요."
         elif not 2 <= len(nickname) <= 30 or any(ord(c) < 32 for c in nickname):
             error = "닉네임은 2~30자 입력해주세요."
-        elif not 12 <= len(password) <= 128:
-            error = "비밀번호는 12~128자 입력해주세요."
-        elif password != form.get("password_confirm"):
+        elif not all(SIGNUP_PASSWORD_MIN_LENGTH <= len(value) <= SIGNUP_PASSWORD_MAX_LENGTH
+                     for value in (password, password_confirm)):
+            error = f"비밀번호와 비밀번호 확인은 {SIGNUP_PASSWORD_MIN_LENGTH}~{SIGNUP_PASSWORD_MAX_LENGTH}자로 입력해주세요."
+        elif password != password_confirm:
             error = "비밀번호 확인이 일치하지 않습니다."
         if not error:
             password_hash = await run_in_threadpool(hash_password, password)

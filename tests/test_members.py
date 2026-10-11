@@ -51,10 +51,12 @@ class MembersTest(unittest.TestCase):
         self.assertIsNotNone(token, page.text[:200])
         return token.group(1)
 
-    def signup(self, client=None, username='traveler', nickname='제주 여행자'):
+    def signup(self, client=None, username='traveler', nickname='제주 여행자',
+               password='A-long-secret-2026', password_confirm=None):
         client = client or self.client
         return client.post('/signup', data={'csrf_token': self.csrf(client, '/signup'), 'username': username,
-            'nickname': nickname, 'password': 'A-long-secret-2026', 'password_confirm': 'A-long-secret-2026'}, follow_redirects=False)
+            'nickname': nickname, 'password': password,
+            'password_confirm': password if password_confirm is None else password_confirm}, follow_redirects=False)
 
     def login(self, client=None, username='traveler', password='A-long-secret-2026'):
         client = client or self.client
@@ -93,6 +95,64 @@ class MembersTest(unittest.TestCase):
         self.assertEqual(len(self.rows('SELECT * FROM users')), 1)
         bad = self.client.post('/signup', data={'csrf_token': self.csrf(self.client, '/signup'), 'username':'other','nickname':'짧음','password':'short','password_confirm':'short'})
         self.assertEqual(bad.status_code, 400)
+
+    def test_signup_password_length_boundaries_without_complexity_requirements(self):
+        for length, status in ((7, 400), (8, 303), (64, 303), (65, 400)):
+            with self.subTest(length=length):
+                username = f'length_{length}'
+                password = 'a' * length
+                response = self.signup(username=username, password=password)
+                self.assertEqual(response.status_code, status)
+                users = self.rows('SELECT password_hash FROM users WHERE username=?', (username,))
+                if status == 303:
+                    self.assertEqual(response.headers['location'], '/login')
+                    self.assertTrue(users[0]['password_hash'].startswith('$argon2id$v=19$m=19456,t=2,p=1$'))
+                    self.assertTrue(verify_password(password, users[0]['password_hash']))
+                    self.assertEqual(self.login(self.new_client(), username, password).status_code, 303)
+                else:
+                    self.assertEqual(users, [])
+                    self.assertIn('8~64자', response.text)
+                    self.assertNotIn(f'value="{password}"', response.text)
+
+    def test_signup_confirmation_length_and_mismatch_rejected(self):
+        for confirmation in ('b' * 8, 'a' * 7, 'a' * 65, ''):
+            with self.subTest(confirmation_length=len(confirmation)):
+                response = self.signup(password='a' * 8, password_confirm=confirmation)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn('비밀번호 확인이 일치하지 않습니다.' if confirmation == 'b' * 8
+                              else '8~64자', response.text)
+                self.assertEqual(self.rows('SELECT id FROM users'), [])
+
+    def test_signup_frontend_limits_and_login_compatibility(self):
+        signup = self.client.get('/signup').text
+        inputs = re.findall(r'<input type="password"[^>]*>', signup)
+        self.assertEqual(len(inputs), 2)
+        for field in inputs:
+            self.assertIn('minlength="8"', field)
+            self.assertIn('maxlength="64"', field)
+            self.assertIn('aria-describedby="signup-password-help"', field)
+            self.assertNotIn('pattern=', field)
+        self.assertIn('8자 이상으로 입력해주세요. 다른 서비스에서 사용하지 않는 비밀번호를 권장합니다.', signup)
+        login = self.client.get('/login').text
+        field = re.search(r'<input type="password"[^>]*>', login).group(0)
+        self.assertIn('maxlength="128"', field)
+        self.assertNotIn('minlength=', field)
+
+    def test_existing_long_member_passwords_still_login_without_hash_changes(self):
+        for length in (65, 128):
+            with self.subTest(length=length):
+                username = f'existing_{length}'
+                password = 'z' * length
+                stored_hash = hash_password(password)
+                self.execute('INSERT INTO users(username,password_hash,nickname) VALUES (?,?,?)',
+                             (username, stored_hash, '기존 회원'))
+                client = self.new_client()
+                response = self.login(client, username, password)
+                self.assertEqual(response.status_code, 303)
+                self.assertEqual(response.headers['location'], '/account')
+                self.assertEqual(client.get('/account').status_code, 200)
+                self.assertEqual(self.rows('SELECT password_hash FROM users WHERE username=?',
+                                          (username,))[0]['password_hash'], stored_hash)
 
     def test_secure_opaque_server_session_rotation_logout_and_restart(self):
         self.member()
