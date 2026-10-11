@@ -16,7 +16,7 @@
 @media(max-width:800px){.category-editor{grid-template-columns:1fr 1fr}.category-editor button{min-height:44px}}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;font-family:Pretendard,"Noto Sans KR",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+body{margin:0;font-family:Pretendard,"Noto Sans KR",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);word-break:keep-all;overflow-wrap:break-word;white-space:normal}
 button,a{font:inherit}
 button{cursor:pointer}
 a{color:inherit;text-decoration:none}
@@ -48,7 +48,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;background:#fff}.footer-i
 .compact-finder .filter-group{margin:0 0 28px}
 .compact-finder .filter-label{display:flex;align-items:center;gap:9px;font-size:16px;margin-bottom:13px;padding:0}
 .filter-step{display:inline-flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;border-radius:50%;background:var(--brand-soft);color:var(--brand-dark);font-size:12px;font-weight:800}
-.compact-finder .chip{min-height:44px;min-width:64px;padding:10px 14px;line-height:1.4;max-width:100%;white-space:normal;transition:background .15s,border-color .15s}
+.compact-finder .chip{min-height:44px;min-width:64px;padding:10px 14px;line-height:1.4;max-width:100%;white-space:nowrap;transition:background .15s,border-color .15s}
 .compact-finder .chip:focus-visible,.compact-finder summary:focus-visible,.compact-finder .primary-btn:focus-visible{outline:3px solid var(--brand);outline-offset:3px}
 .filter-help{color:var(--muted);font-size:12px;line-height:1.6;margin:0 0 12px}
 .filter-help-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
@@ -97,3 +97,28 @@ footer{border-top:1px solid var(--line);padding:36px 0;background:#fff}.footer-i
 .place-term-group[hidden]{display:none}
 .category-new-editor{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:800px){.category-new-editor{grid-template-columns:1fr 1fr}}
+
+/* Shared text flow: Korean words stay together; technical tokens can break anywhere. */
+:where(p, .section-copy, .filter-help, .map-recommendation, .issue-text){text-wrap:pretty}
+:where(.text-token, code, pre){word-break:normal;overflow-wrap:anywhere}
+pre{white-space:pre-wrap}
+:where(.hero-primary,.hero-secondary,.primary-btn,.primary-inline,.secondary-btn,.ghost-btn,.mini-btn,.text-btn,.detail-link,.map-btn,.share-btn,.chip,.map-category,.badge,.tag,.status,.news-category,.sponsor-badge,.category-tabs a,.member-section-nav a,.member-links a,.member-links button,.nav a,.map-header nav a){white-space:nowrap}
+/* A custom long label may truncate, but must not force the page wider. */
+.chip,.map-category,.badge,.tag{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.badge.text-token{white-space:normal;overflow:visible}
+:where(.section-head>div,.detail-content,.form-card,.admin-form,.admin-form label,.form-grid>*,.article-facts dd,.category-editor>*){min-width:0}
+:where(.section-copy,.filter-help,.finder-note,.quick-card small,.hero-board-card small,.footer-inner p){line-height:1.6}
+:where(.news-card h3,.place-card h3,.compact-place-body h3,.pick-body h3,.map-card-body h3){display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+@media(max-width:640px){
+ .section-head,.hero-actions,.form-actions{flex-wrap:wrap}
+ .section-head>div{flex:1 1 200px}
+ .form-actions>*{max-width:100%}
+ .auth-wrap{min-width:0;padding:24px 16px}.auth-card{min-width:0}
+ .form-grid,.category-editor,.category-new-editor{grid-template-columns:minmax(0,1fr)}
+ .admin-form input,.admin-form select,.admin-form textarea{min-width:0;max-width:100%}
+ .article-facts div{grid-template-columns:76px minmax(0,1fr)}
+ .news-empty-public{padding:24px;align-items:flex-start}.news-empty-public>div{min-width:0}
+ .empty-state{padding:32px 22px}
+ .compact-place-body .compact-place-reason,.map-card-body .map-recommendation,.map-selected .map-recommendation,.news-card p{font-size:14px;line-height:1.6}
+ .map-header nav{gap:12px;flex-shrink:0}
+}

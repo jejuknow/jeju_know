@@ -7,11 +7,11 @@
 .member-auth-footer{text-align:center;margin-top:24px;font-size:14px}.member-auth-footer a{color:var(--brand);font-weight:700}
 .member-error{background:#fff0ee;color:#a52a22;border:1px solid #f7c7c1;border-radius:12px;padding:14px;margin:18px 0}
 .member-help,.issue-author{color:var(--muted,#626d85);font-size:14px;line-height:1.7}
-.issue-author{font-size:12px;margin:8px 0}.issue-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.issue-author{font-size:12px;margin:8px 0}.issue-text{white-space:pre-wrap}
 .member-account{max-width:960px}.member-account>.form-card{margin-top:24px;scroll-margin-top:100px}
-.member-issue{margin:0 auto}.member-account h1,.article-content h1,.news-card h3{overflow-wrap:anywhere}
+.member-issue{margin:0 auto}
 .member-section-nav{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}.member-section-nav a{background:#fff;border:1px solid var(--line,#e7ebf4);border-radius:999px;padding:10px 16px;font-size:14px;font-weight:700}
-.member-post{display:flex;justify-content:space-between;align-items:center;gap:20px;border-top:1px solid var(--line,#e7ebf4);padding:20px 0}.member-post>div:first-child{min-width:0}.member-post h3{margin:0;overflow-wrap:anywhere}
+.member-post{display:flex;justify-content:space-between;align-items:center;gap:20px;border-top:1px solid var(--line,#e7ebf4);padding:20px 0}.member-post>div:first-child{min-width:0}.member-post h3{margin:0}
 .member-check{display:flex!important;align-items:flex-start;gap:10px}.member-check input{width:20px!important;min-width:20px;margin-top:3px}
 .member-account details summary{cursor:pointer;font-weight:700;padding:14px 0}.member-account .admin-form{margin-top:14px}
 .member-account .primary-inline{align-self:flex-start}.member-account h2 small{font-size:16px;color:var(--muted,#626d85)}

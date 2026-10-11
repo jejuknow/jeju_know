@@ -20,7 +20,7 @@
       <form method="post" action="/admin/categories/{{ item.id }}/edit" class="admin-form category-editor">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="slug" value="{{ item.slug }}">
         <label>이름<input name="name" value="{{ item.name }}" maxlength="40" required></label>
-        <div><span class="badge">{{ item.slug }}</span><p>{{ item.place_count }}개 장소에서 사용 중</p></div>
+        <div><span class="badge text-token">{{ item.slug }}</span><p>{{ item.place_count }}개 장소에서 사용 중</p></div>
         <label>노출 순서<input name="sort_order" type="number" min="0" max="9999" value="{{ item.sort_order }}" required></label>
         <label class="check"><input type="checkbox" name="is_active" value="1" {% if item.is_active %}checked{% endif %}>활성</label><button class="secondary-btn" type="submit">저장</button>
       </form>
