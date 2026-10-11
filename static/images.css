@@ -1,0 +1,25 @@
+.image-upload-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:20px}
+.image-upload-grid.single{grid-template-columns:minmax(0,1fr);max-width:520px}
+.image-upload-slot{min-width:0;border:1px solid var(--line,#e4e8f2);border-radius:18px;padding:16px;background:#fff}
+.image-upload-slot h3{font-size:15px;margin:0 0 12px}
+.image-preview{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:#f5f7fc;border-radius:12px;overflow:hidden}
+.image-preview img{width:100%;height:100%;object-fit:contain}
+.image-placeholder{padding:20px;color:#78839a;font-size:13px;text-align:center}
+.image-upload-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.admin-form .image-file-button{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:44px;overflow:hidden;cursor:pointer;font-weight:700}
+.admin-form .image-file-button input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;padding:0}
+.image-file-button:focus-within{outline:3px solid #a4adff;outline-offset:2px}
+.admin-form .image-remove{display:flex;flex-direction:row;align-items:center;gap:6px;min-height:44px;font-size:13px}
+.admin-form .image-remove input{width:18px;height:18px;margin:0}
+.image-feedback{font-size:13px;line-height:1.6;margin:10px 0 0;color:#56627c;min-height:1.6em}
+.image-url-option{margin-top:24px}.image-url-option summary{cursor:pointer;font-weight:700;padding:8px 0}
+.image-url-option label{margin-top:12px}
+.detail-visual.uploaded-visual{background:#f3f5fa;overflow:hidden}
+.uploaded-visual img{width:100%;height:100%;object-fit:contain;display:block}
+.place-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 28px}
+.place-gallery figure{min-width:0;margin:0}.place-gallery a{display:block;background:#f3f5fa;border-radius:14px;overflow:hidden}
+.place-gallery img{width:100%;aspect-ratio:4/3;object-fit:contain;display:block}
+.place-gallery figcaption{font-size:12px;color:#78839a;padding-top:6px}
+.article-hero.uploaded-poster{height:auto;min-height:200px;max-height:none;background:#f3f5fa;display:block}
+.uploaded-poster img{display:block;width:100%;max-height:80vh;object-fit:contain}
+@media(max-width:640px){.image-upload-grid{grid-template-columns:minmax(0,1fr)}.image-upload-slot{padding:14px}.image-upload-actions{gap:10px}.image-feedback,.image-editor .form-help{line-height:1.6}.place-gallery{gap:10px}}

@@ -75,7 +75,7 @@
   function thumbnail(place) {
     const frame=element('div','map-thumb');
     frame.textContent=place.emoji||'📍';
-    if (/^https?:\/\//i.test(place.image_url||'')) {
+    if (/^https?:\/\//i.test(place.image_url||'') || /^\/uploads\/places\/[0-9a-f]{32}\.webp$/.test(place.image_url||'')) {
       const image=element('img');image.src=place.image_url;image.alt='';image.loading='lazy';
       image.addEventListener('error',()=>image.remove());frame.append(image);
     }

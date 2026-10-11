@@ -92,3 +92,13 @@ python -m unittest discover -s tests -v
 - 유료 홍보는 일반 추천과 구분해 `광고·협찬` 라벨 표시
 
 외부 사이트의 게시물 원문/이미지를 자동 복제하지 않고, 운영자가 확인한 사실을 요약해 출처와 확인일을 기록하는 방식을 기본으로 합니다.
+
+## 이미지 파일 업로드
+
+- 저장 위치는 DB 파일과 같은 영구 데이터 디렉터리의 `uploads/issues/`, `uploads/places/`입니다. Railway에서는 `/data/jejuno.db`와 `/data/uploads/`를 같은 Volume에서 사용합니다. 재배포 시 업로드 파일을 복사하거나 초기화하지 않습니다.
+- `20261011_image_uploads` migration은 먼저 SQLite online backup을 `/data/backups/jejuno-before-image-upload-*.db`에 생성하고 무결성을 검사합니다. 백업 실패 시 시작을 중단합니다. 기존 행과 `image_url`은 변경하지 않고 `images`, `image_file_gc` 테이블만 추가합니다.
+- `images`에는 장소/이슈 외래키, 랜덤 파일 경로, WebP MIME, 너비·높이·바이트 크기·순서를 저장합니다. 순서 0은 대표사진, 1~4는 장소 추가사진입니다. 업로드 대표사진이 기존 URL보다 우선하고, 삭제하면 URL 또는 이모지로 돌아갑니다.
+- JPG/JPEG·PNG·WebP만 허용하며 확장자·MIME·실제 디코딩 형식을 모두 검사합니다. 파일당 10MiB, 2,500만 화소를 넘는 이미지와 움직이는 이미지·HEIC·SVG는 거절합니다. Pillow로 회전을 보정하고 긴 변 최대 1920px, WebP quality 86으로 재인코딩하며 EXIF/GPS/XMP를 제거합니다. [Pillow 이미지 저장 문서](https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#webp)
+- 파일 입력은 모바일 기본 사진 선택기를 사용합니다. 업로드 전 미리보기는 브라우저에서만 생성되고, 콘텐츠 저장 버튼을 누를 때 전송됩니다. iPhone에서 HEIC 파일이 선택되면 JPG/PNG 변환 안내가 표시됩니다.
+- `/uploads/{kind}/{filename}`은 DB 등록 여부와 공개 여부/소유자/관리자 권한을 검사합니다. 이 경로를 별도의 공개 StaticFiles 또는 CDN 원본으로 교체하면 비공개 보호가 사라지므로 유지해야 합니다.
+- 콘텐츠와 이미지 메타데이터 변경은 하나의 DB transaction으로 처리합니다. 교체·삭제 파일은 참조를 확인한 뒤 제거하며 일시적인 파일 삭제 실패는 `image_file_gc`에 남겨 다음 저장 또는 서버 재시작 때 재시도합니다. DB 복원 시에는 동일 시점의 `uploads/` 파일 백업도 함께 복원해야 합니다.

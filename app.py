@@ -17,6 +17,8 @@ from place_migrations import backup_before_migration, migrate_place_categories
 from user_migrations import backup_before_user_migration, migrate_users
 from home_migrations import backup_before_home_migration, migrate_home
 from taxonomy_migrations import backup_before_taxonomy_migration, migrate_taxonomy, TYPES
+from image_migrations import backup_before_image_migration, migrate_images
+from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedFormRoute
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
 from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
 from member_routes import register_member_routes, validate_news
@@ -134,6 +136,7 @@ def create_app(test_config=None):
         secret_path.write_text(secret_key, encoding="utf-8")
 
     app = FastAPI(title="JEJUNO")
+    app.router.route_class = ClosedFormRoute
     app.state.database = str(database_path)
     app.state.testing = bool(test_config.get("TESTING"))
     app.state.kakao_map_key = os.environ.get("KAKAO_MAP_JS_KEY", "").strip()
@@ -163,6 +166,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        image_backup_path = backup_before_image_migration(app.state.database)
         taxonomy_backup_path = backup_before_taxonomy_migration(app.state.database)
         home_backup_path = backup_before_home_migration(app.state.database)
         user_backup_path = backup_before_user_migration(app.state.database)
@@ -259,8 +263,16 @@ def create_app(test_config=None):
         migrate_users(app.state.database, user_backup_path)
         migrate_home(app.state.database, home_backup_path)
         migrate_taxonomy(app.state.database, taxonomy_backup_path)
+        migrate_images(app.state.database, image_backup_path)
 
     init_db()
+    image_store = ImageStore(database_path.parent / "uploads", connect_db)
+    app.state.image_store = image_store
+    image_store.collect()
+
+    @app.get("/uploads/{kind}/{filename}")
+    def uploaded_image(request: Request, kind: str, filename: str):
+        return image_store.response(request, kind, filename)
 
     @app.get("/health")
     def healthcheck():
@@ -317,7 +329,7 @@ def create_app(test_config=None):
         if place.get("accessible_status") == "가능" and "무장애" not in public_features:
             public_features.append("무장애")
         place["features_public"] = public_features
-        return place
+        return image_store.decorate(place, "places")
 
     def row_to_news(row):
         item = dict(row)
@@ -351,7 +363,7 @@ def create_app(test_config=None):
             item["event_status"] = "예정"
         else:
             item["event_status"] = "진행/접수중"
-        return item
+        return image_store.decorate(item, "issues")
 
     def unique_slug(candidate, exclude_id=None):
         candidate = (candidate or "").strip().lower()
@@ -392,7 +404,7 @@ def create_app(test_config=None):
             index += 1
 
     async def parse_place_form(request: Request, existing=None):
-        form = await request.form()
+        form = await request.form(max_files=5, max_fields=100, max_part_size=FORM_BYTES)
         slug = unique_slug(form.get("slug"), existing["id"] if existing else None)
         return form, {
             "slug": slug,
@@ -403,7 +415,7 @@ def create_app(test_config=None):
             "latitude": str(form.get("latitude", existing["latitude"] if existing and existing["latitude"] is not None else "")).strip(),
             "longitude": str(form.get("longitude", existing["longitude"] if existing and existing["longitude"] is not None else "")).strip(),
             "emoji": str(form.get("emoji", "📍")).strip() or "📍",
-            "image_url": str(form.get("image_url", "")).strip(),
+            "image_url": str(form.get("image_url", existing["image_url"] if existing else "")).strip(),
             "is_pick": 1 if form.get("is_pick") == "1" else 0,
             "companions": form.getlist("companions"),
             "features": form.getlist("features"),
@@ -424,7 +436,7 @@ def create_app(test_config=None):
         }
 
     async def parse_news_form(request: Request, existing=None):
-        form = await request.form()
+        form = await request.form(max_files=1, max_fields=40, max_part_size=FORM_BYTES)
         slug = unique_news_slug(form.get("slug"), existing["id"] if existing else None)
         return form, {
             "slug": slug,
@@ -432,7 +444,7 @@ def create_app(test_config=None):
             "category": str(form.get("category", "")).strip(),
             "summary": str(form.get("summary", "")).strip(),
             "body": str(form.get("body", "")).strip(),
-            "image_url": str(form.get("image_url", "")).strip(),
+            "image_url": str(form.get("image_url", existing["image_url"] if existing else "")).strip(),
             "venue": str(form.get("venue", "")).strip(),
             "event_start": str(form.get("event_start", "")).strip(),
             "event_end": str(form.get("event_end", "")).strip(),
@@ -729,25 +741,29 @@ def create_app(test_config=None):
         if error := validate_news(data, NEWS_CATEGORIES):
             flash(request, error, "error")
             return RedirectResponse(url="/admin/news/new", status_code=303)
+        try:
+            plan = await image_store.prepare(form, "issues")
+        except ImageError as exc:
+            flash(request, str(exc), "error")
+            return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": None, "legacy_image_url": data["image_url"], "images": []}, "mode": "new", **form_options()}, status_code=400)
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        conn = connect_db()
-        conn.execute(
-            """
-            INSERT INTO news_posts (
-                slug, title, category, summary, body, image_url, venue,
-                event_start, event_end, external_url, source_name, checked_at,
-                is_featured, is_sponsored, sponsor_name, published, updated_at, is_promoted
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                data["slug"], data["title"], data["category"], data["summary"], data["body"],
-                data["image_url"], data["venue"], data["event_start"], data["event_end"],
-                data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
-                data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"],
-            ),
-        )
-        conn.commit()
-        conn.close()
+        with plan.transaction() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO news_posts (
+                    slug, title, category, summary, body, image_url, venue,
+                    event_start, event_end, external_url, source_name, checked_at,
+                    is_featured, is_sponsored, sponsor_name, published, updated_at, is_promoted
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    data["slug"], data["title"], data["category"], data["summary"], data["body"],
+                    data["image_url"], data["venue"], data["event_start"], data["event_end"],
+                    data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
+                    data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"],
+                ),
+            )
+            plan.apply(conn, cursor.lastrowid)
         flash(request, "제주 소식을 저장했습니다.", "success")
         return RedirectResponse(url="/admin#news-admin", status_code=303)
 
@@ -783,25 +799,29 @@ def create_app(test_config=None):
         if error := validate_news(data, NEWS_CATEGORIES):
             flash(request, error, "error")
             return RedirectResponse(url=f"/admin/news/{news_id}/edit", status_code=303)
+        try:
+            plan = await image_store.prepare(form, "issues")
+        except ImageError as exc:
+            flash(request, str(exc), "error")
+            return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": news_id, "legacy_image_url": data["image_url"], "images": image_store.list("issues", news_id)}, "mode": "edit", **form_options()}, status_code=400)
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        conn = connect_db()
-        conn.execute(
-            """
-            UPDATE news_posts SET
-                slug=?, title=?, category=?, summary=?, body=?, image_url=?, venue=?,
-                event_start=?, event_end=?, external_url=?, source_name=?, checked_at=?,
-                is_featured=?, is_sponsored=?, sponsor_name=?, published=?, updated_at=?, is_promoted=?
-            WHERE id=?
-            """,
-            (
-                data["slug"], data["title"], data["category"], data["summary"], data["body"],
-                data["image_url"], data["venue"], data["event_start"], data["event_end"],
-                data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
-                data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"], news_id,
-            ),
-        )
-        conn.commit()
-        conn.close()
+        with plan.transaction() as conn:
+            conn.execute(
+                """
+                UPDATE news_posts SET
+                    slug=?, title=?, category=?, summary=?, body=?, image_url=?, venue=?,
+                    event_start=?, event_end=?, external_url=?, source_name=?, checked_at=?,
+                    is_featured=?, is_sponsored=?, sponsor_name=?, published=?, updated_at=?, is_promoted=?
+                WHERE id=?
+                """,
+                (
+                    data["slug"], data["title"], data["category"], data["summary"], data["body"],
+                    data["image_url"], data["venue"], data["event_start"], data["event_end"],
+                    data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
+                    data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"], news_id,
+                ),
+            )
+            plan.apply(conn, news_id)
         flash(request, "제주 소식을 수정했습니다.", "success")
         return RedirectResponse(url="/admin#news-admin", status_code=303)
 
@@ -841,9 +861,11 @@ def create_app(test_config=None):
         if not row:
             conn.close()
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
-        conn.execute("DELETE FROM news_posts WHERE id=?", (news_id,))
-        conn.commit()
         conn.close()
+        plan = ImagePlan(image_store, "issues")
+        with plan.transaction() as conn:
+            plan.delete_owner(conn, news_id)
+            conn.execute("DELETE FROM news_posts WHERE id=?", (news_id,))
         flash(request, f"‘{row['title']}’ 소식을 삭제했습니다.", "success")
         return RedirectResponse(url="/admin#news-admin", status_code=303)
 
@@ -961,29 +983,33 @@ def create_app(test_config=None):
         if error:
             flash(request, error, "error")
             return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": data, "mode": "new", **form_options()}, status_code=400)
-        conn = connect_db()
-        cursor = conn.execute(
-            """
-            INSERT INTO places (
-                slug, name, region, category, emoji, image_url, is_pick,
-                companions, features, parking_status, pet_status, child_status,
-                accessible_status, one_line, reason, note, address, map_url,
-                info_source, checked_at, is_example, published, updated_at, category_id, latitude, longitude
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                data["slug"], data["name"], data["region"], data["category"], data["emoji"], data["image_url"],
-                data["is_pick"], json.dumps(data["companions"], ensure_ascii=False),
-                json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
-                data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
-                data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
-                data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                data["category_id"], data["latitude"], data["longitude"],
-            ),
-        )
-        save_links(conn, cursor.lastrowid, data["term_ids"])
-        conn.commit()
-        conn.close()
+        try:
+            plan = await image_store.prepare(form, "places")
+        except ImageError as exc:
+            flash(request, str(exc), "error")
+            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": None, "legacy_image_url": data["image_url"], "images": []}, "mode": "new", **form_options()}, status_code=400)
+        with plan.transaction() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO places (
+                    slug, name, region, category, emoji, image_url, is_pick,
+                    companions, features, parking_status, pet_status, child_status,
+                    accessible_status, one_line, reason, note, address, map_url,
+                    info_source, checked_at, is_example, published, updated_at, category_id, latitude, longitude
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    data["slug"], data["name"], data["region"], data["category"], data["emoji"], data["image_url"],
+                    data["is_pick"], json.dumps(data["companions"], ensure_ascii=False),
+                    json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
+                    data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
+                    data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
+                    data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    data["category_id"], data["latitude"], data["longitude"],
+                ),
+            )
+            save_links(conn, cursor.lastrowid, data["term_ids"])
+            plan.apply(conn, cursor.lastrowid)
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
         return RedirectResponse(url="/admin", status_code=303)
 
@@ -1019,28 +1045,32 @@ def create_app(test_config=None):
         if error:
             flash(request, error, "error")
             return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": data, "mode": "edit", **form_options(existing["category_id"])}, status_code=400)
-        conn = connect_db()
-        conn.execute(
-            """
-            UPDATE places SET
-                slug=?, name=?, region=?, category=?, emoji=?, image_url=?, is_pick=?,
-                companions=?, features=?, parking_status=?, pet_status=?, child_status=?,
-                accessible_status=?, one_line=?, reason=?, note=?, address=?, map_url=?,
-                info_source=?, checked_at=?, is_example=?, published=?, updated_at=?, category_id=?, latitude=?, longitude=?
-            WHERE id=?
-            """,
-            (
-                data["slug"], data["name"], data["region"], data["category"], data["emoji"], data["image_url"],
-                data["is_pick"], json.dumps(data["companions"], ensure_ascii=False),
-                json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
-                data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
-                data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
-                data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"), data["category_id"], data["latitude"], data["longitude"], place_id,
-            ),
-        )
-        save_links(conn, place_id, data["term_ids"])
-        conn.commit()
-        conn.close()
+        try:
+            plan = await image_store.prepare(form, "places")
+        except ImageError as exc:
+            flash(request, str(exc), "error")
+            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": place_id, "legacy_image_url": data["image_url"], "images": image_store.list("places", place_id)}, "mode": "edit", **form_options()}, status_code=400)
+        with plan.transaction() as conn:
+            conn.execute(
+                """
+                UPDATE places SET
+                    slug=?, name=?, region=?, category=?, emoji=?, image_url=?, is_pick=?,
+                    companions=?, features=?, parking_status=?, pet_status=?, child_status=?,
+                    accessible_status=?, one_line=?, reason=?, note=?, address=?, map_url=?,
+                    info_source=?, checked_at=?, is_example=?, published=?, updated_at=?, category_id=?, latitude=?, longitude=?
+                WHERE id=?
+                """,
+                (
+                    data["slug"], data["name"], data["region"], data["category"], data["emoji"], data["image_url"],
+                    data["is_pick"], json.dumps(data["companions"], ensure_ascii=False),
+                    json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
+                    data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
+                    data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
+                    data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"), data["category_id"], data["latitude"], data["longitude"], place_id,
+                ),
+            )
+            save_links(conn, place_id, data["term_ids"])
+            plan.apply(conn, place_id)
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")
         return RedirectResponse(url="/admin", status_code=303)
 
@@ -1077,14 +1107,16 @@ def create_app(test_config=None):
         if not row:
             conn.close()
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
-        conn.execute("DELETE FROM places WHERE id=?", (place_id,))
-        conn.commit()
         conn.close()
+        plan = ImagePlan(image_store, "places")
+        with plan.transaction() as conn:
+            plan.delete_owner(conn, place_id)
+            conn.execute("DELETE FROM places WHERE id=?", (place_id,))
         flash(request, f"‘{row['name']}’을(를) 즉시 삭제했습니다.", "success")
         return RedirectResponse(url="/admin", status_code=303)
 
     register_member_routes(app, templates, connect_db, require_csrf, flash,
-                           parse_news_form, row_to_news, admin_guard, NEWS_CATEGORIES, secret_key)
+                           parse_news_form, row_to_news, admin_guard, NEWS_CATEGORIES, secret_key, image_store)
     return app
 
 

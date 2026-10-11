@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
 from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_password, rate_limited, safe_external_url, verify_password
+from image_uploads import ImagePlan, ImageError
 
 
 SIGNUP_PASSWORD_MIN_LENGTH = 8
@@ -39,7 +40,7 @@ def validate_news(data, categories):
 
 
 def register_member_routes(app, templates, connect_db, require_csrf, flash,
-                           parse_news_form, row_to_news, admin_guard, categories, secret):
+                           parse_news_form, row_to_news, admin_guard, categories, secret, image_store):
     def render(request, template, status=200, **context):
         context.update(signup_password_min_length=SIGNUP_PASSWORD_MIN_LENGTH,
                        signup_password_max_length=SIGNUP_PASSWORD_MAX_LENGTH)
@@ -261,18 +262,28 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         if limited(request, "publish", str(current_user(request)["id"]), limit=30, window=3600):
             return throttled()
         error = validate_news(data, categories)
+        plan = None
+        if not error:
+            try:
+                plan = await image_store.prepare(form, "issues")
+            except ImageError as exc:
+                error = str(exc)
         if error:
-            return render(request, "member_issue_form.html", status=400, item={**data, "id": news_id}, error=error)
+            images = image_store.list("issues", news_id) if news_id else []
+            return render(request, "member_issue_form.html", status=400, item={**data, "id": news_id,
+                "legacy_image_url": data["image_url"], "images": images}, error=error)
         # Allowlist editable fields: never accept author, visibility, or featured flags from members.
         fields = ("title", "category", "summary", "body", "image_url", "venue", "event_start", "event_end", "external_url", "source_name", "checked_at")
         values = [data[key] for key in fields]
-        with closing(connect_db()) as conn, conn:
+        with plan.transaction() as conn:
             if post:
                 conn.execute("UPDATE news_posts SET " + ",".join(key + "=?" for key in fields) + ",updated_at=CURRENT_TIMESTAMP WHERE id=? AND author_id=? AND author_type='user' AND deleted_at IS NULL", (*values, news_id, current_user(request)["id"]))
                 slug = post["slug"]
             else:
                 slug = "issue-" + secrets.token_hex(12)
-                conn.execute("INSERT INTO news_posts (" + ",".join(fields) + ",slug,author_id,author_type,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user',1)", (*values, slug, current_user(request)["id"]))
+                cursor = conn.execute("INSERT INTO news_posts (" + ",".join(fields) + ",slug,author_id,author_type,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user',1)", (*values, slug, current_user(request)["id"]))
+                news_id = cursor.lastrowid
+            plan.apply(conn, news_id)
         flash(request, "제주 이슈를 저장했습니다." if post else "제주 이슈가 바로 공개되었습니다.")
         # Hidden posts stay hidden even after the author edits them.
         return redirect("/account")
@@ -294,7 +305,9 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         post, response = owned_post(request, news_id)
         if response:
             return response
-        with closing(connect_db()) as conn, conn:
+        plan = ImagePlan(image_store, "issues")
+        with plan.transaction() as conn:
+            plan.delete_owner(conn, news_id)
             conn.execute("UPDATE news_posts SET deleted_at=CURRENT_TIMESTAMP,published=0,updated_at=CURRENT_TIMESTAMP WHERE id=? AND author_id=? AND author_type='user'", (news_id, current_user(request)["id"]))
         flash(request, "게시물을 삭제했습니다.")
         return redirect("/account")

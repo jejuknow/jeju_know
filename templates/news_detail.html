@@ -5,7 +5,7 @@
 <main class="article-page wrap">
   <a class="article-back" href="{{ url_for('news_list') }}">← 제주 이슈로</a>
   <article class="article-shell">
-    <div class="article-hero {% if item.image_url %}has-image{% endif %}" {% if item.image_url %}style="background-image:url('{{ item.image_url }}')"{% endif %}>{% if not item.image_url %}<span>🗓️</span>{% endif %}</div>
+    <div class="article-hero {% if item.image_url %}uploaded-poster{% endif %}">{% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.title }} 대표 포스터">{% else %}<span>🗓️</span>{% endif %}</div>
     <div class="article-content">
       <div class="article-badges"><span class="news-category">{{ item.category }}</span><span class="status {{ 'draft' if item.event_status == '종료' else 'published' }}">{{ item.event_status }}</span>{% if item.is_promoted or item.is_sponsored %}<span class="sponsor-badge">{{ '홍보·제휴' if item.is_promoted else '광고·협찬' }}{% if item.sponsor_name %} · {{ item.sponsor_name }}{% endif %}</span>{% endif %}</div>
       <h1>{{ item.title }}</h1><p class="article-summary">{{ item.summary }}</p>

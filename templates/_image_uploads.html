@@ -1,0 +1,28 @@
+{% macro image_uploads(content, kind) %}
+<section class="form-card image-editor" data-image-editor>
+  <h2>{{ '장소 사진' if kind == 'places' else '대표 포스터' }}</h2>
+  <p class="form-help">{{ '대표사진 1장과 추가사진 최대 4장을 올릴 수 있어요. 아래 번호 순서로 표시됩니다.' if kind == 'places' else '행사나 소식을 소개하는 포스터 1장을 올려주세요.' }} 저장 버튼을 누르면 반영됩니다.</p>
+  <p class="form-help" id="image-upload-help">JPG·PNG·WebP, 파일당 10MB·2,500만 화소 이하. HEIC·움직이는 이미지는 JPG 또는 PNG로 변환해주세요.</p>
+  <div class="image-upload-grid {{ 'single' if kind == 'issues' else '' }}">
+  {% for slot in range(5 if kind == 'places' else 1) %}
+    {% set saved = ((content.get('images') or [])|selectattr('sort_order','equalto',slot)|list|first) if content else none %}
+    <div class="image-upload-slot" data-image-slot>
+      <h3>{{ ('대표사진' if kind == 'places' else '대표 포스터') if slot == 0 else '추가사진 ' ~ slot }}</h3>
+      <div class="image-preview" data-original="{{ saved.url if saved else '' }}">
+        <img {% if saved %}src="{{ saved.url }}"{% else %}hidden{% endif %} alt="{{ '대표 이미지' if slot == 0 else '추가사진 ' ~ slot }} 미리보기">
+        <span class="image-placeholder" {% if saved %}hidden{% endif %}>선택한 이미지가 여기 표시됩니다.</span>
+      </div>
+      <div class="image-upload-actions">
+        <label class="secondary-btn image-file-button"><span>{{ '이미지 변경' if saved else '+ 이미지 업로드' }}</span><input type="file" id="image-{{ slot }}" name="image_{{ slot }}" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" aria-label="{{ '대표사진' if kind == 'places' and slot == 0 else '대표 포스터' if slot == 0 else '추가사진 ' ~ slot }} 업로드" aria-describedby="image-upload-help"></label>
+        <label class="image-remove"><input type="checkbox" name="remove_image_{{ slot }}" value="1">삭제</label>
+      </div>
+      <p class="image-feedback" role="status" aria-live="polite"></p>
+    </div>
+  {% endfor %}
+  </div>
+  <details class="image-url-option"><summary>기존 이미지 URL 사용 (선택)</summary>
+    <p class="form-help">업로드한 대표 이미지가 우선 표시됩니다. 업로드 사진을 삭제하면 저장된 URL 이미지가 다시 표시됩니다.</p>
+    <label>대표 이미지 URL<input type="url" name="image_url" maxlength="2048" value="{{ content.get('legacy_image_url', content.get('image_url','')) if content else '' }}" placeholder="https://..."></label>
+  </details>
+</section>
+{% endmacro %}

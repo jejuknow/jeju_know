@@ -7,12 +7,14 @@
   <title>{% block title %}JEJUNO{% endblock %}</title>
   <link rel="stylesheet" href="/static/styles.css?v=20261011-wrap" />
   <link rel="stylesheet" href="/static/members.css?v=20261011-wrap" />
+  <link rel="stylesheet" href="/static/images.css?v=20261011-uploads" />
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% endif %}
   {% block body %}{% endblock %}
   <script src="/static/site-nav.js?v=20261008-home"></script>
+  <script src="/static/image-uploads.js?v=20261011-uploads" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

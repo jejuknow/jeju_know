@@ -4,8 +4,9 @@
 <header class="site-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>오늘 제주 어디가지?</span></a><nav class="nav detail-nav"><a href="{{ url_for('home') }}#places">← 장소 찾기</a><a href="/map">제주 지도</a></nav></div></header>
 <main class="detail-page wrap">
   <article class="detail-shell">
-    <div class="detail-visual {% if place.image_url %}has-image{% endif %}" {% if place.image_url %}style="background-image:url('{{ place.image_url }}')"{% endif %}>{% if not place.image_url %}<span>{{ place.emoji }}</span>{% endif %}</div>
+    <div class="detail-visual {% if place.image_url %}uploaded-visual{% endif %}">{% if place.image_url %}<img src="{{ place.image_url }}" alt="{{ place.name }} 대표사진">{% else %}<span>{{ place.emoji }}</span>{% endif %}</div>
     <div class="detail-content">
+      {% if place.images|rejectattr('is_primary')|list %}<section aria-label="추가사진" class="place-gallery">{% for image in place.images if not image.is_primary %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ image.sort_order }}" loading="lazy"></a><figcaption>추가사진 {{ image.sort_order }}</figcaption></figure>{% endfor %}</section>{% endif %}
       <div class="meta-row"><span class="badge primary">{{ place.region }}</span><span class="badge">{{ place.category }}</span>{% if place.is_pick %}<span class="badge pick">JEJUNO PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       <h1 class="detail-title">{{ place.name }}</h1>
       <p class="detail-lead">{{ place.one_line }}</p>

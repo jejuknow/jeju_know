@@ -1,0 +1,221 @@
+"""Validated uploads, atomic content/metadata writes, and reference-aware file cleanup."""
+import io
+import logging
+import re
+import threading
+import uuid
+from contextlib import closing, contextmanager
+from pathlib import Path
+
+from PIL import Image, ImageOps, UnidentifiedImageError
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
+from fastapi.responses import FileResponse, Response
+from fastapi.routing import APIRoute
+from starlette.exceptions import HTTPException
+from starlette.formparsers import MultiPartException
+from auth_security import BODY_LIMIT_MESSAGE
+
+MAX_FILE_BYTES = 10 * 1024 * 1024
+MAX_PIXELS = 25_000_000
+MAX_EDGE = 1920
+FORM_BYTES = 131072
+FORMATS = {".jpg": ("JPEG", "image/jpeg"), ".jpeg": ("JPEG", "image/jpeg"),
+           ".png": ("PNG", "image/png"), ".webp": ("WEBP", "image/webp")}
+KINDS = {"places": "place_id", "issues": "issue_id"}
+FILE_PATH = re.compile(r"(?:places|issues)/[0-9a-f]{32}\.webp\Z")
+PROCESS_SLOTS = threading.BoundedSemaphore(1)
+logger = logging.getLogger(__name__)
+
+
+class ImageError(ValueError):
+    pass
+
+
+class ClosedFormRoute(APIRoute):
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+        async def handle(request):
+            try:
+                return await handler(request)
+            except MultiPartException as exc:
+                if exc.message == BODY_LIMIT_MESSAGE:
+                    return Response(BODY_LIMIT_MESSAGE, status_code=413)
+                raise
+            except HTTPException as exc:
+                if exc.status_code == 400 and exc.detail == BODY_LIMIT_MESSAGE:
+                    return Response(BODY_LIMIT_MESSAGE, status_code=413)
+                raise
+            finally:
+                await request.close()
+        return handle
+
+
+def optimize_image(raw, filename, content_type):
+    expected = FORMATS.get(Path(filename).suffix.lower())
+    if not expected or content_type.lower() != expected[1]:
+        raise ImageError("JPG, PNG, WebP 이미지만 업로드할 수 있어요. HEIC 등은 JPG로 변환해주세요.")
+    if not raw or len(raw) > MAX_FILE_BYTES:
+        raise ImageError("이미지는 파일당 10MB 이하로 선택해주세요.")
+    try:
+        with PROCESS_SLOTS:
+            with Image.open(io.BytesIO(raw), formats=["JPEG", "PNG", "WEBP"]) as check:
+                if check.format != expected[0]:
+                    raise ImageError("파일 형식과 실제 이미지 형식이 일치하지 않습니다.")
+                if check.width * check.height > MAX_PIXELS:
+                    raise ImageError("이미지 해상도가 너무 큽니다. 2,500만 화소 이하로 줄여주세요.")
+                if getattr(check, "is_animated", False):
+                    raise ImageError("움직이는 이미지는 지원하지 않습니다. 정지 이미지로 선택해주세요.")
+                check.verify()
+            with Image.open(io.BytesIO(raw), formats=["JPEG", "PNG", "WEBP"]) as source:
+                source.load()
+                oriented = ImageOps.exif_transpose(source)
+                oriented.thumbnail((MAX_EDGE, MAX_EDGE), Image.Resampling.LANCZOS)
+                pixels = oriented.convert("RGBA" if "A" in oriented.getbands() or "transparency" in oriented.info else "RGB")
+                # Copy pixels into a fresh image: EXIF/GPS/XMP and profiles never leave the server.
+                clean = Image.new(pixels.mode, pixels.size)
+                clean.paste(pixels)
+                result = io.BytesIO()
+                clean.save(result, "WEBP", quality=86, method=4, exif=b"", icc_profile=None)
+                return result.getvalue(), clean.width, clean.height
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError) as error:
+        if isinstance(error, ImageError):
+            raise
+        raise ImageError("이미지 파일을 읽을 수 없습니다. 정상적인 JPG, PNG, WebP 파일을 선택해주세요.") from error
+
+
+class ImageStore:
+    def __init__(self, root, connect_db):
+        self.root = Path(root).resolve()
+        self.connect_db = connect_db
+        for kind in KINDS:
+            folder = self.root / kind
+            if folder.is_symlink():
+                raise RuntimeError("Upload directories must not be symlinks")
+            folder.mkdir(parents=True, exist_ok=True)
+
+    def path(self, relative):
+        if not FILE_PATH.fullmatch(relative):
+            raise ImageError("올바르지 않은 이미지 경로입니다.")
+        path = (self.root / relative).resolve()
+        if not path.is_relative_to(self.root) or path.parent != self.root / relative.split('/')[0]:
+            raise ImageError("올바르지 않은 이미지 경로입니다.")
+        return path
+
+    def list(self, kind, owner_id):
+        with closing(self.connect_db()) as conn:
+            rows = conn.execute(f"SELECT * FROM images WHERE {KINDS[kind]}=? ORDER BY sort_order", (owner_id,)).fetchall()
+        return [{**dict(row), "url": "/uploads/" + row["file_path"], "is_primary": row["sort_order"] == 0} for row in rows]
+
+    def decorate(self, item, kind):
+        item["legacy_image_url"] = item.get("image_url", "")
+        item["images"] = self.list(kind, item["id"])
+        primary = next((image for image in item["images"] if image["is_primary"]), None)
+        if primary:
+            item["image_url"] = primary["url"]
+        return item
+
+    async def prepare(self, form, kind):
+        plan = ImagePlan(self, kind)
+        count = 5 if kind == "places" else 1
+        uploads = [(key, value) for key, value in form.multi_items() if isinstance(value, UploadFile) and value.filename]
+        valid_names = {f"image_{slot}" for slot in range(count)}
+        if len(uploads) > count or len({key for key, _ in uploads}) != len(uploads) or any(key not in valid_names for key, _ in uploads):
+            raise ImageError("장소 사진은 대표 1장과 추가 4장, 제주 이슈 포스터는 1장까지 가능합니다.")
+        try:
+            for slot in range(count):
+                if form.get(f"remove_image_{slot}") == "1":
+                    plan.remove.add(slot)
+                upload = form.get(f"image_{slot}")
+                if not isinstance(upload, UploadFile) or not upload.filename:
+                    continue
+                raw = await upload.read(MAX_FILE_BYTES + 1)
+                output, width, height = await run_in_threadpool(optimize_image, raw, upload.filename, upload.content_type or "")
+                relative = f"{kind}/{uuid.uuid4().hex}.webp"
+                plan.new[slot] = {"file_path": relative, "width": width, "height": height, "byte_size": len(output)}
+                await run_in_threadpool(self.write, relative, output)
+            return plan
+        except BaseException:
+            plan.discard()
+            raise
+        finally:
+            for _, upload in uploads:
+                await upload.close()
+
+    def write(self, relative, data):
+        with self.path(relative).open("xb") as target:
+            target.write(data)
+
+    def collect(self):
+        with closing(self.connect_db()) as conn, conn:
+            conn.execute("BEGIN IMMEDIATE")
+            for row in conn.execute("SELECT file_path FROM image_file_gc").fetchall():
+                relative = row[0]
+                if conn.execute("SELECT 1 FROM images WHERE file_path=?", (relative,)).fetchone():
+                    continue
+                # An editor may have reused an uploaded file through the legacy URL field.
+                if any(conn.execute(f"SELECT 1 FROM {table} WHERE instr(image_url,?)>0", ('/uploads/' + relative,)).fetchone()
+                       for table in ("places", "news_posts")):
+                    continue
+                try:
+                    self.path(relative).unlink(missing_ok=True)
+                except (OSError, ImageError):
+                    logger.warning("Image cleanup deferred")
+                    continue
+                conn.execute("DELETE FROM image_file_gc WHERE file_path=?", (relative,))
+
+    def response(self, request, kind, filename):
+        if kind not in KINDS:
+            return Response(status_code=404)
+        try:
+            path = self.path(f"{kind}/{filename}")
+        except ImageError:
+            return Response(status_code=404)
+        with closing(self.connect_db()) as conn:
+            # Only registered images are served; private/deleted content remains protected.
+            rows = conn.execute("""SELECT p.published AS place_public,n.published AS issue_public,
+                n.author_id,n.deleted_at FROM images i
+                LEFT JOIN places p ON p.id=i.place_id LEFT JOIN news_posts n ON n.id=i.issue_id
+                WHERE i.file_path=?""", (f"{kind}/{filename}",)).fetchall()
+        member = request.scope.get("member")
+        allowed = any(request.session.get("admin_id") or row["place_public"] or
+                      (row["deleted_at"] is None and (row["issue_public"] or
+                       (member and member["id"] == row["author_id"]))) for row in rows)
+        if not allowed or not path.is_file():
+            return Response(status_code=404)
+        return FileResponse(path, media_type="image/webp", headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+
+class ImagePlan:
+    def __init__(self, store, kind):
+        self.store, self.kind = store, kind
+        self.new, self.remove = {}, set()
+
+    def discard(self):
+        for image in self.new.values():
+            self.store.path(image["file_path"]).unlink(missing_ok=True)
+
+    def delete_owner(self, conn, owner_id):
+        column = KINDS[self.kind]
+        conn.execute(f"INSERT OR IGNORE INTO image_file_gc SELECT file_path FROM images WHERE {column}=?", (owner_id,))
+        conn.execute(f"DELETE FROM images WHERE {column}=?", (owner_id,))
+
+    def apply(self, conn, owner_id):
+        column = KINDS[self.kind]
+        for slot in self.remove | self.new.keys():
+            conn.execute(f"INSERT OR IGNORE INTO image_file_gc SELECT file_path FROM images WHERE {column}=? AND sort_order=?", (owner_id, slot))
+            conn.execute(f"DELETE FROM images WHERE {column}=? AND sort_order=?", (owner_id, slot))
+            if image := self.new.get(slot):
+                conn.execute(f"INSERT INTO images({column},file_path,width,height,byte_size,sort_order) VALUES (?,?,?,?,?,?)",
+                             (owner_id, image["file_path"], image["width"], image["height"], image["byte_size"], slot))
+
+    @contextmanager
+    def transaction(self):
+        try:
+            with closing(self.store.connect_db()) as conn, conn:
+                conn.execute("BEGIN IMMEDIATE")
+                yield conn
+        except BaseException:
+            self.discard()
+            raise
+        self.store.collect()

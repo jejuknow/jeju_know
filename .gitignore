@@ -5,3 +5,4 @@ data/jejuno.db
 data/secret_key.txt
 .env
 data/backups/
+data/uploads/

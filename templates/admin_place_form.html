@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_image_uploads.html" import image_uploads %}
 {% block title %}{{ '장소 수정' if mode == 'edit' else '새 장소 등록' }} | JEJUNO{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% set p = place or {} %}
@@ -7,8 +8,10 @@
 <main class="admin-wide admin-main narrow">
   <div class="admin-title-row"><div><p class="kicker">PLACE</p><h1>{{ '장소 수정' if mode == 'edit' else '새 장소 등록' }}</h1><p>저장하면 별도 승인 없이 즉시 반영됩니다.</p></div></div>
   {% include '_flashes.html' %}
-  <form method="post" class="admin-form place-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <section class="form-card"><h2>기본 정보</h2><div class="form-grid two"><label>장소명 *<input name="name" value="{{ p.get('name','') }}" required></label><label>URL 슬러그<small>비워두면 자동 생성됩니다.</small><input name="slug" value="{{ p.get('slug','') }}" placeholder="gudeum"></label><label>지역 *<select name="region" required><option value="">선택</option>{% for item in regions %}<option value="{{ item }}" {% if p.get('region') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label><label>카테고리 *<select name="category_id" required><option value="">선택</option>{% for item in categories %}<option value="{{ item.id }}" {% if p.get('category_id')|string == item.id|string or p.get('category') == item.name %}selected{% endif %}>{{ item.name }}{{ " (비활성 · 기존 분류)" if not item.is_active else "" }}</option>{% endfor %}</select><small><a href="/admin/categories">카테고리 관리 →</a></small></label><label>이모지<input name="emoji" value="{{ p.get('emoji','📍') }}" maxlength="8"></label><label>대표 이미지 URL<input name="image_url" value="{{ p.get('image_url','') }}" placeholder="https://..."></label><label class="span-2">주소<input name="address" value="{{ p.get('address','') }}"></label><label class="span-2">지도 링크<input name="map_url" value="{{ p.get('map_url','') }}" placeholder="https://map.naver.com/..."></label></div></section>
+  <form method="post" enctype="multipart/form-data" class="admin-form place-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <section class="form-card"><h2>기본 정보</h2><div class="form-grid two"><label>장소명 *<input name="name" value="{{ p.get('name','') }}" required></label><label>URL 슬러그<small>비워두면 자동 생성됩니다.</small><input name="slug" value="{{ p.get('slug','') }}" placeholder="gudeum"></label><label>지역 *<select name="region" required><option value="">선택</option>{% for item in regions %}<option value="{{ item }}" {% if p.get('region') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label><label>카테고리 *<select name="category_id" required><option value="">선택</option>{% for item in categories %}<option value="{{ item.id }}" {% if p.get('category_id')|string == item.id|string or p.get('category') == item.name %}selected{% endif %}>{{ item.name }}{{ " (비활성 · 기존 분류)" if not item.is_active else "" }}</option>{% endfor %}</select><small><a href="/admin/categories">카테고리 관리 →</a></small></label><label>이모지<input name="emoji" value="{{ p.get('emoji','📍') }}" maxlength="8"></label><label class="span-2">주소<input name="address" value="{{ p.get('address','') }}"></label><label class="span-2">지도 링크<input name="map_url" value="{{ p.get('map_url','') }}" placeholder="https://map.naver.com/..."></label></div></section>
+  {{ image_uploads(p, "places") }}
+
 
     <input type="hidden" name="taxonomy_present" value="1">
     {% for parent in taxonomy.categories %}

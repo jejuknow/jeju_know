@@ -3,6 +3,7 @@
   'use strict';
   function escapeHtml(value=''){return String(value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
   function imageUrl(value){
+    if (/^\/uploads\/(places|issues)\/[0-9a-f]{32}\.webp$/.test(value||'')) return value;
     try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)?url.href:'';}catch{return '';}
   }
   function visual(place,className){

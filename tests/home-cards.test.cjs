@@ -36,3 +36,12 @@ test('card content and image attributes are escaped; non-http images are ignored
   }
   assert.ok(cards.pickCard({...places[0],image_url:'https://example.com/photo.jpg'},'애월').includes('<img src="https://example.com/photo.jpg"'));
 });
+test('PICK and result cards display registered upload paths and reject arbitrary local paths',()=>{
+  const uploaded='/uploads/places/'+'a'.repeat(32)+'.webp';
+  for(const render of [cards.placeCard,cards.pickCard]){
+    assert.ok(render({...places[0],image_url:uploaded},'애월').includes(`<img src="${uploaded}"`));
+    for(const unsafe of ['/uploads/../secret','//evil.example/photo.jpg','/static/test.svg']){
+      assert.ok(!render({...places[0],image_url:unsafe},'애월').includes('<img'));
+    }
+  }
+});
