@@ -5,18 +5,7 @@
   const regions = ['제주시내','애월','한림','한경','구좌','조천','성산','표선','남원','서귀포시내','대정','안덕'];
   const categories = ['맛집','카페','가볼 곳'];
   const companions = ['혼자','연인','친구','부모님','아이'];
-  const preferences = [
-    option('taste','맛 중심',['맛','맛집 추천']),
-    option('view','좋은 뷰',['뷰','View','뷰 좋은 곳']),
-    option('mood','감성 공간',['감성']),
-    option('healing','힐링',['조용한 힐링']),
-    option('local','제주다움',['로컬','전통','제주다운 곳']),
-    option('popular','인기 핫플',['핫플','트렌디한','트렌디']),
-    option('value','가성비',['가성비 좋은 곳']),
-    option('space','넓은 공간',['대형','넓고 편안한 곳']),
-    option('premium','고급 분위기',['고급','고급스러운 곳']),
-    option('unique','이색 경험',['이색'])
-  ];
+  const preferences = (typeof module!=='undefined' && module.exports ? require('./place-taxonomy-seed.json').cafe_feature : (root.PlaceTaxonomySeed?.cafe_feature||[]));
   const menus = {
     '전체': [],
     '카페': ['커피','베이커리','디저트','브런치','차·말차'].map(label => option(label,label,label==='차·말차'?['차','말차']:[])),

@@ -57,3 +57,12 @@
 }
 @media(max-width:360px){.preference-group #preferenceChips .chip{flex-basis:calc(50% - 4px)}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+/* Progressive filters share existing chips and spacing. */
+.results-nav{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;font-size:12px}
+.category-details[hidden],.place-term-group[hidden]{display:none}
+.category-details{border-top:1px solid var(--line);padding-top:22px;animation:filter-reveal .16s ease-out}
+#categoryDetailChips{display:flex;flex-wrap:wrap;gap:8px}
+#categoryDetailChips .chip{min-height:44px;min-width:100px;flex:0 1 auto}
+@keyframes filter-reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:700px){#categoryDetailChips .chip{flex:1 0 calc(33.333% - 8px);min-width:0;padding:10px 8px}.category-details{padding-top:18px}}
+@media(prefers-reduced-motion:reduce){.category-details{animation:none}}

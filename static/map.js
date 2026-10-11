@@ -58,9 +58,11 @@
   const coordinateCount=document.getElementById('mapCoordinateCount');
   const fitButton=document.getElementById('mapFit');
   const sheetToggle=document.getElementById('mapSheetToggle');
-  const categories=JSON.parse(document.getElementById('mapCategoriesData').textContent);
+  const taxonomy=JSON.parse(document.getElementById('mapCategoriesData').textContent);
+  const categories=taxonomy.categories, filters=root.PlaceSearch;
+  const detailNav=document.getElementById('mapDetails');
   const parameters=new URLSearchParams(location.search);
-  const state={category:parameters.get('category')||'', q:parameters.get('q')||'', places:[], selected:null};
+  const state={...filters.fromParams(parameters),places:[],selected:null};
   let view=null, pending=null, sequence=0, debounce;
   query.value=state.q;
   const element=(tag,className,text)=>{
@@ -79,7 +81,11 @@
     }
     return frame;
   }
-  function categoryName() { return state.category ? categories.find(c=>c.slug===state.category)?.name||'선택한 카테고리' : '전체'; }
+  function categoryName() { return filters.labels(state,taxonomy).join(' · ')||'전체'; }
+  function renderDetails(){
+    const terms=filters.termsFor(taxonomy,state.category);detailNav.hidden=!terms.length;
+    filters.chips(detailNav,[{value:'',label:'전체'},...terms.map(t=>({value:t.slug,label:t.name}))],state.terms,'map-category');
+  }
   function updateNotice() {
     if(!view) return;
     const mapped=state.places.filter(hasCoordinates).length;
@@ -152,7 +158,7 @@
   async function search() {
     clearTimeout(debounce);pending?.abort();pending=new AbortController();const request=++sequence;
     list.setAttribute('aria-busy','true');
-    const params=new URLSearchParams();if(state.category)params.set('category',state.category);if(state.q)params.set('q',state.q);
+    const params=filters.params(state);
     history.replaceState(null,'',location.pathname+(params.size?'?'+params.toString():''));
     try {
       const response=await fetch('/api/places?'+params,{signal:pending.signal,headers:{Accept:'application/json'}});
@@ -165,12 +171,13 @@
       list.replaceChildren(element('p','map-empty','연결을 확인하고 검색 버튼을 다시 눌러 주세요.'));
     } finally { if(request===sequence)list.setAttribute('aria-busy','false'); }
   }
-  categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category]');if(!button)return;state.category=button.dataset.category;state.q=query.value.trim();search();});
+  categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category]');if(!button)return;filters.select(state,'category',button.dataset.category);renderDetails();state.q=query.value.trim();search();});
+  detailNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,'terms',button.dataset.value);renderDetails();search();});
   document.getElementById('mapSearch').addEventListener('submit',event=>{event.preventDefault();state.q=query.value.trim();search();});
   query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search();},250);});
   fitButton.addEventListener('click',()=>view?.fit());
   sheetToggle.addEventListener('click',()=>setListExpanded(!workspace.classList.contains('is-list-expanded')));
-  search();
+  renderDetails();search();
   root.JejunoKakao.load(workspace.dataset.kakaoKey).then(maps=>{
     view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,index,select)=>{
       const pin=element('button','map-pin',String(index));pin.type='button';pin.setAttribute('aria-label',`${place.name} 지도 마커`);pin.setAttribute('aria-pressed','false');pin.addEventListener('click',select);return pin;

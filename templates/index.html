@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}JEJUNO | 제주를 아는 사람의 제주 기록{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261008-home">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261011-filters">{% endblock %}
 {% block body %}
 <header class="site-header editorial-header">
   <div class="wrap header-inner">
@@ -41,21 +41,12 @@
 
   <section class="finder-section" id="finder">
     <div class="wrap finder-layout">
-      <div class="finder-intro"><p class="kicker">PLACE FINDER</p><h2>오늘 제주 어디가지?</h2><p>어디로, 누구와 떠나나요?<br>지역부터 취향까지 차근차근 골라보세요.</p><div class="finder-note">TIP · 원하는 조건만 선택해도 좋아요.<br>직접 기록하고 확인한 정보로 찾아드려요.</div></div>
+      <div class="finder-intro"><p class="kicker">PLACE FINDER</p><h2>오늘 제주 어디가지?</h2><p>어디로, 누구와 떠나나요?<br>지역·장소 종류·동행만 골라도 좋아요.</p><div class="finder-note">TIP · 원하는 조건만 선택해도 좋아요.<br>직접 기록하고 확인한 정보로 찾아드려요.</div></div>
       <div class="finder-card compact-finder">
         <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">1</span>어디로 갈까요?</legend><div class="chips" data-filter="region" id="regionChips"></div></fieldset>
         <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">2</span>무엇을 찾나요?</legend><div class="chips" data-filter="category" id="categoryChips"></div></fieldset>
         <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">3</span>누구와 가나요?</legend><p class="filter-help">함께 가는 사람을 모두 골라주세요.</p><div class="chips" data-filter="companions" id="companionChips"></div></fieldset>
-        <fieldset class="filter-group preference-group"><legend class="filter-label"><span class="filter-step">4</span>어떤 곳이 좋아요?</legend><div class="filter-help-row"><p class="filter-help">선택사항 · 원하는 취향만 골라주세요. 다시 누르면 해제돼요.</p><span id="preferenceCount" class="filter-count">0/3 선택</span></div><div class="chips" data-filter="preferences" id="preferenceChips"></div><p class="filter-feedback" id="filterFeedback" role="status" aria-live="polite"></p></fieldset>
-        <details class="more-filters" id="moreFilters">
-          <summary><span class="filter-step">5</span>메뉴·이용 조건 더보기 <span class="filter-count" id="detailCount"></span></summary>
-          <div class="filter-details-body">
-            <fieldset class="filter-subgroup" id="menuGroup" hidden><legend id="menuLabel">메뉴</legend><p class="filter-help">고른 항목 중 하나 이상을 포함해요.</p><div class="chips" data-filter="menu" id="menuChips"></div></fieldset>
-            <p class="filter-help" id="menuHint">맛집·카페·가볼 곳을 선택하면 맞춤 메뉴와 활동을 고를 수 있어요.</p>
-            <fieldset class="filter-subgroup"><legend>이용 조건</legend><p class="filter-help">고른 조건을 모두 만족하는 곳을 찾아요.</p><div class="chips" data-filter="conditions" id="conditionChips"></div></fieldset>
-            <details class="taste-details"><summary>세부 취향 더보기</summary><p class="filter-help">고른 세부 취향 중 하나 이상을 포함해요.</p><div id="detailChips"></div></details>
-          </div>
-        </details>
+        <fieldset class="filter-group category-details" id="categoryDetails" hidden><legend class="filter-label" id="categoryDetailTitle"></legend><div class="filter-help-row"><p class="filter-help">선택사항 · 여러 개를 고를 수 있어요. 다시 누르면 해제돼요.</p><span class="filter-count" id="categoryDetailCount"></span></div><div class="chips" data-filter="terms" id="categoryDetailChips"></div></fieldset>
         <button class="primary-btn" id="findBtn" type="button" disabled>이 조건으로 장소 보기 →</button>
       </div>
     </div>
@@ -95,8 +86,8 @@
       <button class="text-btn" id="resetBtn">필터 초기화</button>
     </div>
     <div id="placeGrid" class="place-grid compact-place-grid" aria-live="polite"></div>
-    <div class="results-footer"><button class="text-btn" id="allResultsBtn" type="button" hidden>전체 결과 보기 →</button></div>
-    <div id="emptyState" class="empty-state" hidden><div class="empty-emoji">🔎</div><h3>조건에 맞는 장소가 아직 없어요.</h3><p>현재 공개된 정보만 기준으로 보여드리고 있어요.<br>조건을 조금 줄여보세요.</p></div>
+    <div class="results-footer"><a class="text-btn" id="allResultsBtn" href="/places" hidden>전체 결과 보기 →</a></div>
+    <div id="emptyState" class="empty-state" hidden><div class="empty-emoji">🔎</div><h3>선택한 조건에 맞는 장소가 아직 없습니다.</h3><p>현재 공개된 정보만 기준으로 보여드리고 있어요.<br>조건을 조금 줄여보세요.</p></div>
   </section>
 
   <section class="section soft" id="pick"><div class="wrap"><div class="section-head"><div><p class="kicker">JEJUNO PICK</p><h2>제주노가 특히 추천하는 곳</h2><p class="section-copy">다시 찾고 싶은 장소, 제주노가 추천하는 이유를 만나보세요.</p></div></div><div id="pickGrid" class="pick-grid"></div></div></section>
@@ -114,7 +105,6 @@
     <div class="wrap partnership-banner-inner"><div><p class="kicker light">JEJUNO PARTNERSHIP</p><h2>좋은 제주 소식이라면,<br>제주노에서 더 잘 보이게.</h2><p>행사·공간·브랜드 홍보를 일반 정보와 구분해 명확하게 표시하고, 향후 유료 프로모션으로 확장할 수 있는 구조를 준비했습니다.</p></div><a href="{{ url_for('partnership') }}">광고·제휴 안내 보기 →</a></div>
   </section>
 </main>
-<dialog id="allResultsDialog" class="results-dialog" aria-labelledby="allResultsTitle"><div class="results-dialog-head"><div><p class="kicker">SEARCH RESULT</p><h2 id="allResultsTitle">전체 검색 결과</h2><p id="allResultsSummary" class="section-copy"></p></div><form method="dialog"><button class="text-btn" aria-label="전체 결과 닫기">닫기 ✕</button></form></div><div class="results-dialog-content"><div id="allResultsGrid" class="compact-place-grid"></div></div></dialog>
 <footer><div class="wrap footer-inner"><div class="brand footer-brand"><strong>JEJUNO</strong><span>jeju_know</span></div><p>제주노가 기록하는 이유 있는 제주 추천 · <a href="{{ url_for('admin_dashboard') }}">관리자</a></p></div></footer>
 {% endblock %}
-{% block scripts %}<script src="/static/place-filters.js?v=20261007"></script><script src="/static/home-cards.js?v=20261008-home"></script><script src="/static/app.js?v=20261008-home"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261011-filters"></script><script src="/static/home-cards.js?v=20261008-home"></script><script src="/static/app.js?v=20261011-filters"></script>{% endblock %}

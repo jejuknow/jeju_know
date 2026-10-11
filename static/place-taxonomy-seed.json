@@ -1,0 +1,180 @@
+{
+  "cafe_feature": [
+    {
+      "id": "taste",
+      "label": "맛 중심",
+      "aliases": [
+        "맛",
+        "맛집 추천"
+      ]
+    },
+    {
+      "id": "view",
+      "label": "좋은 뷰",
+      "aliases": [
+        "뷰",
+        "View",
+        "뷰 좋은 곳",
+        "오션뷰",
+        "숲뷰",
+        "정원뷰",
+        "노을뷰",
+        "오름뷰"
+      ]
+    },
+    {
+      "id": "mood",
+      "label": "감성 공간",
+      "aliases": [
+        "감성",
+        "모던",
+        "빈티지",
+        "앤티크",
+        "한옥/제주 전통",
+        "미니멀"
+      ]
+    },
+    {
+      "id": "healing",
+      "label": "힐링",
+      "aliases": [
+        "조용한 힐링"
+      ]
+    },
+    {
+      "id": "local",
+      "label": "제주다움",
+      "aliases": [
+        "로컬",
+        "전통",
+        "제주다운 곳",
+        "제주 식재료",
+        "제주 건축/돌담"
+      ]
+    },
+    {
+      "id": "popular",
+      "label": "인기 핫플",
+      "aliases": [
+        "핫플",
+        "트렌디한",
+        "트렌디",
+        "신상",
+        "SNS 인기"
+      ]
+    },
+    {
+      "id": "value",
+      "label": "가성비",
+      "aliases": [
+        "가성비 좋은 곳"
+      ]
+    },
+    {
+      "id": "space",
+      "label": "넓은 공간",
+      "aliases": [
+        "대형",
+        "넓고 편안한 곳"
+      ]
+    },
+    {
+      "id": "premium",
+      "label": "고급 분위기",
+      "aliases": [
+        "고급",
+        "고급스러운 곳"
+      ]
+    },
+    {
+      "id": "unique",
+      "label": "이색 경험",
+      "aliases": [
+        "이색",
+        "음악",
+        "전시",
+        "체험",
+        "독특한 공간",
+        "동물 체험"
+      ]
+    }
+  ],
+  "restaurant_subcategory": [
+    {
+      "id": "korean",
+      "label": "한식",
+      "aliases": []
+    },
+    {
+      "id": "western",
+      "label": "양식",
+      "aliases": []
+    },
+    {
+      "id": "chinese",
+      "label": "중식",
+      "aliases": []
+    },
+    {
+      "id": "japanese",
+      "label": "일식",
+      "aliases": []
+    },
+    {
+      "id": "vietnamese",
+      "label": "베트남식",
+      "aliases": []
+    },
+    {
+      "id": "asian",
+      "label": "기타 아시아",
+      "aliases": []
+    },
+    {
+      "id": "pork-cutlet",
+      "label": "돈가스",
+      "aliases": [
+        "돈까스"
+      ]
+    },
+    {
+      "id": "ramen",
+      "label": "라멘",
+      "aliases": []
+    },
+    {
+      "id": "noodles",
+      "label": "국수·면",
+      "aliases": [
+        "국수",
+        "면"
+      ]
+    },
+    {
+      "id": "grill",
+      "label": "고기·구이",
+      "aliases": [
+        "고기",
+        "구이",
+        "흑돼지"
+      ]
+    },
+    {
+      "id": "seafood",
+      "label": "해산물",
+      "aliases": [
+        "생선요리"
+      ]
+    },
+    {
+      "id": "snack",
+      "label": "분식",
+      "aliases": []
+    },
+    {
+      "id": "other",
+      "label": "기타",
+      "aliases": []
+    }
+  ]
+}

@@ -16,6 +16,8 @@ from starlette.templating import Jinja2Templates
 from place_migrations import backup_before_migration, migrate_place_categories
 from user_migrations import backup_before_user_migration, migrate_users
 from home_migrations import backup_before_home_migration, migrate_home
+from taxonomy_migrations import backup_before_taxonomy_migration, migrate_taxonomy, TYPES
+from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
 from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
 from member_routes import register_member_routes, validate_news
 from starlette.concurrency import run_in_threadpool
@@ -161,6 +163,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        taxonomy_backup_path = backup_before_taxonomy_migration(app.state.database)
         home_backup_path = backup_before_home_migration(app.state.database)
         user_backup_path = backup_before_user_migration(app.state.database)
         backup_path = backup_before_migration(app.state.database)
@@ -255,6 +258,7 @@ def create_app(test_config=None):
         migrate_place_categories(app.state.database, backup_path)
         migrate_users(app.state.database, user_backup_path)
         migrate_home(app.state.database, home_backup_path)
+        migrate_taxonomy(app.state.database, taxonomy_backup_path)
 
     init_db()
 
@@ -403,6 +407,7 @@ def create_app(test_config=None):
             "is_pick": 1 if form.get("is_pick") == "1" else 0,
             "companions": form.getlist("companions"),
             "features": form.getlist("features"),
+            "term_ids": form.getlist("term_ids") if form.get("taxonomy_present") == "1" else None,
             "parking_status": str(form.get("parking_status", "미확인")),
             "pet_status": str(form.get("pet_status", "미확인")),
             "child_status": str(form.get("child_status", "미확인")),
@@ -444,7 +449,7 @@ def create_app(test_config=None):
     def place_categories(current_id=None, active_only=True):
         conn = connect_db()
         rows = conn.execute(
-            "SELECT * FROM categories" + (" WHERE is_active=1 OR id=?" if active_only else "") + " ORDER BY sort_order,id",
+            "SELECT * FROM categories WHERE type='place'" + (" AND (is_active=1 OR id=?)" if active_only else "") + " ORDER BY sort_order,id",
             (current_id,) if active_only else (),
         ).fetchall()
         conn.close()
@@ -459,9 +464,16 @@ def create_app(test_config=None):
         else:  # Preserve the existing category-name POST contract.
             category = conn.execute("SELECT * FROM categories WHERE name=?", (data["category"],)).fetchone()
         conn.close()
-        if not category or (not category["is_active"] and (not existing or existing["category_id"] != category["id"])):
+        if not category or category["type"] != "place" or (not category["is_active"] and (not existing or existing["category_id"] != category["id"])):
             return "활성 카테고리를 선택해 주세요. 기존 장소의 비활성 분류는 유지할 수 있습니다."
         data["category_id"], data["category"] = category["id"], category["name"]
+        conn = connect_db()
+        try:
+            error = validate_terms(conn, data, existing)
+        finally:
+            conn.close()
+        if error:
+            return error
         lat, lng = data["latitude"], data["longitude"]
         if not lat and not lng:
             data["latitude"] = data["longitude"] = None
@@ -475,12 +487,21 @@ def create_app(test_config=None):
             data["latitude"], data["longitude"] = lat, lng
         return None
 
+    def get_taxonomy(include_inactive=False):
+        conn = connect_db()
+        try:
+            return taxonomy(conn, REGIONS, COMPANIONS, include_inactive)
+        finally:
+            conn.close()
+
     def form_options(current_id=None):
+        options = get_taxonomy(True)
         return {
-            "regions": REGIONS,
+            "taxonomy": options,
+            "regions": options["regions"],
             "categories": place_categories(current_id),
             "kakao_map_key": app.state.kakao_map_key,
-            "companions": COMPANIONS,
+            "companions": options["companions"],
             "features": FEATURES,
             "status_options": STATUS_OPTIONS,
         }
@@ -514,19 +535,21 @@ def create_app(test_config=None):
         return templates.TemplateResponse(request=request, name="place_detail.html", context={"place": row_to_place(row)})
 
     @app.get("/api/places")
-    async def api_places(category: str = "", q: str = ""):
+    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = ""):
         conn = connect_db()
-        # Existing unfiltered response is preserved. Map search reuses this public-only API.
-        clauses, params = ["p.published=1"], []
-        if category:
-            clauses.append("c.slug=? AND c.is_active=1")
-            params.append(category)
-        if q.strip():
-            clauses.append("instr(lower(p.name || ' ' || p.one_line || ' ' || p.region || ' ' || p.address || ' ' || p.features),lower(?))>0")
-            params.append(q.strip())
-        rows = conn.execute("SELECT p.*, c.slug AS category_slug FROM places p LEFT JOIN categories c ON c.id=p.category_id WHERE " + " AND ".join(clauses) + " ORDER BY p.is_pick DESC,p.updated_at DESC,p.id DESC", params).fetchall()
-        conn.close()
-        return JSONResponse([row_to_place(row) for row in rows], headers={"Cache-Control": "no-store"})
+        try:
+            rows = public_search(conn, category, q, region, companion, detail, condition)
+            return JSONResponse([row_to_place(row) for row in rows], headers={"Cache-Control": "no-store"})
+        finally:
+            conn.close()
+
+    @app.get("/api/place-taxonomy")
+    async def api_place_taxonomy():
+        return JSONResponse(get_taxonomy(), headers={"Cache-Control": "no-store"})
+
+    @app.get("/places", response_class=HTMLResponse)
+    async def place_list(request: Request):
+        return templates.TemplateResponse(request=request, name="place_list.html", context={})
 
     @app.get("/api/categories")
     async def api_categories():
@@ -535,7 +558,7 @@ def create_app(test_config=None):
     @app.get("/map", response_class=HTMLResponse)
     async def map_page(request: Request):
         return templates.TemplateResponse(request=request, name="map.html", context={
-            "categories": place_categories(), "kakao_map_key": app.state.kakao_map_key,
+            "categories": navigation_order(place_categories()), "taxonomy": get_taxonomy(), "kakao_map_key": app.state.kakao_map_key,
         })
 
     @app.get("/news", response_class=HTMLResponse)
@@ -830,9 +853,9 @@ def create_app(test_config=None):
         if guard:
             return guard
         conn = connect_db()
-        rows = conn.execute("SELECT c.*,COUNT(p.id) AS place_count FROM categories c LEFT JOIN places p ON p.category_id=c.id GROUP BY c.id ORDER BY c.sort_order,c.id").fetchall()
+        rows = conn.execute("SELECT c.*, (SELECT COUNT(*) FROM places p WHERE p.category_id=c.id) + (SELECT COUNT(*) FROM place_category_links l WHERE l.category_id=c.id) AS place_count, (SELECT COUNT(*) FROM categories child WHERE child.parent_id=c.id) AS child_count FROM categories c ORDER BY c.sort_order,c.id").fetchall()
         conn.close()
-        return templates.TemplateResponse(request=request, name="admin_categories.html", context={"categories": [dict(r) for r in rows]})
+        return templates.TemplateResponse(request=request, name="admin_categories.html", context={"categories": [dict(r) for r in rows], "classification_types": TYPES})
 
     async def save_category(request, category_id=None):
         guard = admin_guard(request)
@@ -852,17 +875,32 @@ def create_app(test_config=None):
         if not name or len(name) > 40 or name == "전체" or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) or len(slug) > 80 or order < 0:
             flash(request, "이름(1~40자, ‘전체’ 제외), 영문 슬러그(소문자·숫자·하이픈), 순서(0~9999)를 확인해 주세요.", "error")
             return RedirectResponse("/admin/categories", status_code=303)
+        kind = str(form.get("type", "place"))
         conn = connect_db()
         try:
             with conn:
                 conn.execute("BEGIN IMMEDIATE")
+                parent_id = None
+                if category_id is None and kind != "place":
+                    parent_slug = {"restaurant_subcategory": "food", "cafe_feature": "cafe"}.get(kind)
+                    parent = conn.execute("SELECT id FROM categories WHERE slug=? AND type='place'", (parent_slug,)).fetchone()
+                    if not parent:
+                        flash(request, "상위 카테고리를 확인해 주세요.", "error")
+                        return RedirectResponse("/admin/categories", status_code=303)
+                    parent_id = parent[0]
+                if kind not in TYPES:
+                    return HTMLResponse("분류 유형을 확인해 주세요.", status_code=400)
                 if category_id is None:
-                    conn.execute("INSERT INTO categories(name,slug,sort_order,is_active) VALUES (?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1")))
+                    conn.execute("INSERT INTO categories(name,slug,sort_order,is_active,type,parent_id) VALUES (?,?,?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1"), kind, parent_id))
                 else:
-                    if not conn.execute("SELECT id FROM categories WHERE id=?", (category_id,)).fetchone():
+                    original = conn.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone()
+                    if not original:
                         return HTMLResponse("카테고리를 찾을 수 없습니다.", status_code=404)
                     # The stable slug survives renaming so shared map URLs continue to work.
                     conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), category_id))
+                    if original["type"] != "place" and original["name"] != name:
+                        aliases = list(dict.fromkeys([*parse_json_list(original["legacy_aliases"]), original["name"]]))
+                        conn.execute("UPDATE categories SET legacy_aliases=? WHERE id=?", (json.dumps(aliases, ensure_ascii=False), category_id))
                     conn.execute("UPDATE places SET category=? WHERE category_id=?", (name, category_id))
             flash(request, "카테고리를 저장했습니다. 방문자 화면에 바로 반영됩니다.")
         except sqlite3.IntegrityError:
@@ -891,9 +929,12 @@ def create_app(test_config=None):
         try:
             with conn:
                 conn.execute("BEGIN IMMEDIATE")
-                count = conn.execute("SELECT COUNT(*) FROM places WHERE category_id=?", (category_id,)).fetchone()[0]
+                count = conn.execute("SELECT (SELECT COUNT(*) FROM places WHERE category_id=?) + (SELECT COUNT(*) FROM place_category_links WHERE category_id=?)", (category_id, category_id)).fetchone()[0]
+                children = conn.execute("SELECT COUNT(*) FROM categories WHERE parent_id=?", (category_id,)).fetchone()[0]
                 if count:
                     flash(request, f"현재 {count}개 장소에서 사용 중인 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
+                elif children:
+                    flash(request, "하위 분류가 있는 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
                 else:
                     conn.execute("DELETE FROM categories WHERE id=?", (category_id,))
                     flash(request, "사용하지 않는 카테고리를 삭제했습니다.")
@@ -921,7 +962,7 @@ def create_app(test_config=None):
             flash(request, error, "error")
             return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": data, "mode": "new", **form_options()}, status_code=400)
         conn = connect_db()
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO places (
                 slug, name, region, category, emoji, image_url, is_pick,
@@ -940,6 +981,7 @@ def create_app(test_config=None):
                 data["category_id"], data["latitude"], data["longitude"],
             ),
         )
+        save_links(conn, cursor.lastrowid, data["term_ids"])
         conn.commit()
         conn.close()
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
@@ -952,10 +994,13 @@ def create_app(test_config=None):
             return guard
         conn = connect_db()
         row = conn.execute("SELECT * FROM places WHERE id=?", (place_id,)).fetchone()
+        place = row_to_place(row) if row else None
+        if place:
+            place["term_ids"] = linked_ids(conn, place_id)
         conn.close()
         if not row:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
-        return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": row_to_place(row), "mode": "edit", **form_options(row["category_id"])})
+        return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": place, "mode": "edit", **form_options(row["category_id"])})
 
     @app.post("/admin/places/{place_id}/edit")
     async def admin_place_edit_post(request: Request, place_id: int):
@@ -993,6 +1038,7 @@ def create_app(test_config=None):
                 data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"), data["category_id"], data["latitude"], data["longitude"], place_id,
             ),
         )
+        save_links(conn, place_id, data["term_ids"])
         conn.commit()
         conn.close()
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")
