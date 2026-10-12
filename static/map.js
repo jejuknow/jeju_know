@@ -133,13 +133,14 @@
     const mapped=state.places.filter(hasCoordinates).length;
     coordinateCount.textContent=`지도 위치 등록 ${mapped}곳`+(mapped<state.places.length?` · 위치 미등록 ${state.places.length-mapped}곳`:'');
     categoryNav.querySelectorAll('button').forEach(button=>{
-      const active=button.dataset.pick?state.pick==='current':!state.pick&&button.dataset.category===state.category;
+      const active=button.dataset.pick?state.pick==='current':button.dataset.category===state.category;
       button.classList.toggle('is-selected',active);button.setAttribute('aria-pressed',String(active));
     });
     list.replaceChildren();selected.hidden=true;state.selected=null;
     if(!state.places.length) {
       const empty=element('div','map-empty');
-      empty.append(element('strong','',state.q?'검색 조건에 맞는 장소가 없습니다.':state.category?`현재 등록된 ${name}가 없습니다.`:'현재 등록된 장소가 없습니다.'),element('p','','다른 검색어나 카테고리를 직접 선택해 주세요.'));
+      empty.append(element('strong','',state.q?'검색 조건에 맞는 장소가 없습니다.':state.category?`현재 등록된 ${name} 장소가 없습니다.`:'현재 등록된 장소가 없습니다.'),element('p','','알고 있는 장소가 있나요?'));
+      const register=element('a','primary-inline','+ 이 조건에 장소 알려주기');register.href=filters.registrationHref(state);empty.append(register);
       list.append(empty);
     }
     state.places.forEach(place=>{
@@ -158,11 +159,15 @@
     fitButton.disabled=!view||!mapped;
     updateNotice();
   }
-  async function search() {
+  async function search(historyMode='push') {
     clearTimeout(debounce);pending?.abort();pending=new AbortController();const request=++sequence;
     list.setAttribute('aria-busy','true');
     const params=filters.params(state);
-    history.replaceState(null,'',location.pathname+(params.size?'?'+params.toString():''));
+    const url=filters.href(location.pathname,state);
+    if(historyMode&&url!==location.pathname+location.search)history[historyMode+'State'](null,'',url);
+    document.getElementById('mapFindLink').href=filters.href('/find',state);
+    document.getElementById('mapRegisterLink').href=filters.registrationHref(state);
+    document.getElementById('mapActiveFilters').textContent=filters.labels(state,taxonomy).join(' · ');
     try {
       const response=await fetch('/api/places?'+params,{signal:pending.signal,headers:{Accept:'application/json'}});
       if(!response.ok) throw new Error('장소를 불러오지 못했습니다. 다시 검색해 주세요.');
@@ -174,13 +179,15 @@
       list.replaceChildren(element('p','map-empty','연결을 확인하고 검색 버튼을 다시 눌러 주세요.'));
     } finally { if(request===sequence)list.setAttribute('aria-busy','false'); }
   }
-  categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category],[data-pick]');if(!button)return;state.pick=button.dataset.pick||'';state.new='';filters.select(state,'category',button.dataset.category||'');renderDetails();state.q=query.value.trim();search();});
+  categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category],[data-pick]');if(!button)return;if(button.dataset.pick)state.pick=state.pick?'':'current';else filters.select(state,'category',button.dataset.category||'');renderDetails();state.q=query.value.trim();search();});
   detailNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,'terms',button.dataset.value);renderDetails();search();});
   document.getElementById('mapSearch').addEventListener('submit',event=>{event.preventDefault();state.q=query.value.trim();search();});
-  query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search();},250);});
+  query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search('replace');},250);});
+  document.getElementById('mapReset').addEventListener('click',()=>{Object.assign(state,filters.defaultState());query.value='';renderDetails();search();});
+  addEventListener('popstate',()=>{Object.assign(state,filters.fromParams(new URLSearchParams(location.search)));query.value=state.q;renderDetails();search(false);});
   fitButton.addEventListener('click',()=>view?.fit());
   sheetToggle.addEventListener('click',()=>setListExpanded(!workspace.classList.contains('is-list-expanded')));
-  renderDetails();search();
+  renderDetails();search(false);
   root.JejunoKakao.load(workspace.dataset.kakaoKey).then(maps=>{
     view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,index,select)=>{
       const pin=element('button','map-pin'+(place.is_pick?' is-pick':''),String(index));pin.type='button';pin.setAttribute('aria-label',`${place.name} 지도 마커`);pin.setAttribute('aria-pressed','false');pin.addEventListener('click',select);return pin;

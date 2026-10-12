@@ -52,7 +52,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
     def login_destination(value):
         # Only known participation pages; never redirect to an arbitrary host.
         value = str(value or '')
-        return value if re.fullmatch(r'/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places', value) else '/account'
+        return value if len(value) <= 10000 and re.fullmatch(r'/map/register(?:\?[^\s#]*)?|/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places', value) else '/account'
 
     def guard(request):
         if not current_user(request):

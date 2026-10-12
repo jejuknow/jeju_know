@@ -606,6 +606,8 @@ def create_app(test_config=None):
 
     @app.get("/map", response_class=HTMLResponse)
     async def map_page(request: Request):
+        if request.query_params.get("register") == "1":
+            return RedirectResponse("/map/register?" + str(request.query_params), status_code=303)
         return templates.TemplateResponse(request=request, name="map.html", context={
             "categories": navigation_order(place_categories()), "taxonomy": get_taxonomy(), "kakao_map_key": app.state.kakao_map_key,
         })

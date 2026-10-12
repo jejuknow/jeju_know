@@ -13,6 +13,7 @@ from community_migrations import today
 from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
                               duplicates, editable, facts, merge_places, opening)
 from image_uploads import FORM_BYTES, ImageError, ImagePlan
+from place_taxonomy import linked_ids, save_links, validate_terms
 
 
 def register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
@@ -84,10 +85,29 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                       similar=similar or [], new_only=new_only, **form_options(data.get("category_id") if data else None))
 
     @app.get("/places/new")
+    async def legacy_submit_get(request: Request):
+        query = str(request.query_params)
+        return redirect("/map/register" + ("?" + query if query else ""))
+
+    @app.get("/map/register")
     async def submit_get(request: Request):
+        # Keep the established administrator form and permissions intact.
+        if not current_user(request) and request.session.get("admin_id"):
+            return redirect("/admin/places/new")
         if response := member_guard(request):
             return response
-        return place_form(request, new_only=request.query_params.get("from") == "new")
+        query = request.query_params
+        new_only = query.get("source") == "new" or query.get("from") == "new"
+        with closing(connect_db()) as conn:
+            category = conn.execute("SELECT id,slug FROM categories WHERE slug=? AND type='place' AND is_active=1", (query.get("category", ""),)).fetchone()
+            if new_only and category and category["slug"] not in ("cafe", "food"):
+                category = None
+            data = {"category_id": category["id"] if category else None,
+                    "region": query.get("region", "") if query.get("region") in regions else "", "term_ids": []}
+            if category:
+                slugs = query.get("detail", "").split(",")
+                data["term_ids"] = [r["id"] for r in conn.execute("SELECT id,slug FROM categories WHERE parent_id=? AND type!='place' AND is_active=1", (category["id"],)) if r["slug"] in slugs]
+        return place_form(request, data, new_only=new_only)
 
     @app.get("/places/{place_id}/edit")
     async def submit_edit_get(request: Request, place_id: int):
@@ -95,11 +115,12 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             return response
         with closing(connect_db()) as conn:
             place = get_place(conn, place_id)
+            term_ids = linked_ids(conn, place_id)
         if not place:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         if not editable(place, current_user(request)["id"]):
             return HTMLResponse("본인이 등록한 미확인 장소만 수정할 수 있습니다. 확인된 장소는 수정 제안을 이용해주세요.", status_code=403)
-        return place_form(request, row_to_place(place))
+        return place_form(request, {**row_to_place(place), "term_ids": term_ids})
 
     async def save_submission(request, place_id=None):
         if response := member_guard(request):
@@ -108,7 +129,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if form is None:
             return bad_csrf()
         # Reject every non-fact field, including forged editorial/ownership/visibility values.
-        allowed = set(FACT_FIELDS) | {"csrf_token", "from_new", "duplicate_ack"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
+        allowed = set(FACT_FIELDS) | {"csrf_token", "from_new", "duplicate_ack", "taxonomy_present", "term_ids"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
         if any(k not in allowed for k in form):
             return HTMLResponse("사용자 장소 등록에서는 기본 정보와 사진만 변경할 수 있습니다.", status_code=403)
         if limited(request, "community-place"):
@@ -121,9 +142,12 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 return HTMLResponse("본인의 미확인 장소만 수정할 수 있습니다.", status_code=403)
             try:
                 data = facts(form, conn, regions, new_only=new_only, existing=existing)
+                data.update(term_ids=form.getlist("term_ids") if form.get("taxonomy_present") == "1" else None, features=[])
+                if error := validate_terms(conn, data, existing):
+                    raise ValueError(error)
             except ValueError as exc:
                 values = {k: str(form.get(k, "")) for k in FACT_FIELDS}
-                values.update(id=place_id, images=image_store.list("places", place_id) if place_id else [])
+                values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
             similar = duplicates(conn, data, place_id)
         data.update(id=place_id, images=image_store.list("places", place_id) if place_id else [])
@@ -135,24 +159,27 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             return place_form(request, data, status=400, error=str(exc), new_only=new_only)
         with plan.transaction() as conn:
             # Recheck under the write lock: an administrator may have verified/merged it meanwhile.
+            fresh = get_place(conn, place_id) if place_id else None
+            if place_id and (not fresh or not editable(fresh, user_id)):
+                plan.discard()
+                return HTMLResponse("정보 확인 상태가 변경되었습니다. 수정 제안을 이용해주세요.", status_code=403)
+            if error := validate_terms(conn, data, fresh):
+                plan.discard()
+                return HTMLResponse(error + " 새로고침 후 다시 시도해주세요.", status_code=400)
             if place_id:
-                fresh = get_place(conn, place_id)
-                if not fresh or not editable(fresh, user_id):
-                    plan.discard()
-                    return HTMLResponse("정보 확인 상태가 변경되었습니다. 수정 제안을 이용해주세요.", status_code=403)
                 fields = (*FACT_FIELDS, "category")
                 conn.execute("UPDATE places SET " + ",".join(k + "=?" for k in fields) + ",updated_at=CURRENT_TIMESTAMP WHERE id=?", (*[data[k] for k in fields],place_id))
-                if fresh["category_id"] != data["category_id"]:
-                    conn.execute("DELETE FROM place_category_links WHERE place_id=?", (place_id,))
                 slug = fresh["slug"]
             else:
                 slug = "place-" + secrets.token_hex(12)
                 fields = (*FACT_FIELDS, "category")
                 place_id = conn.execute("INSERT INTO places (" + ",".join(fields) + ",slug,submitted_by_user_id,source_type,verification_status,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user','unverified',1)", (*[data[k] for k in fields],slug,user_id)).lastrowid
+            save_links(conn, place_id, data["term_ids"])
             plan.apply(conn, place_id)
-        flash(request, "장소를 저장했습니다. 사용자 등록 · 정보 미확인으로 표시됩니다.")
-        return redirect("/account/places")
+        flash(request, "장소를 저장했습니다. 사용자 등록 · 미확인으로 표시됩니다.")
+        return redirect("/place/" + slug)
 
+    @app.post("/map/register")
     @app.post("/places/new")
     async def submit_post(request: Request):
         return await save_submission(request)

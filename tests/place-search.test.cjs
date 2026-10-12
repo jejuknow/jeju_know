@@ -28,3 +28,15 @@ test('DB names drive detail choices and preserve IDs through renaming',()=>{
   assert.equal(filters.termsFor(data,'cafe').length,1);assert.equal(filters.termsFor(data,'attraction').length,0);
   const state={...filters.defaultState(),category:'cafe',terms:['cafe-mood']};assert.deepEqual(filters.labels(state,data),['커피집','분위기']);
 });
+
+test('FIND MAP and registration links retain every active filter and NEW context',()=>{
+  const state={category:'food',region:'애월',companions:['부모님','아이'],terms:['food-western'],q:'바다 & 숲',condition:'rain',pick:'current',new:'current'};
+  for(const path of ['/find','/map']){
+    const url=new URL(filters.href(path,state),'https://example.test');
+    assert.equal(url.pathname,path);assert.deepEqual(filters.fromParams(url.searchParams),state);
+  }
+  const register=new URL(filters.registrationHref(state),'https://example.test');
+  assert.equal(register.pathname,'/map/register');assert.equal(register.searchParams.get('source'),'new');
+  assert.deepEqual(filters.fromParams(register.searchParams),state);
+  assert.equal(new URL(filters.registrationHref(filters.defaultState()),'https://example.test').searchParams.get('source'),'map');
+});

@@ -1,8 +1,9 @@
 const search=window.PlaceSearch, cards=window.HomeCards;
-const state=search.defaultState();
+const state=search.fromParams(new URLSearchParams(location.search));
 let taxonomy, requestId=0, pending;
 const $=id=>document.getElementById(id);
 function buildFilters(){
+  $('finderQuery').value=state.q;
   search.chips($('regionChips'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:search.regionLabel(v)}))],state.region);
   search.chips($('categoryChips'),[{value:'',label:'전체'},...taxonomy.categories.map(v=>({value:v.slug,label:v.name}))],state.category);
   search.chips($('companionChips'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:v}))],state.companions);
@@ -12,9 +13,13 @@ function buildFilters(){
   $('categoryDetailCount').textContent=state.terms.length?`${state.terms.length}개 선택`:'';
   search.chips($('categoryDetailChips'),terms.map(v=>({value:v.slug,label:v.name})),state.terms);
 }
-async function renderResults(scroll=false){
+async function renderResults(scroll=false,updateUrl=true){
   pending?.abort();pending=new AbortController();const request=++requestId;
   const query=search.params(state), labels=search.labels(state,taxonomy);
+  const url=search.href(location.pathname,state)+location.hash;
+  if(updateUrl&&url!==location.pathname+location.search+location.hash)history.pushState(null,'',url);
+  $('finderMapLink').href=search.href('/map',state);
+  $('finderRegisterLink').href=search.registrationHref(state);
   $('placeGrid').setAttribute('aria-busy','true');$('allResultsBtn').hidden=true;
   try{
     const response=await fetch('/api/places?'+query,{signal:pending.signal,headers:{Accept:'application/json'}});
@@ -33,7 +38,10 @@ document.querySelector('.compact-finder').addEventListener('click',event=>{
   const button=event.target.closest('.chip');if(!button||!taxonomy)return;
   search.select(state,button.closest('[data-filter]').dataset.filter,button.dataset.value);buildFilters();
 });
-$('findBtn').addEventListener('click',()=>renderResults(true));
+$('findBtn').addEventListener('click',()=>{state.q=$('finderQuery').value.trim();renderResults(true);});
+$('finderQuery').addEventListener('input',()=>{state.q=$('finderQuery').value.trim();});
+$('finderQuery').addEventListener('keydown',event=>{if(event.key==='Enter'&&taxonomy){event.preventDefault();$('findBtn').click();}});
+addEventListener('popstate',()=>{if(taxonomy){Object.assign(state,search.fromParams(new URLSearchParams(location.search)));buildFilters();renderResults(false,false);}});
 $('resetBtn').addEventListener('click',()=>{if(!taxonomy)return;Object.assign(state,search.defaultState());buildFilters();renderResults();});
 document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListener('click',event=>{
   if(!taxonomy)return;event.preventDefault();Object.assign(state,search.defaultState());
@@ -49,7 +57,7 @@ async function boot(){
     taxonomy=await config.json();const all=await places.json();
     const picks=all.filter(p=>p.is_pick).slice(0,3);
     if($('pickGrid'))$('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,search.regionLabel(p.region))).join(''):'<p>아직 공개된 JEJU_KNOW PICK이 없습니다.</p>';
-    buildFilters();await renderResults();$('findBtn').disabled=false;
+    buildFilters();await renderResults(false,false);$('findBtn').disabled=false;
   }catch{$('resultSummary').textContent='장소 데이터를 불러오지 못했습니다. 새로고침해 주세요.';}
 }
 boot();

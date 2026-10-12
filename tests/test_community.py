@@ -107,7 +107,7 @@ class CommunityTest(unittest.TestCase):
     def test_03_create_immediate_public_unverified_not_recommended(self):
         p=self.place()
         result=self.api()[0]
-        self.assertEqual(result['status_label'],'사용자 등록 · 정보 미확인')
+        self.assertEqual(result['status_label'],'사용자 등록 · 미확인')
         self.assertFalse(result['is_pick']);self.assertEqual(p['reason'],'')
         self.assertEqual(self.rows('SELECT * FROM best_collection_places'),[])
         for key in ('parking_status','pet_status','child_status','accessible_status'): self.assertEqual(p[key],'미확인')
@@ -125,7 +125,7 @@ class CommunityTest(unittest.TestCase):
             self.assertEqual(self.create(**data).status_code,400,data)
 
     def test_06_forged_admin_fields_rejected(self):
-        for key in ('is_pick','reason','note','verification_status','verified_at','submitted_by_user_id','source_type','published','new_override','is_sponsored','features','term_ids'):
+        for key in ('is_pick','reason','note','verification_status','verified_at','submitted_by_user_id','source_type','published','new_override','is_sponsored','features'):
             self.assertEqual(self.create(**{key:'1'}).status_code,403,key)
         self.assertEqual(self.rows('SELECT * FROM places'),[])
 
@@ -389,6 +389,87 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(len(self.rows('SELECT * FROM place_correction_suggestions')),1)
         self.assertEqual(self.post(self.admin,'/admin/suggestions/1/review',action='accept').status_code,409)
         self.assertEqual(self.post(self.admin,'/admin/best/1/places',place_id=p['id'],action='remove').status_code,303)
+
+
+    def test_38_map_registration_auth_prefill_and_legacy_url(self):
+        from urllib.parse import unquote
+        url='/map/register?source=new&category=food&region=%EC%95%A0%EC%9B%94&detail=food-western'
+        guest=self.visitor.get(url,follow_redirects=False)
+        self.assertEqual(guest.status_code,303)
+        self.assertEqual(unquote(guest.headers['location'].split('next=')[1]),url)
+        html=self.member.get(url).text
+        self.assertIn('MAP · NEW',html)
+        self.assertIn('action="/map/register"',html)
+        self.assertRegex(html,r'name="opened_year"[^>]+required')
+        self.assertIn('id="placeLocationMap"',html)
+        term=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
+        self.assertRegex(html,rf'name="term_ids" value="{term}" checked')
+        legacy=self.member.get('/places/new?from=new',follow_redirects=False)
+        self.assertEqual(legacy.headers['location'],'/map/register?from=new')
+        self.assertEqual(self.visitor.get('/map?register=1&source=new',follow_redirects=False).headers['location'],'/map/register?register=1&source=new')
+        self.assertEqual(self.admin.get('/map/register',follow_redirects=False).headers['location'],'/admin/places/new')
+        login=self.visitor.post('/login',data={'csrf_token':self.csrf(self.visitor,'/login'),'username':'other','password':'community-test-secret','next':url},follow_redirects=False)
+        self.assertEqual(login.headers['location'],url)
+
+    def test_39_one_map_record_discovered_by_find_map_and_new(self):
+        term=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
+        r=self.post(self.member,'/map/register',**self.form(category_id=self.category['food'],opened_year=str(self.now.year),from_new='1',taxonomy_present='1',term_ids=[str(term)],latitude='33.45',longitude='126.4'))
+        self.assertEqual(r.status_code,303,r.text)
+        self.assertEqual(len(self.rows('SELECT id FROM places')),1)
+        p=self.rows('SELECT * FROM places')[0]
+        self.assertEqual(r.headers['location'],'/place/'+p['slug'])
+        for query in ('?category=food&region=애월&detail=food-western','?new=current&category=food'):
+            results=self.api(query)
+            self.assertEqual([item['id'] for item in results],[p['id']])
+            self.assertEqual(results[0]['status_label'],'사용자 등록 · 미확인')
+            self.assertEqual(results[0]['latitude'],33.45)
+            self.assertFalse(results[0]['is_pick'])
+        self.assertEqual(self.visitor.get('/place/'+p['slug']).status_code,200)
+
+    def test_40_member_terms_validate_preserve_and_switch_category(self):
+        cafe=self.rows("SELECT id FROM categories WHERE slug='cafe-view'")[0]['id']
+        food=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
+        for term in (str(food),'99999','bad','9'*5000):
+            r=self.post(self.member,'/map/register',**self.form(taxonomy_present='1',term_ids=[term]))
+            self.assertEqual(r.status_code,400)
+        p=self.place(taxonomy_present='1',term_ids=[str(cafe)])
+        self.assertIn(f'value="{cafe}" checked',self.member.get(f"/places/{p['id']}/edit").text)
+        self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.form()).status_code,303)
+        self.assertEqual(self.rows('SELECT category_id FROM place_category_links'),[{'category_id':cafe}])
+        self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.form(category_id=self.category['attraction'],taxonomy_present='1')).status_code,303)
+        self.assertEqual(self.rows('SELECT * FROM place_category_links'),[])
+
+    def test_41_canonical_map_upload_duplicate_and_security(self):
+        image=io.BytesIO();Image.effect_noise((500,500),100).convert('RGB').save(image,format='PNG')
+        self.assertGreater(len(image.getvalue()),131072)
+        data={'csrf_token':self.csrf(self.member),**self.form(opened_year=str(self.now.year))}
+        r=self.member.post('/map/register',data=data,files={'image_0':('photo.png',image.getvalue(),'image/png')},follow_redirects=False)
+        self.assertEqual(r.status_code,303,r.text)
+        self.assertEqual(len(self.rows('SELECT * FROM images')),1)
+        duplicate=self.post(self.member,'/map/register',**self.form())
+        self.assertEqual(duplicate.status_code,409)
+        self.assertIn('정보 수정 제안',duplicate.text)
+        self.assertEqual(len(self.rows('SELECT * FROM places')),1)
+        self.assertEqual(self.member.post('/map/register',data=self.form()).status_code,400)
+        self.assertEqual(self.post(self.member,'/map/register',**self.form(is_pick='1')).status_code,403)
+
+    def test_42_find_has_no_register_cta_and_new_uses_map(self):
+        html=self.member.get('/find').text
+        self.assertNotIn('+ 장소 알려주기',html)
+        self.assertIn('MAP에서 장소 알려주기',html)
+        self.assertIn('id="finderMapLink"',html)
+        self.assertIn('id="finderQuery"',html)
+        self.assertIn('/map/register?source=new&amp;category=cafe',self.member.get('/new?category=cafe').text)
+        self.assertIn('id="mapRegisterLink"',self.visitor.get('/map').text)
+        self.assertIn('id="mapFindLink"',self.visitor.get('/map').text)
+
+    def test_43_new_context_requires_year_and_still_allows_missing_coordinates(self):
+        r=self.post(self.member,'/map/register',**self.form(from_new='1'))
+        self.assertEqual(r.status_code,400)
+        r=self.post(self.member,'/map/register',**self.form(from_new='1',opened_year=str(self.now.year)))
+        self.assertEqual(r.status_code,303)
+        result=self.api('?new=current')[0]
+        self.assertIsNone(result['latitude']);self.assertIsNone(result['longitude'])
 
 
 class CommunityMigrationTest(unittest.TestCase):

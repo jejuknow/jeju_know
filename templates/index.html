@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}JEJU_KNOW | 제주를 아는 사람의 제주 기록{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261011-wrap">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261012-map-flow">{% endblock %}
 {% block body %}
 <main id="top">
   <section class="editorial-hero">
@@ -65,4 +65,4 @@
 </main>
 <footer><div class="wrap footer-inner">{{ brand_logo(variant='footer-brand') }}<p>JEJU_KNOW가 기록하는 이유 있는 제주 추천 · <a href="{{ url_for('admin_dashboard') }}">관리자</a></p></div></footer>
 {% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261012-brand"></script><script src="/static/home-cards.js?v=20261012-brand"></script><script src="/static/app.js?v=20261012-brand"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261012-map-flow"></script><script src="/static/home-cards.js?v=20261012-map-flow"></script><script src="/static/app.js?v=20261012-map-flow"></script>{% endblock %}

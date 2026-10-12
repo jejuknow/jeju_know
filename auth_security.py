@@ -128,7 +128,7 @@ class ServerSessionMiddleware:
         if scope["method"] in ("POST", "PUT", "PATCH", "DELETE"):
             limit = 131072
             if connection.headers.get("content-type", "").lower().startswith("multipart/form-data"):
-                if ((data.get("admin_id") or (member and member["role"] == "admin")) and re.fullmatch(r"/admin/places/(?:new|\d+/edit)", scope["path"])) or (member and re.fullmatch(r"/places/(?:new|\d+/edit)", scope["path"])):
+                if ((data.get("admin_id") or (member and member["role"] == "admin")) and re.fullmatch(r"/admin/places/(?:new|\d+/edit)", scope["path"])) or (member and re.fullmatch(r"/map/register|/places/(?:new|\d+/edit)", scope["path"])):
                     limit += 5 * 10 * 1024 * 1024
                 elif ((data.get("admin_id") and re.fullmatch(r"/admin/news/(?:new|\d+/edit)", scope["path"]))
                       or (member and re.fullmatch(r"/issues/(?:new|\d+/edit)", scope["path"]))):

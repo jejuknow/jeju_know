@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
 {% block title %}FIND · 제주 장소 찾기 | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261011-wrap">{% endblock %}
-{% block body %}<main><div class="wrap"><div class="community-callout"><div><strong>함께 만드는 제주 장소 기록</strong><p>새로운 장소를 알려주세요. 등록 주체와 확인 상태를 구분해 보여드립니다.</p></div><a class="primary-inline" href="/places/new">+ 장소 알려주기</a></div></div>{% include '_finder.html' %}{% include '_place_results.html' %}</main>{% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261012-brand"></script><script src="/static/home-cards.js?v=20261012-brand"></script><script src="/static/app.js?v=20261012-brand"></script>{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261012-map-flow">{% endblock %}
+{% block body %}<main>{% include '_finder.html' %}{% include '_place_results.html' %}</main>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261012-map-flow"></script><script src="/static/home-cards.js?v=20261012-map-flow"></script><script src="/static/app.js?v=20261012-map-flow"></script>{% endblock %}

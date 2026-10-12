@@ -25,6 +25,11 @@
     state.terms=(query.get('detail')||'').split(',').filter(Boolean);
     return state;
   }
+  function href(path,state){const query=params(state);return path+(query.size?'?'+query:'');}
+  function registrationHref(state,source='map'){
+    const query=params(state);query.set('source',source==='new'||state.new==='current'?'new':'map');
+    return '/map/register?'+query;
+  }
   function termsFor(taxonomy,category){
     const parent=taxonomy.categories.find(c=>c.slug===category);
     return parent?taxonomy.terms.filter(t=>t.parent_id===parent.id):[];
@@ -41,6 +46,6 @@
       button.classList.toggle('is-selected',active);button.setAttribute('aria-pressed',String(active));container.append(button);
     });
   }
-  const api={defaultState,select,params,fromParams,termsFor,labels,chips,regionLabel};
+  const api={defaultState,select,params,fromParams,termsFor,labels,chips,regionLabel,href,registrationHref};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PlaceSearch=api;
 })(typeof window==='undefined'?globalThis:window);
