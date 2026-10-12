@@ -120,7 +120,9 @@
       list.querySelectorAll('.map-place-card').forEach(card=>{card.classList.remove('is-selected');card.querySelector('button').setAttribute('aria-pressed','false');});
     });
     const body=element('div','map-selected-body');
-    body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',place.one_line||'제주노가 기록한 장소입니다.'));
+    body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
+    body.append(element('p','place-provenance',place.status_label||''));
+    if(place.is_pick)body.append(element('span','badge pick','JEJUNO PICK'));
     if(!hasCoordinates(place)) body.append(element('p','map-location-missing','지도 위치 미등록'));
     const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
     body.append(link);selected.append(close,thumbnail(place),body);selected.hidden=false;
@@ -131,7 +133,7 @@
     const mapped=state.places.filter(hasCoordinates).length;
     coordinateCount.textContent=`지도 위치 등록 ${mapped}곳`+(mapped<state.places.length?` · 위치 미등록 ${state.places.length-mapped}곳`:'');
     categoryNav.querySelectorAll('button').forEach(button=>{
-      const active=button.dataset.category===state.category;
+      const active=button.dataset.pick?state.pick==='current':!state.pick&&button.dataset.category===state.category;
       button.classList.toggle('is-selected',active);button.setAttribute('aria-pressed',String(active));
     });
     list.replaceChildren();selected.hidden=true;state.selected=null;
@@ -144,7 +146,8 @@
       const card=element('article','map-place-card');card.dataset.placeId=place.id;
       const button=element('button','map-place-select');button.type='button';button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',`${place.name} 위치 보기`);
       const body=element('div','map-card-body');
-      body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',place.one_line||'제주노가 기록한 장소입니다.'));
+      body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
+      body.append(element('p','place-provenance',place.status_label||''));
       if(place.is_pick) body.append(element('span','badge pick','JEJUNO PICK'));
       if(!hasCoordinates(place)) body.append(element('span','map-location-missing','지도 위치 미등록'));
       button.append(thumbnail(place),body);button.addEventListener('click',()=>selectPlace(place.id));
@@ -171,7 +174,7 @@
       list.replaceChildren(element('p','map-empty','연결을 확인하고 검색 버튼을 다시 눌러 주세요.'));
     } finally { if(request===sequence)list.setAttribute('aria-busy','false'); }
   }
-  categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category]');if(!button)return;filters.select(state,'category',button.dataset.category);renderDetails();state.q=query.value.trim();search();});
+  categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category],[data-pick]');if(!button)return;state.pick=button.dataset.pick||'';state.new='';filters.select(state,'category',button.dataset.category||'');renderDetails();state.q=query.value.trim();search();});
   detailNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,'terms',button.dataset.value);renderDetails();search();});
   document.getElementById('mapSearch').addEventListener('submit',event=>{event.preventDefault();state.q=query.value.trim();search();});
   query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search();},250);});
@@ -180,7 +183,7 @@
   renderDetails();search();
   root.JejunoKakao.load(workspace.dataset.kakaoKey).then(maps=>{
     view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,index,select)=>{
-      const pin=element('button','map-pin',String(index));pin.type='button';pin.setAttribute('aria-label',`${place.name} 지도 마커`);pin.setAttribute('aria-pressed','false');pin.addEventListener('click',select);return pin;
+      const pin=element('button','map-pin'+(place.is_pick?' is-pick':''),String(index));pin.type='button';pin.setAttribute('aria-label',`${place.name} 지도 마커`);pin.setAttribute('aria-pressed','false');pin.addEventListener('click',select);return pin;
     });
     view.render(state.places);fitButton.disabled=!state.places.some(hasCoordinates);updateNotice();
     new ResizeObserver(()=>view.resize()).observe(document.getElementById('kakaoMap'));

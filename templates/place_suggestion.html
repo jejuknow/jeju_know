@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}정보 수정 제안 | JEJUNO{% endblock %}{% block body_class %}admin-body{% endblock %}
+{% block body %}<main class="admin-wide admin-main narrow"><p class="kicker">UPDATE A PLACE</p><h1>{{ place.name }} · 수정 제안</h1><p class="section-copy">관리자가 확인하기 전에는 현재 장소 정보가 바뀌지 않습니다.</p>{% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
+<form class="admin-form form-card" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>제안 항목<select name="field" id="suggestionField" required>{% for value,label in suggestion_fields.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+<label id="suggestionText">변경 내용<textarea name="new_value" id="suggestionValue" required maxlength="2000" rows="4"></textarea></label>
+<label id="suggestionCategory" hidden>올바른 카테고리<select name="new_value" disabled>{% for c in categories if c.is_active %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
+<p class="form-help" id="suggestionHelp">변경된 내용을 입력해주세요. 폐업·기타는 확인한 내용을 문장으로 적어주세요.</p>
+<label>확인 근거·이유<textarea name="reason" required minlength="5" maxlength="2000" rows="4" placeholder="공식 안내, 현장 안내 또는 변경 정보를 알게 된 경위를 적어주세요."></textarea></label><div class="form-actions"><a class="secondary-btn" href="/place/{{ place.slug }}">장소로 돌아가기</a><button class="primary-inline" type="submit">수정 제안 보내기</button></div></form></main>{% endblock %}
+{% block scripts %}<script src="/static/place-suggestion.js?v=20261012"></script>{% endblock %}

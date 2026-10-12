@@ -49,6 +49,11 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
     def redirect(url):
         return RedirectResponse(url, status_code=303)
 
+    def login_destination(value):
+        # Only known participation pages; never redirect to an arbitrary host.
+        value = str(value or '')
+        return value if re.fullmatch(r'/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places', value) else '/account'
+
     def guard(request):
         if not current_user(request):
             return redirect("/login")
@@ -118,8 +123,8 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
     @app.get("/login", response_class=HTMLResponse)
     async def login_get(request: Request):
         if current_user(request):
-            return redirect("/account")
-        return render(request, "member_auth.html", mode="login", values={})
+            return redirect(login_destination(request.query_params.get('next')))
+        return render(request, "member_auth.html", mode="login", values={}, next_url=login_destination(request.query_params.get('next')))
 
     @app.post("/login")
     async def login_post(request: Request):
@@ -134,14 +139,14 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         valid = await run_in_threadpool(verify_password, password, user["password_hash"] if user and user["password_hash"] else DUMMY_HASH)
         if not valid or not user or user["status"] != "active":
-            return render(request, "member_auth.html", status=400, mode="login", values={"username": username}, error="아이디 또는 비밀번호를 확인해주세요.")
+            return render(request, "member_auth.html", status=400, mode="login", values={"username": username}, next_url=login_destination(form.get('next')), error="아이디 또는 비밀번호를 확인해주세요.")
         with closing(connect_db()) as conn, conn:
             conn.execute("UPDATE users SET last_login_at=CURRENT_TIMESTAMP WHERE id=?", (user["id"],))
             if PASSWORD_HASHER.check_needs_rehash(user["password_hash"]):
                 replacement = await run_in_threadpool(hash_password, password)
                 conn.execute("UPDATE users SET password_hash=? WHERE id=?", (replacement, user["id"]))
         rotate(request, user["id"])
-        return redirect("/account")
+        return redirect(login_destination(form.get('next')))
 
     @app.post("/logout")
     async def logout(request: Request):

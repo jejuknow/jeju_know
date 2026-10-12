@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 from starlette.formparsers import MultiPartException
-from auth_security import BODY_LIMIT_MESSAGE
+from auth_security import BODY_LIMIT_MESSAGE, safe_external_url
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_PIXELS = 25_000_000
@@ -110,9 +110,22 @@ class ImageStore:
     def decorate(self, item, kind):
         item["legacy_image_url"] = item.get("image_url", "")
         item["images"] = self.list(kind, item["id"])
+        if kind == "places":
+            with closing(self.connect_db()) as conn:
+                merged = conn.execute("SELECT i.* FROM images i JOIN places p ON p.id=i.place_id WHERE p.merged_into_id=? ORDER BY p.id,i.sort_order", (item["id"],)).fetchall()
+                legacy = conn.execute("SELECT image_url FROM places WHERE merged_into_id=? AND image_url!='' ORDER BY id", (item["id"],)).fetchall()
+            # Keep overflow photos and their original records when merging two five-photo places.
+            item["merged_images"] = [{**dict(r), "url": "/uploads/" + r["file_path"], "sort_order": 5+n, "is_primary": False} for n,r in enumerate(merged)]
+            for row in legacy:
+                if safe_external_url(row["image_url"]):
+                    item["merged_images"].append({"url": row["image_url"], "is_primary": False})
+        else:
+            item["merged_images"] = []
         primary = next((image for image in item["images"] if image["is_primary"]), None)
         if primary:
             item["image_url"] = primary["url"]
+        elif not item.get("image_url") and item["merged_images"]:
+            item["image_url"] = item["merged_images"][0]["url"]
         return item
 
     async def prepare(self, form, kind):
@@ -173,12 +186,16 @@ class ImageStore:
             return Response(status_code=404)
         with closing(self.connect_db()) as conn:
             # Only registered images are served; private/deleted content remains protected.
-            rows = conn.execute("""SELECT p.published AS place_public,n.published AS issue_public,
+            rows = conn.execute("""SELECT CASE WHEN COALESCE(c.deleted_at,p.deleted_at) IS NULL THEN COALESCE(c.published,p.published) ELSE 0 END AS place_public,
+                COALESCE(c.submitted_by_user_id,p.submitted_by_user_id) AS place_author,
+                COALESCE(c.deleted_at,p.deleted_at) AS place_deleted,n.published AS issue_public,
                 n.author_id,n.deleted_at FROM images i
-                LEFT JOIN places p ON p.id=i.place_id LEFT JOIN news_posts n ON n.id=i.issue_id
+                LEFT JOIN places p ON p.id=i.place_id LEFT JOIN places c ON c.id=p.merged_into_id
+                LEFT JOIN news_posts n ON n.id=i.issue_id
                 WHERE i.file_path=?""", (f"{kind}/{filename}",)).fetchall()
         member = request.scope.get("member")
-        allowed = any(request.session.get("admin_id") or row["place_public"] or
+        allowed = any(request.session.get("admin_id") or (member and member["role"] == "admin") or row["place_public"] or
+                      (member and row["place_deleted"] is None and row["place_author"] == member["id"]) or
                       (row["deleted_at"] is None and (row["issue_public"] or
                        (member and member["id"] == row["author_id"]))) for row in rows)
         if not allowed or not path.is_file():

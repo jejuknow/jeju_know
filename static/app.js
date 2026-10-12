@@ -44,11 +44,11 @@ document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListen
 }));
 async function boot(){
   try{
-    const [config,places]=await Promise.all([fetch('/api/place-taxonomy'),fetch('/api/places')]);
+    const [config,places]=await Promise.all([fetch('/api/place-taxonomy'),fetch('/api/places?pick=current')]);
     if(!config.ok||!places.ok)throw new Error('데이터 로딩 실패');
     taxonomy=await config.json();const all=await places.json();
     const picks=all.filter(p=>p.is_pick).slice(0,3);
-    $('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,search.regionLabel(p.region))).join(''):'<p>아직 공개된 JEJUNO PICK이 없습니다.</p>';
+    if($('pickGrid'))$('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,search.regionLabel(p.region))).join(''):'<p>아직 공개된 JEJUNO PICK이 없습니다.</p>';
     buildFilters();await renderResults();$('findBtn').disabled=false;
   }catch{$('resultSummary').textContent='장소 데이터를 불러오지 못했습니다. 새로고침해 주세요.';}
 }

@@ -3,7 +3,6 @@
 {% block title %}제주 이슈 {{ '수정' if item and item.id else '등록' }} | JEJUNO{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
-<header class="admin-header"><div class="admin-wide"><a class="brand" href="/"><strong>JEJUNO</strong><span>함께 나누는 제주</span></a><a class="secondary-btn" href="/account">내 활동</a></div></header>
 <main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>제주 이슈 {{ '수정' if item and item.id else '등록' }}</h1><p>새 글은 저장 즉시 공개됩니다. 본인이 확인한 정보를 요약하고 출처를 남겨주세요.</p></div></div>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
 {% if item and item.id and not item.published %}<p class="member-help">관리자가 숨긴 글입니다. 수정해도 공개 상태는 변경되지 않습니다.</p>{% endif %}

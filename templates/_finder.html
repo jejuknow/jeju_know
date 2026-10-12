@@ -1,0 +1,12 @@
+  <section class="finder-section" id="finder">
+    <div class="wrap finder-layout">
+      <div class="finder-intro"><p class="kicker">PLACE FINDER</p><h2>오늘 제주 어디가지?</h2><p>어디로, 누구와 떠나나요?<br>지역·장소 종류·동행만 골라도 좋아요.</p><div class="finder-note">TIP · 원하는 조건만 선택해도 좋아요.<br>함께 모은 장소 정보에서 찾아보세요.</div></div>
+      <div class="finder-card compact-finder">
+        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">1</span>어디로 갈까요?</legend><div class="chips" data-filter="region" id="regionChips"></div></fieldset>
+        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">2</span>무엇을 찾나요?</legend><div class="chips" data-filter="category" id="categoryChips"></div></fieldset>
+        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">3</span>누구와 가나요?</legend><p class="filter-help">함께 가는 사람을 모두 골라주세요.</p><div class="chips" data-filter="companions" id="companionChips"></div></fieldset>
+        <fieldset class="filter-group category-details" id="categoryDetails" hidden><legend class="filter-label" id="categoryDetailTitle"></legend><div class="filter-help-row"><p class="filter-help">선택사항 · 여러 개를 고를 수 있어요. 다시 누르면 해제돼요.</p><span class="filter-count" id="categoryDetailCount"></span></div><div class="chips" data-filter="terms" id="categoryDetailChips"></div></fieldset>
+        <button class="primary-btn" id="findBtn" type="button" disabled>이 조건으로 장소 보기 →</button>
+      </div>
+    </div>
+  </section>

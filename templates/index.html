@@ -2,59 +2,32 @@
 {% block title %}JEJUNO | 제주를 아는 사람의 제주 기록{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/home.css?v=20261011-wrap">{% endblock %}
 {% block body %}
-<header class="site-header editorial-header">
-  <div class="wrap header-inner">
-    <a class="brand" href="#top" aria-label="JEJUNO 홈"><strong>JEJUNO</strong><span>jeju_know</span></a>
-    <nav class="nav" id="siteNav" aria-label="주요 메뉴">
-      <a href="{{ url_for('news_list') }}">제주 이슈</a>
-      <a href="#finder">장소 찾기</a>
-      <a href="/map">제주 지도</a>
-      <a href="#pick">JEJUNO PICK</a>
-      <a href="#collections">추천 모음</a>
-      <a href="{{ url_for('partnership') }}">광고·제휴</a>
-      <a href="https://www.instagram.com/jeju_know/" target="_blank" rel="noreferrer">Instagram</a>
-    </nav>
-    <button class="nav-toggle" id="navToggle" aria-label="메뉴 열기" aria-controls="siteNav" aria-expanded="false">☰</button>
-  </div>
-</header>
-
 <main id="top">
   <section class="editorial-hero">
     <div class="wrap editorial-hero-inner">
       <div class="hero-story">
         <span class="hero-pill">JEJU LOCAL CURATION</span>
         <h1>내가 다시 가고 싶은<br><em>제주 기록</em></h1>
-        <p class="hero-subtitle"><span>맛집·카페·가볼 곳부터 제주 소식까지.</span><span>직접 기록한 추천 이유와 확인한 정보를 모았습니다.</span></p>
+        <p class="hero-subtitle"><span>맛집·카페·가볼 곳부터 제주 소식까지.</span><span>제주노의 추천과 함께 모은 장소 정보를 만나보세요.</span></p>
         <div class="hero-actions">
           <a class="hero-primary" href="#finder">내 조건으로 장소 찾기</a>
-          <a class="hero-secondary" href="#pick">제주노 PICK 보기</a>
+          <a class="hero-secondary" href="/map?pick=current">제주노 PICK 보기</a>
         </div>
       </div>
       <nav class="hero-board" aria-label="빠른 탐색">
         <a href="#finder" class="hero-board-card blue"><span>☕</span><strong>카페·맛집</strong><small>지역과 동행으로 찾기</small></a>
         <a href="{{ url_for('news_list') }}" class="hero-board-card green"><span>📰</span><strong>제주 이슈</strong><small>제주의 새로운 소식</small></a>
         <a href="/map" class="hero-board-card orange"><span>🗺️</span><strong>제주 지도</strong><small>지도에서 장소 찾기</small></a>
-        <a href="{{ url_for('partnership') }}" class="hero-board-card dark"><span>📣</span><strong>홍보·제휴</strong><small>제주노와 함께 알리기</small></a>
+        <a href="/new" class="hero-board-card dark"><span>✨</span><strong>NEW</strong><small>새로 생긴 카페와 맛집</small></a>
       </nav>
     </div>
   </section>
 
-  <section class="finder-section" id="finder">
-    <div class="wrap finder-layout">
-      <div class="finder-intro"><p class="kicker">PLACE FINDER</p><h2>오늘 제주 어디가지?</h2><p>어디로, 누구와 떠나나요?<br>지역·장소 종류·동행만 골라도 좋아요.</p><div class="finder-note">TIP · 원하는 조건만 선택해도 좋아요.<br>직접 기록하고 확인한 정보로 찾아드려요.</div></div>
-      <div class="finder-card compact-finder">
-        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">1</span>어디로 갈까요?</legend><div class="chips" data-filter="region" id="regionChips"></div></fieldset>
-        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">2</span>무엇을 찾나요?</legend><div class="chips" data-filter="category" id="categoryChips"></div></fieldset>
-        <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">3</span>누구와 가나요?</legend><p class="filter-help">함께 가는 사람을 모두 골라주세요.</p><div class="chips" data-filter="companions" id="companionChips"></div></fieldset>
-        <fieldset class="filter-group category-details" id="categoryDetails" hidden><legend class="filter-label" id="categoryDetailTitle"></legend><div class="filter-help-row"><p class="filter-help">선택사항 · 여러 개를 고를 수 있어요. 다시 누르면 해제돼요.</p><span class="filter-count" id="categoryDetailCount"></span></div><div class="chips" data-filter="terms" id="categoryDetailChips"></div></fieldset>
-        <button class="primary-btn" id="findBtn" type="button" disabled>이 조건으로 장소 보기 →</button>
-      </div>
-    </div>
-  </section>
+  {% include '_finder.html' %}
 
   <section class="section wrap news-home" id="today">
     <div class="section-head editorial-section-head">
-      <div><p class="kicker">JEJUNO TODAY</p><h2>제주 이슈</h2><p class="section-copy">{{ news_categories|join(', ') }}을 제주노가 확인한 정보와 출처 기준으로 정리합니다.</p></div>
+      <div><p class="kicker">JEJUNO TODAY</p><h2>제주 이슈</h2><p class="section-copy">{{ news_categories|join(', ') }} 소식을 제주노와 사용자들이 함께 전합니다.</p></div>
       <a class="text-btn" href="{{ url_for('news_list') }}">제주 이슈 전체보기 →</a>
     </div>
     {% if news_items %}
@@ -80,31 +53,16 @@
     {% endif %}
   </section>
 
-  <section class="section wrap" id="places">
-    <div class="section-head">
-      <div><p class="kicker">SEARCH RESULT</p><h2>조건에 맞는 장소</h2><p id="resultSummary" class="section-copy" role="status">장소 데이터를 불러오는 중입니다.</p></div>
-      <button class="text-btn" id="resetBtn">필터 초기화</button>
-    </div>
-    <div id="placeGrid" class="place-grid compact-place-grid" aria-live="polite"></div>
-    <div class="results-footer"><a class="text-btn" id="allResultsBtn" href="/places" hidden>전체 결과 보기 →</a></div>
-    <div id="emptyState" class="empty-state" hidden><div class="empty-emoji">🔎</div><h3>선택한 조건에 맞는 장소가 아직 없습니다.</h3><p>현재 공개된 정보만 기준으로 보여드리고 있어요.<br>조건을 조금 줄여보세요.</p></div>
-  </section>
+  {% include '_place_results.html' %}
 
-  <section class="section soft" id="pick"><div class="wrap"><div class="section-head"><div><p class="kicker">JEJUNO PICK</p><h2>제주노가 특히 추천하는 곳</h2><p class="section-copy">다시 찾고 싶은 장소, 제주노가 추천하는 이유를 만나보세요.</p></div></div><div id="pickGrid" class="pick-grid"></div></div></section>
+  <section class="section soft" id="pick"><div class="wrap"><div class="section-head"><div><p class="kicker">JEJUNO PICK</p><h2>이달의 JEJUNO PICK</h2><p class="section-copy">제주노가 이번 달 고른 장소</p></div><a class="text-btn" href="/map?pick=current">지도에서 PICK 보기 →</a></div><div id="pickGrid" class="pick-grid"></div></div></section>
 
   <section class="section wrap" id="collections">
     <div class="section-head"><div><p class="kicker">CURATED LIST</p><h2>상황별 추천 모음</h2><p class="section-copy">함께하는 사람과 오늘의 날씨에 맞춰 제주를 골라보세요.</p></div></div>
-    <div class="collection-grid">
-      <article class="collection-card"><span>👨‍👩‍👦</span><h3>부모님과 가기 좋은 제주</h3><p>부모님 동행 태그가 등록된 장소를 빠르게 확인합니다.</p><a href="#finder" data-collection="parents">이 조건으로 보기 →</a></article>
-      <article class="collection-card"><span>☕</span><h3>혼자 쉬기 좋은 카페</h3><p>혼자 + 카페 조건으로 조용히 들르기 좋은 후보를 봅니다.</p><a href="#finder" data-collection="soloCafe">이 조건으로 보기 →</a></article>
-      <article class="collection-card"><span>🌧️</span><h3>비 오는 날의 제주</h3><p>날씨가 아쉬운 날에도 갈 수 있는 장소를 모아봅니다.</p><a href="#finder" data-collection="rain">이 조건으로 보기 →</a></article>
-    </div>
+    {% include '_best_collections.html' %}
   </section>
 
-  <section class="partnership-banner">
-    <div class="wrap partnership-banner-inner"><div><p class="kicker light">JEJUNO PARTNERSHIP</p><h2>좋은 제주 소식이라면,<br>제주노에서 더 잘 보이게.</h2><p>행사·공간·브랜드 홍보를 일반 정보와 구분해 명확하게 표시하고, 향후 유료 프로모션으로 확장할 수 있는 구조를 준비했습니다.</p></div><a href="{{ url_for('partnership') }}">광고·제휴 안내 보기 →</a></div>
-  </section>
 </main>
 <footer><div class="wrap footer-inner"><div class="brand footer-brand"><strong>JEJUNO</strong><span>jeju_know</span></div><p>제주노가 기록하는 이유 있는 제주 추천 · <a href="{{ url_for('admin_dashboard') }}">관리자</a></p></div></footer>
 {% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261011-filters"></script><script src="/static/home-cards.js?v=20261011-uploads"></script><script src="/static/app.js?v=20261011-filters"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261012-community"></script><script src="/static/home-cards.js?v=20261012-community"></script><script src="/static/app.js?v=20261012-community"></script>{% endblock %}

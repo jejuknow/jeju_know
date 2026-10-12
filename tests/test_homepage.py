@@ -94,15 +94,15 @@ class HomepageTest(unittest.TestCase):
         positions=[page.text.index(f'id="{identifier}"') for identifier in ('finder','today','places','pick','collections')]
         self.assertEqual(positions,sorted(positions))
         self.assertIn('<h1>내가 다시 가고 싶은<br><em>제주 기록</em></h1>',page.text)
-        self.assertIn('<span>맛집·카페·가볼 곳부터 제주 소식까지.</span><span>직접 기록한 추천 이유와 확인한 정보를 모았습니다.</span>',page.text)
-        self.assertIn('href="#pick">제주노 PICK 보기',page.text)
+        self.assertIn('<span>맛집·카페·가볼 곳부터 제주 소식까지.</span><span>제주노의 추천과 함께 모은 장소 정보를 만나보세요.</span>',page.text)
+        self.assertIn('href="/map?pick=current">제주노 PICK 보기',page.text)
         self.assertIn('선택사항',page.text)
         self.assertIn('id="allResultsBtn" href="/places"',page.text)
         self.assertEqual(self.client.get('/places').status_code,200)
-        self.assertIn('href="http://testserver/news">제주 이슈</a>',page.text)
+        self.assertIn('href="/news"',page.text)
         for path in ('/news','/partnership'):
             html=self.client.get(path).text
-            self.assertIn('>제주 이슈</a>',html)
+            self.assertIn('>ISSUE</a>',html)
             self.assertIn('aria-controls="siteNav"',html)
         self.assertEqual(self.client.get('/map').status_code,200)
 

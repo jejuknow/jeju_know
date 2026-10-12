@@ -1,16 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{{ place.name }} | JEJUNO{% endblock %}
 {% block body %}
-<header class="site-header"><div class="wrap header-inner"><a class="brand" href="{{ url_for('home') }}"><strong>JEJUNO</strong><span>오늘 제주 어디가지?</span></a><nav class="nav detail-nav"><a href="{{ url_for('home') }}#places">← 장소 찾기</a><a href="/map">제주 지도</a></nav></div></header>
 <main class="detail-page wrap">
   <article class="detail-shell">
     <div class="detail-visual {% if place.image_url %}uploaded-visual{% endif %}">{% if place.image_url %}<img src="{{ place.image_url }}" alt="{{ place.name }} 대표사진">{% else %}<span>{{ place.emoji }}</span>{% endif %}</div>
     <div class="detail-content">
-      {% if place.images|rejectattr('is_primary')|list %}<section aria-label="추가사진" class="place-gallery">{% for image in place.images if not image.is_primary %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ image.sort_order }}" loading="lazy"></a><figcaption>추가사진 {{ image.sort_order }}</figcaption></figure>{% endfor %}</section>{% endif %}
+      {% set gallery = (place.images|rejectattr('is_primary')|list) + place.merged_images %}
+      {% if gallery %}<section aria-label="추가사진" class="place-gallery">{% for image in gallery %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ loop.index }}" loading="lazy"></a><figcaption>추가사진 {{ loop.index }}</figcaption></figure>{% endfor %}</section>{% endif %}
       <div class="meta-row"><span class="badge primary">{{ place.region }}</span><span class="badge">{{ place.category }}</span>{% if place.is_pick %}<span class="badge pick">JEJUNO PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       <h1 class="detail-title">{{ place.name }}</h1>
+      <p class="place-provenance">{{ place.status_label }}</p>
+      {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
+      {% if place.website_url %}<p><a href="{{ place.website_url }}" target="_blank" rel="noopener noreferrer">홈페이지·Instagram →</a></p>{% endif %}
       <p class="detail-lead">{{ place.one_line }}</p>
-      <div class="detail-section"><h2>👍 왜 추천해요?</h2><p>{{ place.reason or '아직 추천 이유가 입력되지 않았습니다.' }}</p></div>
+      {% if place.pick_note or place.reason %}<div class="detail-section"><h2>👍 제주노 추천 이유</h2><p>{{ place.pick_note or place.reason }}</p></div>{% endif %}
       <div class="detail-section"><h2>👥 잘 맞는 동행</h2><div class="tag-row">{% for item in place.companions %}<span class="tag">#{{ item }}</span>{% else %}<span class="muted">미입력</span>{% endfor %}</div></div>
       <div class="detail-section"><h2>✨ 장소 특징</h2><div class="tag-row">{% for item in place.features_public %}<span class="tag">#{{ item }}</span>{% else %}<span class="muted">미입력</span>{% endfor %}</div></div>
       <div class="detail-section"><h2>ℹ️ 이용 정보</h2><div class="status-grid"><div><span>주차</span><strong>{{ place.parking_status }}</strong></div><div><span>반려동물</span><strong>{{ place.pet_status }}</strong></div><div><span>아이 동반</span><strong>{{ place.child_status }}</strong></div><div><span>무장애</span><strong>{{ place.accessible_status }}</strong></div></div></div>
@@ -20,6 +23,8 @@
         {% if place.map_url %}<a class="map-btn" href="{{ place.map_url }}" target="_blank" rel="noreferrer">지도에서 보기</a>{% else %}<a class="map-btn" href="https://map.naver.com/p/search/{{ place.name|urlencode }}" target="_blank" rel="noreferrer">네이버지도 검색</a>{% endif %}
         <button class="share-btn" id="sharePlace" data-title="{{ place.name }}">공유하기</button>
       </div>
+      <div class="community-callout"><div><strong>정보가 달라졌나요?</strong><p>변경된 정보는 관리자가 확인한 뒤 반영합니다.</p></div><a class="secondary-btn" href="/places/{{ place.id }}/suggest">수정 제안하기</a></div>
+      {% if member and member.id == place.submitted_by_user_id and place.verification_status == 'unverified' %}<a class="text-btn" href="/places/{{ place.id }}/edit">내가 등록한 장소 수정 →</a>{% endif %}
     </div>
   </article>
 </main>
@@ -28,7 +33,7 @@
 <script>
 document.getElementById('sharePlace')?.addEventListener('click', async (e) => {
   const title = e.currentTarget.dataset.title;
-  const data = {title:`JEJUNO | ${title}`, text:`제주노 추천 장소: ${title}`, url:location.href};
+  const data = {title:`JEJUNO | ${title}`, text:`JEJUNO 장소 정보: ${title}`, url:location.href};
   if (navigator.share) { try { await navigator.share(data); } catch(_){} }
   else { try { await navigator.clipboard.writeText(location.href); alert('링크를 복사했습니다.'); } catch(_) { prompt('링크를 복사해주세요.', location.href); } }
 });

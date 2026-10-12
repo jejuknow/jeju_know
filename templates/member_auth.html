@@ -9,6 +9,7 @@
   {% include '_flashes.html' %}{% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
   <form method="post" class="admin-form" action="/{{ mode }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if mode == 'login' %}<input type="hidden" name="next" value="{{ next_url or '/account' }}">{% endif %}
     <label>아이디<input name="username" required minlength="3" maxlength="30" autocomplete="username" autocapitalize="none" value="{{ values.username or '' }}" {% if mode == 'signup' %}pattern="[a-zA-Z0-9_]{3,30}"{% endif %}></label>
     {% if mode == 'signup' %}<small>영문·숫자·밑줄 3~30자, 대소문자는 구분하지 않습니다.</small>{% endif %}
     <label>비밀번호<input type="password" name="password" required {% if mode == 'signup' %}minlength="{{ signup_password_min_length }}" maxlength="{{ signup_password_max_length }}" autocomplete="new-password" aria-describedby="signup-password-help"{% else %}maxlength="128" autocomplete="current-password"{% endif %}></label>

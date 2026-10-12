@@ -1,4 +1,4 @@
-{% macro image_uploads(content, kind) %}
+{% macro image_uploads(content, kind, legacy=true) %}
 <section class="form-card image-editor" data-image-editor>
   <h2>{{ '장소 사진' if kind == 'places' else '대표 포스터' }}</h2>
   <p class="form-help">{{ '대표사진 1장과 추가사진 최대 4장을 올릴 수 있어요. 아래 번호 순서로 표시됩니다.' if kind == 'places' else '행사나 소식을 소개하는 포스터 1장을 올려주세요.' }} 저장 버튼을 누르면 반영됩니다.</p>
@@ -20,9 +20,9 @@
     </div>
   {% endfor %}
   </div>
-  <details class="image-url-option"><summary>기존 이미지 URL 사용 (선택)</summary>
+  {% if legacy %}<details class="image-url-option"><summary>기존 이미지 URL 사용 (선택)</summary>
     <p class="form-help">업로드한 대표 이미지가 우선 표시됩니다. 업로드 사진을 삭제하면 저장된 URL 이미지가 다시 표시됩니다.</p>
     <label>대표 이미지 URL<input type="url" name="image_url" maxlength="2048" value="{{ content.get('legacy_image_url', content.get('image_url','')) if content else '' }}" placeholder="https://..."></label>
-  </details>
+  </details>{% endif %}
 </section>
 {% endmacro %}

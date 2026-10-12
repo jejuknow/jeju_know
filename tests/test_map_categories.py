@@ -92,7 +92,9 @@ class MapCategoryTest(unittest.TestCase):
         self.post(f"/admin/places/{place['id']}/delete")
         self.post(f"/admin/categories/{category['id']}/delete")
         with closing(sqlite3.connect(self.db_path)) as conn:
-            self.assertEqual(conn.execute('SELECT count(*) FROM categories WHERE id=?',(category['id'],)).fetchone()[0],0)
+            # A deleted place with monthly PICK history still references its category.
+            self.assertEqual(conn.execute('SELECT count(*) FROM categories WHERE id=?',(category['id'],)).fetchone()[0],1)
+            self.assertIsNotNone(conn.execute('SELECT deleted_at FROM places WHERE id=?',(place['id'],)).fetchone()[0])
             self.assertEqual(conn.execute('PRAGMA foreign_key_check').fetchall(),[])
 
     def test_coordinate_validation_and_clear(self):

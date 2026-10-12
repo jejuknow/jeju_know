@@ -1,0 +1,9 @@
+<header class="site-header community-header"><div class="wrap header-inner">
+  <a class="brand" href="/" aria-label="JEJUNO 홈"><strong>JEJUNO</strong><span>jeju_know</span></a>
+  <nav class="nav" id="siteNav" aria-label="주요 메뉴">
+    {% for label, href in [('FIND','/find'),('NEW','/new'),('ISSUE','/news'),('MAP','/map'),('BEST','/best')] %}
+    <a href="{{ href }}" {% if request.url.path == href or (href == '/best' and request.url.path.startswith('/best/')) %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <button class="nav-toggle" id="navToggle" type="button" aria-label="메뉴 열기" aria-controls="siteNav" aria-expanded="false">☰</button>
+</div></header>

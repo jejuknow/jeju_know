@@ -1,5 +1,6 @@
 """Shared DB classifications and public search used by home, list and map."""
 from taxonomy_migrations import json_list, legacy_term_ids
+from community_migrations import today
 
 CORE_ORDER = {"food": 0, "cafe": 1, "attraction": 2}
 
@@ -48,10 +49,19 @@ def save_links(conn, place_id, term_ids):
     conn.executemany("INSERT INTO place_category_links(place_id,category_id) VALUES (?,?)", [(place_id, i) for i in term_ids])
 
 
-def public_search(conn, category="", q="", region="", companion="", detail="", condition=""):
+def public_search(conn, category="", q="", region="", companion="", detail="", condition="", pick="", new=""):
     if any(len(v) > limit for v, limit in ((category, 80), (q, 200), (region, 100), (companion, 1000), (detail, 8100), (condition, 40))):
         return []
-    clauses, params = ["p.published=1"], []
+    clauses, params = ["p.published=1", "p.deleted_at IS NULL", "p.merged_into_id IS NULL"], []
+    if pick not in ("", "current") or new not in ("", "current"):
+        return []
+    now = today()
+    if pick:
+        clauses.append("EXISTS(SELECT 1 FROM place_pick_periods k WHERE k.place_id=p.id AND k.year=? AND k.month=? AND k.is_active=1)")
+        params.extend([now.year,now.month])
+    if new:
+        clauses.append("c.slug IN ('cafe','food') AND c.is_active=1 AND p.new_override!='hide' AND (p.new_override='show' OR p.opened_year=?)")
+        params.append(now.year)
     if category:
         clauses.append("c.slug=? AND c.type='place' AND c.is_active=1")
         params.append(category)

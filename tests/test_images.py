@@ -217,7 +217,8 @@ class ImageUploadTest(unittest.TestCase):
         self.assertEqual(self.rows('SELECT * FROM images'),[])
         self.assertFalse(any(path.exists() for path in files))
         self.save_place(emoji='☕')
-        place = self.rows('SELECT * FROM places')[0]
+        # PICK history now retains an archived row after deletion; only live rows render.
+        place = self.rows('SELECT * FROM places WHERE deleted_at IS NULL')[0]
         self.assertIn('☕',self.visitor.get('/place/'+place['slug']).text)
 
     def test_shared_reference_survives_until_last_reference_deleted(self):

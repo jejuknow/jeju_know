@@ -22,6 +22,9 @@ from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedF
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
 from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
 from member_routes import register_member_routes, validate_news
+from community_migrations import backup_before_community_migration, migrate_community, today as community_today
+from community_places import decorate_facts, opening, save_admin_facts, VERIFICATION_LABELS
+from community_routes import register_community_routes
 from starlette.concurrency import run_in_threadpool
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -155,6 +158,8 @@ def create_app(test_config=None):
             "csrf_token": request.session["csrf_token"], "flashes": flashes,
             "news_categories": NEWS_CATEGORIES, "news_category_labels": NEWS_CATEGORY_LABELS,
             "member": current_user(request),
+            "verification_labels": VERIFICATION_LABELS,
+            "current_year": community_today().year, "current_month": community_today().month,
         }
 
     templates = Jinja2Templates(directory=BASE_DIR / "templates", context_processors=[context_processor])
@@ -166,6 +171,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        community_backup_path = backup_before_community_migration(app.state.database)
         image_backup_path = backup_before_image_migration(app.state.database)
         taxonomy_backup_path = backup_before_taxonomy_migration(app.state.database)
         home_backup_path = backup_before_home_migration(app.state.database)
@@ -264,6 +270,7 @@ def create_app(test_config=None):
         migrate_home(app.state.database, home_backup_path)
         migrate_taxonomy(app.state.database, taxonomy_backup_path)
         migrate_images(app.state.database, image_backup_path)
+        migrate_community(app.state.database, community_backup_path)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -329,6 +336,11 @@ def create_app(test_config=None):
         if place.get("accessible_status") == "가능" and "무장애" not in public_features:
             public_features.append("무장애")
         place["features_public"] = public_features
+        conn = connect_db()
+        try:
+            decorate_facts(conn, place)
+        finally:
+            conn.close()
         return image_store.decorate(place, "places")
 
     def row_to_news(row):
@@ -433,6 +445,11 @@ def create_app(test_config=None):
             "checked_at": str(form.get("checked_at", "")).strip(),
             "is_example": 1 if form.get("is_example") == "1" else 0,
             "published": 1 if form.get("published") == "1" else 0,
+            "opened_year": form.get("opened_year", existing["opened_year"] if existing else None),
+            "opened_month": form.get("opened_month", existing["opened_month"] if existing else None),
+            "website_url": str(form.get("website_url", existing["website_url"] if existing else "")).strip(),
+            "new_override": str(form.get("new_override", existing["new_override"] if existing else "auto")),
+            "verification_status": str(form.get("verification_status", existing["verification_status"] if existing else "unverified")),
         }
 
     async def parse_news_form(request: Request, existing=None):
@@ -468,6 +485,14 @@ def create_app(test_config=None):
         return [dict(row) for row in rows]
 
     def validate_place(data, existing=None):
+        try:
+            data["opened_year"], data["opened_month"] = opening(data["opened_year"], data["opened_month"])
+        except ValueError as exc:
+            return str(exc)
+        if data["verification_status"] not in VERIFICATION_LABELS or data["new_override"] not in ("auto","show","hide"):
+            return "확인 상태와 NEW 노출 설정을 확인해주세요."
+        if not safe_external_url(data["website_url"]) or len(data["website_url"]) > 2000:
+            return "홈페이지는 올바른 http 또는 https URL로 입력해주세요."
         if not data["name"] or not data["region"]:
             return "장소명과 지역을 확인해 주세요."
         conn = connect_db()
@@ -530,28 +555,40 @@ def create_app(test_config=None):
         news_rows = conn.execute(
             "SELECT * FROM news_posts WHERE published=1 AND deleted_at IS NULL ORDER BY is_promoted DESC, datetime(created_at) DESC, id DESC LIMIT 5"
         ).fetchall()
+        collections = [dict(r) for r in conn.execute("SELECT * FROM best_collections WHERE published=1 ORDER BY sort_order,id")]
         conn.close()
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"news_items": [row_to_news(row) for row in news_rows]},
+            context={"news_items": [row_to_news(row) for row in news_rows], "collections": collections},
         )
 
     @app.get("/place/{slug}", response_class=HTMLResponse)
     async def place_detail(request: Request, slug: str):
         conn = connect_db()
-        row = conn.execute("SELECT * FROM places WHERE slug=? AND published=1", (slug,)).fetchone()
+        row = conn.execute("SELECT * FROM places WHERE slug=? AND deleted_at IS NULL", (slug,)).fetchone()
+        if row and row["merged_into_id"]:
+            target = conn.execute("SELECT slug FROM places WHERE id=? AND published=1 AND deleted_at IS NULL", (row["merged_into_id"],)).fetchone()
+            conn.close()
+            return RedirectResponse("/place/" + target["slug"], status_code=301) if target else HTMLResponse("장소를 찾을 수 없습니다.",status_code=404)
         conn.close()
-        if not row:
+        if not row or not row["published"]:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         return templates.TemplateResponse(request=request, name="place_detail.html", context={"place": row_to_place(row)})
 
     @app.get("/api/places")
-    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = ""):
+    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = ""):
         conn = connect_db()
         try:
-            rows = public_search(conn, category, q, region, companion, detail, condition)
-            return JSONResponse([row_to_place(row) for row in rows], headers={"Cache-Control": "no-store"})
+            rows = public_search(conn, category, q, region, companion, detail, condition, pick, new)
+            places = [row_to_place(row) for row in rows]
+            if pick == "current":
+                places.sort(key=lambda p: (p["pick_order"],p["id"]))
+            # Private submitter IDs and internal moderator identities are never public API fields.
+            for place in places:
+                for key in ("submitted_by_user_id","verified_by","deleted_at","merged_into_id"):
+                    place.pop(key, None)
+            return JSONResponse(places, headers={"Cache-Control": "no-store"})
         finally:
             conn.close()
 
@@ -707,7 +744,7 @@ def create_app(test_config=None):
         if guard:
             return guard
         conn = connect_db()
-        rows = conn.execute("SELECT * FROM places ORDER BY updated_at DESC, id DESC").fetchall()
+        rows = conn.execute("SELECT * FROM places WHERE deleted_at IS NULL AND merged_into_id IS NULL ORDER BY updated_at DESC, id DESC").fetchall()
         news_rows = conn.execute("SELECT * FROM news_posts WHERE deleted_at IS NULL ORDER BY updated_at DESC, id DESC").fetchall()
         conn.close()
         return templates.TemplateResponse(
@@ -1010,6 +1047,7 @@ def create_app(test_config=None):
             )
             save_links(conn, cursor.lastrowid, data["term_ids"])
             plan.apply(conn, cursor.lastrowid)
+            save_admin_facts(conn, cursor.lastrowid, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
         return RedirectResponse(url="/admin", status_code=303)
 
@@ -1019,7 +1057,10 @@ def create_app(test_config=None):
         if guard:
             return guard
         conn = connect_db()
-        row = conn.execute("SELECT * FROM places WHERE id=?", (place_id,)).fetchone()
+        row = conn.execute("SELECT * FROM places WHERE id=? AND deleted_at IS NULL", (place_id,)).fetchone()
+        if row and row["merged_into_id"]:
+            conn.close()
+            return RedirectResponse(f"/admin/places/{row['merged_into_id']}/edit", status_code=303)
         place = row_to_place(row) if row else None
         if place:
             place["term_ids"] = linked_ids(conn, place_id)
@@ -1034,7 +1075,7 @@ def create_app(test_config=None):
         if guard:
             return guard
         conn = connect_db()
-        existing = conn.execute("SELECT * FROM places WHERE id=?", (place_id,)).fetchone()
+        existing = conn.execute("SELECT * FROM places WHERE id=? AND deleted_at IS NULL AND merged_into_id IS NULL", (place_id,)).fetchone()
         conn.close()
         if not existing:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
@@ -1071,6 +1112,7 @@ def create_app(test_config=None):
             )
             save_links(conn, place_id, data["term_ids"])
             plan.apply(conn, place_id)
+            save_admin_facts(conn, place_id, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")
         return RedirectResponse(url="/admin", status_code=303)
 
@@ -1083,7 +1125,7 @@ def create_app(test_config=None):
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         conn = connect_db()
-        row = conn.execute("SELECT published FROM places WHERE id=?", (place_id,)).fetchone()
+        row = conn.execute("SELECT published FROM places WHERE id=? AND deleted_at IS NULL AND merged_into_id IS NULL", (place_id,)).fetchone()
         if not row:
             conn.close()
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
@@ -1103,20 +1145,28 @@ def create_app(test_config=None):
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         conn = connect_db()
-        row = conn.execute("SELECT name FROM places WHERE id=?", (place_id,)).fetchone()
+        row = conn.execute("SELECT name FROM places WHERE id=? AND deleted_at IS NULL AND merged_into_id IS NULL", (place_id,)).fetchone()
         if not row:
             conn.close()
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         conn.close()
         plan = ImagePlan(image_store, "places")
         with plan.transaction() as conn:
-            plan.delete_owner(conn, place_id)
-            conn.execute("DELETE FROM places WHERE id=?", (place_id,))
+            related = conn.execute("SELECT (SELECT count(*) FROM place_pick_periods WHERE place_id=?) + (SELECT count(*) FROM place_correction_suggestions WHERE place_id=?) + (SELECT count(*) FROM best_collection_places WHERE place_id=?) + (SELECT count(*) FROM place_merge_log WHERE source_id=? OR target_id=?)", (place_id,place_id,place_id,place_id,place_id)).fetchone()[0]
+            if related:
+                for owner in conn.execute("SELECT id FROM places WHERE id=? OR merged_into_id=?", (place_id,place_id)).fetchall():
+                    plan.delete_owner(conn, owner[0])
+                conn.execute("UPDATE places SET published=0,deleted_at=CURRENT_TIMESTAMP WHERE id=?", (place_id,))
+            else:
+                plan.delete_owner(conn, place_id)
+                conn.execute("DELETE FROM places WHERE id=?", (place_id,))
         flash(request, f"‘{row['name']}’을(를) 즉시 삭제했습니다.", "success")
         return RedirectResponse(url="/admin", status_code=303)
 
     register_member_routes(app, templates, connect_db, require_csrf, flash,
                            parse_news_form, row_to_news, admin_guard, NEWS_CATEGORIES, secret_key, image_store)
+    register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
+                              row_to_place, form_options, REGIONS, secret_key, image_store)
     return app
 
 

@@ -1,5 +1,11 @@
 const test=require('node:test'), assert=require('node:assert/strict');
 const filters=require('../static/place-search.js');
+test('monthly PICK and NEW survive URLs without masquerading as a category',()=>{
+  const state={...filters.defaultState(),pick:'current',new:'current'};
+  assert.deepEqual(filters.fromParams(filters.params(state)),state);
+  assert.equal(state.category,'');
+  assert.deepEqual(filters.labels(state,{categories:[],terms:[]}),['이달의 JEJUNO PICK','신상']);
+});
 test('base selection and optional multiple details toggle and reset on category switch',()=>{
   const state=filters.defaultState();assert.deepEqual(state.terms,[]);
   filters.select(state,'category','food');

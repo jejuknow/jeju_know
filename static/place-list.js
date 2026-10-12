@@ -1,5 +1,6 @@
 (async()=>{
   const search=window.PlaceSearch, state=search.fromParams(new URLSearchParams(location.search));
+  if(document.getElementById('allPlaceGrid').dataset.new==='current')state.new='current';
   const query=search.params(state), grid=document.getElementById('allPlaceGrid'), summary=document.getElementById('listSummary');
   document.getElementById('listMapLink').href='/map?'+query;
   try{
