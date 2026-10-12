@@ -459,6 +459,7 @@ class CommunityTest(unittest.TestCase):
         self.assertIn('MAP에서 장소 알려주기',html)
         self.assertIn('id="finderMapLink"',html)
         self.assertIn('id="finderQuery"',html)
+        self.assertIn('href="/map?category=cafe&amp;detail=cafe-view"',self.visitor.get('/find?category=cafe&detail=cafe-view').text)
         self.assertIn('/map/register?source=new&amp;category=cafe',self.member.get('/new?category=cafe').text)
         self.assertIn('id="mapRegisterLink"',self.visitor.get('/map').text)
         self.assertIn('id="mapFindLink"',self.visitor.get('/map').text)

@@ -2,6 +2,9 @@ const search=window.PlaceSearch, cards=window.HomeCards;
 const state=search.fromParams(new URLSearchParams(location.search));
 let taxonomy, requestId=0, pending;
 const $=id=>document.getElementById(id);
+// Links must preserve the URL even while the initial API requests are pending.
+$('finderMapLink').href=search.href('/map',state);
+$('finderRegisterLink').href=search.registrationHref(state);
 function buildFilters(){
   $('finderQuery').value=state.q;
   search.chips($('regionChips'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:search.regionLabel(v)}))],state.region);
