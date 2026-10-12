@@ -23,7 +23,7 @@ test('PICK uses the recommendation reason while ordinary cards stay concise and 
   const compact=cards.placeCard(places[0],'애월');
   const pick=cards.pickCard(places[0],'애월');
   assert.ok(compact.includes('짧은 설명'));assert.ok(!compact.includes('긴 추천 이유'));
-  assert.ok(pick.includes('제주노 추천 이유'));assert.ok(pick.includes('긴 추천 이유'));
+  assert.ok(pick.includes('JEJU_KNOW 추천 이유'));assert.ok(pick.includes('긴 추천 이유'));
   assert.ok(compact.includes('/place/place-0'));assert.ok(pick.includes('/place/place-0'));
   assert.ok(pick.includes('pick-visual'));assert.ok(compact.includes('compact-place-visual'));
 });

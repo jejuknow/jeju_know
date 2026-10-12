@@ -122,7 +122,7 @@
     const body=element('div','map-selected-body');
     body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
     body.append(element('p','place-provenance',place.status_label||''));
-    if(place.is_pick)body.append(element('span','badge pick','JEJUNO PICK'));
+    if(place.is_pick)body.append(element('span','badge pick','JEJU_KNOW PICK'));
     if(!hasCoordinates(place)) body.append(element('p','map-location-missing','지도 위치 미등록'));
     const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
     body.append(link);selected.append(close,thumbnail(place),body);selected.hidden=false;
@@ -148,7 +148,7 @@
       const body=element('div','map-card-body');
       body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
       body.append(element('p','place-provenance',place.status_label||''));
-      if(place.is_pick) body.append(element('span','badge pick','JEJUNO PICK'));
+      if(place.is_pick) body.append(element('span','badge pick','JEJU_KNOW PICK'));
       if(!hasCoordinates(place)) body.append(element('span','map-location-missing','지도 위치 미등록'));
       button.append(thumbnail(place),body);button.addEventListener('click',()=>selectPlace(place.id));
       const link=element('a','map-card-detail','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;

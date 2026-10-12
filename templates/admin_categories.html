@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}장소 분류 관리 | JEJUNO{% endblock %}
+{% block title %}장소 분류 관리 | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
-<header class="admin-header"><div class="admin-wide"><a class="brand" href="/admin"><strong>JEJUNO</strong><span>관리자</span></a><div class="admin-header-actions"><a class="secondary-btn" href="/map" target="_blank">제주 지도 보기</a><a class="ghost-btn" href="/admin">콘텐츠 관리</a></div></div></header>
+<header class="admin-header"><div class="admin-wide">{{ brand_logo('관리자') }}<div class="admin-header-actions"><a class="secondary-btn" href="/map" target="_blank">제주 지도 보기</a><a class="ghost-btn" href="/admin">콘텐츠 관리</a></div></div></header>
 <main class="admin-wide admin-main">
   <div class="admin-title-row"><div><p class="kicker">PLACE CATEGORIES</p><h1>장소 분류 관리</h1><p>순서가 작은 분류부터 표시됩니다. 비활성화해도 기존 장소와 상세 주소는 유지됩니다.</p></div></div>
   {% include '_flashes.html' %}

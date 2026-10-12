@@ -10,7 +10,7 @@ from community_migrations import today
 FACT_LIMITS = {"name": 120, "region": 40, "address": 300, "one_line": 600,
                "map_url": 2000, "website_url": 2000}
 FACT_FIELDS = (*FACT_LIMITS, "category_id", "opened_year", "opened_month", "latitude", "longitude")
-VERIFICATION_LABELS = {"unverified": "정보 미확인", "community_confirmed": "정보 확인됨", "jejuno_verified": "JEJUNO 확인"}
+VERIFICATION_LABELS = {"unverified": "정보 미확인", "community_confirmed": "정보 확인됨", "jejuno_verified": "JEJU_KNOW 확인"}
 SUGGESTION_FIELDS = {"name": "장소명 변경", "address": "주소 변경·이전", "closed": "폐업",
                      "category_id": "카테고리 오류", "opening": "오픈 정보", "coordinates": "지도 위치",
                      "map_url": "지도 링크", "website_url": "홈페이지·Instagram", "other": "기타"}
@@ -99,7 +99,7 @@ def decorate_facts(conn, place):
     place["is_pick"] = bool(period)
     place["pick_note"] = period["pick_note"] if period else ""
     place["pick_order"] = period["sort_order"] if period else 0
-    place["status_label"] = ("사용자 등록 · " if place["source_type"] == "user" else "제주노 등록 · ") + VERIFICATION_LABELS[place["verification_status"]]
+    place["status_label"] = ("사용자 등록 · " if place["source_type"] == "user" else "JEJU_KNOW 등록 · ") + VERIFICATION_LABELS[place["verification_status"]]
     place["opening_label"] = (f'{place["opened_year"]}년' + (f' {place["opened_month"]}월' if place["opened_month"] else "") + " 오픈") if place["opened_year"] else ""
     return place
 

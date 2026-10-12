@@ -30,7 +30,7 @@
     return parent?taxonomy.terms.filter(t=>t.parent_id===parent.id):[];
   }
   function labels(state,taxonomy){
-    return [state.pick==='current'?'이달의 JEJUNO PICK':'',state.new==='current'?'신상':'',regionLabel(state.region),taxonomy.categories.find(c=>c.slug===state.category)?.name||state.category,...state.companions,
+    return [state.pick==='current'?'이달의 JEJU_KNOW PICK':'',state.new==='current'?'신상':'',regionLabel(state.region),taxonomy.categories.find(c=>c.slug===state.category)?.name||state.category,...state.companions,
       ...state.terms.map(slug=>taxonomy.terms.find(t=>t.slug===slug)?.name||slug),state.q,state.condition==='rain'?'비 오는 날':state.condition].filter(Boolean);
   }
   function chips(container,options,selected,css='chip'){

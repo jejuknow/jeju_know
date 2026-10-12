@@ -15,7 +15,7 @@
   }
   function pickCard(place,region){
     const tags=[...new Set([...(place.features_public||place.features||[]),...(place.companions||[])])].slice(0,4);
-    return `<article class="pick-card">${visual(place,'pick-visual')}<div class="pick-body"><span class="pick-label">JEJUNO PICK</span><h3>${escapeHtml(place.name)}</h3><p class="pick-meta">${escapeHtml(region)} · ${escapeHtml(place.category)}</p><div class="pick-recommendation"><strong>제주노 추천 이유</strong><p>${escapeHtml(place.pick_note||place.reason||place.one_line||'상세 페이지에서 장소 정보를 확인해보세요.')}</p></div><div class="tag-row">${tags.map(tag=>`<span class="tag">#${escapeHtml(tag)}</span>`).join('')}</div><a class="pick-detail-link" href="/place/${encodeURIComponent(place.slug)}">상세보기 <span aria-hidden="true">→</span></a></div></article>`;
+    return `<article class="pick-card">${visual(place,'pick-visual')}<div class="pick-body"><span class="pick-label">JEJU_KNOW PICK</span><h3>${escapeHtml(place.name)}</h3><p class="pick-meta">${escapeHtml(region)} · ${escapeHtml(place.category)}</p><div class="pick-recommendation"><strong>JEJU_KNOW 추천 이유</strong><p>${escapeHtml(place.pick_note||place.reason||place.one_line||'상세 페이지에서 장소 정보를 확인해보세요.')}</p></div><div class="tag-row">${tags.map(tag=>`<span class="tag">#${escapeHtml(tag)}</span>`).join('')}</div><a class="pick-detail-link" href="/place/${encodeURIComponent(place.slug)}">상세보기 <span aria-hidden="true">→</span></a></div></article>`;
   }
   function searchResults(places,state,filters){
     const all=places.filter(place=>filters.matches(place,state));

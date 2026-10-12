@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ '회원가입' if mode == 'signup' else '로그인' }} | JEJUNO{% endblock %}
+{% block title %}{{ '회원가입' if mode == 'signup' else '로그인' }} | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
 <main class="auth-wrap member-auth"><section class="auth-card">
-  <a class="brand" href="/"><strong>JEJUNO</strong><span>나의 제주를 함께 기록해요</span></a>
+  {{ brand_logo('나의 제주를 함께 기록해요') }}
   <h1>{{ '회원가입' if mode == 'signup' else '로그인' }}</h1>
   <p class="auth-copy">{{ '아이디와 닉네임으로 시작하세요. 작성한 제주 이슈는 바로 공개됩니다.' if mode == 'signup' else '제주에서 찾은 소식을 나누고 내 기록을 관리하세요.' }}</p>
   {% include '_flashes.html' %}{% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}

@@ -113,7 +113,7 @@ class CommunityTest(unittest.TestCase):
         for key in ('parking_status','pet_status','child_status','accessible_status'): self.assertEqual(p[key],'미확인')
         self.assertNotIn('submitted_by_user_id',result)
         html=self.visitor.get('/place/'+p['slug']).text
-        self.assertNotIn('제주노 추천 이유',html);self.assertIn('수정 제안하기',html)
+        self.assertNotIn('JEJU_KNOW 추천 이유',html);self.assertIn('수정 제안하기',html)
 
     def test_04_required_and_length_validation(self):
         for data in ({'name':''},{'region':''},{'address':''},{'name':'가'*121},{'one_line':'가'*601},{'category_id':'9999'}):

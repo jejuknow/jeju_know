@@ -138,7 +138,7 @@ def create_app(test_config=None):
         secret_key = secrets.token_urlsafe(48)
         secret_path.write_text(secret_key, encoding="utf-8")
 
-    app = FastAPI(title="JEJUNO")
+    app = FastAPI(title="JEJU_KNOW")
     app.router.route_class = ClosedFormRoute
     app.state.database = str(database_path)
     app.state.testing = bool(test_config.get("TESTING"))
@@ -345,8 +345,8 @@ def create_app(test_config=None):
 
     def row_to_news(row):
         item = dict(row)
-        item["author_label"] = "사용자 등록" if item.get("author_type") == "user" else "제주노 등록"
-        item["author_name"] = "제주노"
+        item["author_label"] = "사용자 등록" if item.get("author_type") == "user" else "JEJU_KNOW 등록"
+        item["author_name"] = "JEJU_KNOW"
         if item.get("author_type") == "user":
             conn = connect_db()
             author = conn.execute("SELECT nickname,status FROM users WHERE id=?", (item.get("author_id"),)).fetchone()

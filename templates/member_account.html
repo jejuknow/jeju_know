@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}내 활동 | JEJUNO{% endblock %}
+{% block title %}내 활동 | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
 <main class="admin-wide admin-main member-account">
-  <div class="admin-title-row"><div><p class="kicker">MY JEJUNO</p><h1>{{ member.nickname }}님의 기록</h1><p>직접 전한 장소·제주 소식과 계정을 관리하세요.</p></div><a class="primary-inline" href="/issues/new">+ 제주 이슈 등록</a></div>
+  <div class="admin-title-row"><div><p class="kicker">MY JEJU_KNOW</p><h1>{{ member.nickname }}님의 기록</h1><p>직접 전한 장소·제주 소식과 계정을 관리하세요.</p></div><a class="primary-inline" href="/issues/new">+ 제주 이슈 등록</a></div>
   {% include '_flashes.html' %}
   <nav class="member-section-nav" aria-label="내 활동 메뉴"><a href="/account/places">내 장소·수정 제안</a><a href="#my-posts">내 제주 이슈</a><a href="#profile">프로필</a><a href="#password">비밀번호 변경</a><a href="#withdraw">회원 탈퇴</a>{% if member.role == 'admin' %}<a href="/admin">관리자</a>{% endif %}</nav>
   <section class="form-card" id="my-posts"><h2>내가 등록한 제주 이슈 <small>{{ posts|length }}</small></h2>

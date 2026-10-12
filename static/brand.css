@@ -1,0 +1,24 @@
+/* Shared symbol and wordmark. Internal brand variables remain unchanged. */
+.brand.brand-lockup{display:inline-flex;flex-direction:row;align-items:center;gap:8px;flex-shrink:0;max-width:100%;text-decoration:none;line-height:1.15}
+.brand-lockup .brand-symbol{display:block;width:64px;height:auto;object-fit:contain;flex-shrink:0}
+.brand-lockup .brand-wordmark{display:flex;flex-direction:column;gap:5px;margin:0;font-size:inherit;min-width:0}
+.brand-lockup .brand-wordmark strong{font-size:23px;letter-spacing:-.7px;white-space:nowrap;overflow-wrap:normal}
+.brand-lockup .brand-wordmark small{font-size:11px;line-height:1.5;color:var(--muted)}
+.auth-card .brand-lockup{display:flex;flex-direction:column;gap:6px;text-align:center;margin-inline:auto}
+.auth-card .brand-lockup .brand-symbol{width:96px}
+.auth-card .brand-wordmark{gap:10px}
+.auth-card .brand-wordmark strong{font-size:26px}
+.auth-card .brand-wordmark small{font-size:14px;word-break:keep-all;overflow-wrap:break-word}
+.footer-brand .brand-symbol{width:52px}
+.footer-brand .brand-wordmark strong{font-size:21px}
+.admin-header .admin-wide{gap:16px}
+.admin-header-actions{flex-wrap:wrap}
+@media(max-width:900px){.admin-header .admin-wide{height:auto;min-height:72px;flex-wrap:wrap;padding-block:10px}}
+@media(max-width:640px){
+  .brand-lockup .brand-symbol{width:52px}
+  .brand-lockup .brand-wordmark strong{font-size:20px;letter-spacing:-.6px}
+  .brand.brand-lockup{gap:5px}
+  .community-header .header-inner{gap:12px}
+  .auth-card .brand-lockup .brand-symbol{width:88px}
+  .auth-card .brand-wordmark strong{font-size:24px}
+}

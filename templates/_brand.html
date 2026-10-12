@@ -1,0 +1,6 @@
+{% macro brand_logo(subtitle='', variant='') -%}
+<a class="brand brand-lockup {{ variant }}" href="/" aria-label="JEJU_KNOW 홈">
+  <img class="brand-symbol" src="/static/images/brand/jeju_know-logo.png" width="256" height="256" alt="JEJU_KNOW" decoding="async">
+  <span class="brand-wordmark"><strong>JEJU_KNOW</strong>{% if subtitle %}<small>{{ subtitle }}</small>{% endif %}</span>
+</a>
+{%- endmacro %}

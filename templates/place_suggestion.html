@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}정보 수정 제안 | JEJUNO{% endblock %}{% block body_class %}admin-body{% endblock %}
+{% extends "base.html" %}{% block title %}정보 수정 제안 | JEJU_KNOW{% endblock %}{% block body_class %}admin-body{% endblock %}
 {% block body %}<main class="admin-wide admin-main narrow"><p class="kicker">UPDATE A PLACE</p><h1>{{ place.name }} · 수정 제안</h1><p class="section-copy">관리자가 확인하기 전에는 현재 장소 정보가 바뀌지 않습니다.</p>{% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
 <form class="admin-form form-card" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>제안 항목<select name="field" id="suggestionField" required>{% for value,label in suggestion_fields.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
 <label id="suggestionText">변경 내용<textarea name="new_value" id="suggestionValue" required maxlength="2000" rows="4"></textarea></label>

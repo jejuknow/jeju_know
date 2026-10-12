@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ place.name }} | JEJUNO{% endblock %}
+{% block title %}{{ place.name }} | JEJU_KNOW{% endblock %}
 {% block body %}
 <main class="detail-page wrap">
   <article class="detail-shell">
@@ -7,13 +7,13 @@
     <div class="detail-content">
       {% set gallery = (place.images|rejectattr('is_primary')|list) + place.merged_images %}
       {% if gallery %}<section aria-label="추가사진" class="place-gallery">{% for image in gallery %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ loop.index }}" loading="lazy"></a><figcaption>추가사진 {{ loop.index }}</figcaption></figure>{% endfor %}</section>{% endif %}
-      <div class="meta-row"><span class="badge primary">{{ place.region }}</span><span class="badge">{{ place.category }}</span>{% if place.is_pick %}<span class="badge pick">JEJUNO PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
+      <div class="meta-row"><span class="badge primary">{{ place.region }}</span><span class="badge">{{ place.category }}</span>{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       <h1 class="detail-title">{{ place.name }}</h1>
       <p class="place-provenance">{{ place.status_label }}</p>
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
       {% if place.website_url %}<p><a href="{{ place.website_url }}" target="_blank" rel="noopener noreferrer">홈페이지·Instagram →</a></p>{% endif %}
       <p class="detail-lead">{{ place.one_line }}</p>
-      {% if place.pick_note or place.reason %}<div class="detail-section"><h2>👍 제주노 추천 이유</h2><p>{{ place.pick_note or place.reason }}</p></div>{% endif %}
+      {% if place.pick_note or place.reason %}<div class="detail-section"><h2>👍 JEJU_KNOW 추천 이유</h2><p>{{ place.pick_note or place.reason }}</p></div>{% endif %}
       <div class="detail-section"><h2>👥 잘 맞는 동행</h2><div class="tag-row">{% for item in place.companions %}<span class="tag">#{{ item }}</span>{% else %}<span class="muted">미입력</span>{% endfor %}</div></div>
       <div class="detail-section"><h2>✨ 장소 특징</h2><div class="tag-row">{% for item in place.features_public %}<span class="tag">#{{ item }}</span>{% else %}<span class="muted">미입력</span>{% endfor %}</div></div>
       <div class="detail-section"><h2>ℹ️ 이용 정보</h2><div class="status-grid"><div><span>주차</span><strong>{{ place.parking_status }}</strong></div><div><span>반려동물</span><strong>{{ place.pet_status }}</strong></div><div><span>아이 동반</span><strong>{{ place.child_status }}</strong></div><div><span>무장애</span><strong>{{ place.accessible_status }}</strong></div></div></div>
@@ -33,7 +33,7 @@
 <script>
 document.getElementById('sharePlace')?.addEventListener('click', async (e) => {
   const title = e.currentTarget.dataset.title;
-  const data = {title:`JEJUNO | ${title}`, text:`JEJUNO 장소 정보: ${title}`, url:location.href};
+  const data = {title:`JEJU_KNOW | ${title}`, text:`JEJU_KNOW 장소 정보: ${title}`, url:location.href};
   if (navigator.share) { try { await navigator.share(data); } catch(_){} }
   else { try { await navigator.clipboard.writeText(location.href); alert('링크를 복사했습니다.'); } catch(_) { prompt('링크를 복사해주세요.', location.href); } }
 });

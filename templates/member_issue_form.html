@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_image_uploads.html" import image_uploads %}
-{% block title %}제주 이슈 {{ '수정' if item and item.id else '등록' }} | JEJUNO{% endblock %}
+{% block title %}제주 이슈 {{ '수정' if item and item.id else '등록' }} | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
 <main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>제주 이슈 {{ '수정' if item and item.id else '등록' }}</h1><p>새 글은 저장 즉시 공개됩니다. 본인이 확인한 정보를 요약하고 출처를 남겨주세요.</p></div></div>
