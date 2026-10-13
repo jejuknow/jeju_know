@@ -244,7 +244,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             return json.dumps([place["opened_year"],place["opened_month"]])
         if field == "coordinates":
             return json.dumps([place["latitude"],place["longitude"]])
-        if field in ("closed","other"):
+        if field in ("closed","business","other"):
             return ""
         return str(place[field] or "")
 
@@ -329,9 +329,9 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                     conn.execute(f"UPDATE places SET {columns[0]}=?,{columns[1]}=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (*values,place["id"]))
                 elif field == "closed":
                     conn.execute("UPDATE places SET published=0,updated_at=CURRENT_TIMESTAMP WHERE id=?", (place["id"],))
-                elif field == "other":
+                elif field in ("business", "other"):
                     if not note:
-                        return HTMLResponse("기타 제안은 장소 수정에서 반영한 내용을 처리 메모에 기록해주세요.", status_code=400)
+                        return HTMLResponse("영업 관련 정보·기타 제안은 장소 수정에서 반영한 내용을 처리 메모에 기록해주세요.", status_code=400)
                 else:
                     try:
                         value = suggestion_value(conn, field, value)

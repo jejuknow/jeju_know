@@ -23,7 +23,7 @@
         {% if place.map_url %}<a class="map-btn" href="{{ place.map_url }}" target="_blank" rel="noreferrer">지도에서 보기</a>{% else %}<a class="map-btn" href="https://map.naver.com/p/search/{{ place.name|urlencode }}" target="_blank" rel="noreferrer">네이버지도 검색</a>{% endif %}
         <button class="share-btn" id="sharePlace" data-title="{{ place.name }}">공유하기</button>
       </div>
-      <div class="community-callout"><div><strong>정보가 달라졌나요?</strong><p>변경된 정보는 관리자가 확인한 뒤 반영합니다.</p></div><a class="secondary-btn" href="/places/{{ place.id }}/suggest">수정 제안하기</a></div>
+      <div class="community-callout"><div><strong>정보가 달라졌나요?</strong><p>주소, 상호명, 영업 여부 등 달라진 정보를 알려주세요.</p><p>변경된 정보는 관리자가 확인한 뒤 반영합니다.</p></div><a class="secondary-btn" href="/places/{{ place.id }}/suggest">정보 바로잡기</a></div>
       {% if member and member.id == place.submitted_by_user_id and place.verification_status == 'unverified' %}<a class="text-btn" href="/places/{{ place.id }}/edit">내가 등록한 장소 수정 →</a>{% endif %}
     </div>
   </article>

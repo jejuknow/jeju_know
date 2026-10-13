@@ -6,7 +6,7 @@
 <p><a class="text-btn" href="/map">← MAP으로 돌아가기</a></p><p class="kicker">MAP · {{ 'NEW' if new_only else 'COMMUNITY' }}</p><h1>{{ '내 장소 수정' if p.get('id') else '신상 장소 알려주기' if new_only else '장소 알려주기' }}</h1>
 <p class="section-copy">함께 만드는 제주 장소 정보입니다. 등록 즉시 ‘사용자 등록 · 미확인’으로 공개되며, JEJU_KNOW 추천과는 별도로 표시됩니다.</p>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
-{% if similar %}<section class="form-card duplicate-warning"><h2>비슷한 장소가 이미 등록되어 있습니다.</h2>{% for item in similar %}<p><a href="/place/{{ item.slug }}" target="_blank" rel="noopener">{{ item.name }} →</a> {{ item.address or item.region }} <a href="/places/{{ item.id }}/suggest">정보 수정 제안 →</a></p>{% endfor %}<p>기존 장소가 맞다면 상세페이지에서 수정 제안을 이용해주세요.</p></section>{% endif %}
+{% if similar %}<section class="form-card duplicate-warning"><h2>비슷한 장소가 이미 등록되어 있습니다.</h2>{% for item in similar %}<p><a href="/place/{{ item.slug }}" target="_blank" rel="noopener">{{ item.name }} →</a> {{ item.address or item.region }} <a href="/places/{{ item.id }}/suggest">정보 바로잡기 →</a></p>{% endfor %}<p>기존 장소가 맞다면 상세페이지에서 수정 제안을 이용해주세요.</p></section>{% endif %}
 <form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form">
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="from_new" value="{{ '1' if new_only else '0' }}">
 <section class="form-card"><h2>장소 기본 정보</h2><div class="form-grid two">

@@ -84,6 +84,7 @@
   function categoryName() { return filters.labels(state,taxonomy).join(' · ')||'전체'; }
   function renderDetails(){
     const terms=filters.termsFor(taxonomy,state.category);detailNav.hidden=!terms.length;
+    if(!terms.length){detailNav.replaceChildren();return;}
     filters.chips(detailNav,[{value:'',label:'전체'},...terms.map(t=>({value:t.slug,label:t.name}))],state.terms,'map-category');
   }
   function updateNotice() {
@@ -120,12 +121,15 @@
       list.querySelectorAll('.map-place-card').forEach(card=>{card.classList.remove('is-selected');card.querySelector('button').setAttribute('aria-pressed','false');});
     });
     const body=element('div','map-selected-body');
-    body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
-    body.append(element('p','place-provenance',place.status_label||''));
-    if(place.is_pick)body.append(element('span','badge pick','JEJU_KNOW PICK'));
-    if(!hasCoordinates(place)) body.append(element('p','map-location-missing','지도 위치 미등록'));
+    const content=element('div','map-selected-content');
+    content.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
+    content.append(element('p','place-provenance',place.status_label||''));
+    if(place.is_pick)content.append(element('span','badge pick','JEJU_KNOW PICK'));
+    if(!hasCoordinates(place)) content.append(element('p','map-location-missing','지도 위치 미등록'));
     const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
-    body.append(link);selected.append(close,thumbnail(place),body);selected.hidden=false;
+    const correction=element('a','detail-link','정보 바로잡기');correction.href=`/places/${encodeURIComponent(place.id)}/suggest`;
+    const actions=element('div','map-selected-actions');actions.append(link,correction);
+    body.append(content,actions);selected.append(close,thumbnail(place),body);selected.hidden=false;
   }
   function render() {
     const name=categoryName();
@@ -139,8 +143,7 @@
     list.replaceChildren();selected.hidden=true;state.selected=null;
     if(!state.places.length) {
       const empty=element('div','map-empty');
-      empty.append(element('strong','',state.q?'검색 조건에 맞는 장소가 없습니다.':state.category?`현재 등록된 ${name} 장소가 없습니다.`:'현재 등록된 장소가 없습니다.'),element('p','','알고 있는 장소가 있나요?'));
-      const register=element('a','primary-inline','+ 이 조건에 장소 알려주기');register.href=filters.registrationHref(state);empty.append(register);
+      empty.append(element('strong','',state.q?'검색 조건에 맞는 장소가 없습니다.':state.category?`현재 등록된 ${name} 장소가 없습니다.`:'현재 등록된 장소가 없습니다.'),element('p','','알고 있는 장소가 있나요? 지도 위의 + 장소 알려주기 버튼을 이용해주세요.'));
       list.append(empty);
     }
     state.places.forEach(place=>{

@@ -11,8 +11,8 @@ FACT_LIMITS = {"name": 120, "region": 40, "address": 300, "one_line": 600,
                "map_url": 2000, "website_url": 2000}
 FACT_FIELDS = (*FACT_LIMITS, "category_id", "opened_year", "opened_month", "latitude", "longitude")
 VERIFICATION_LABELS = {"unverified": "미확인", "community_confirmed": "정보 확인됨", "jejuno_verified": "JEJU_KNOW 확인"}
-SUGGESTION_FIELDS = {"name": "장소명 변경", "address": "주소 변경·이전", "closed": "폐업",
-                     "category_id": "카테고리 오류", "opening": "오픈 정보", "coordinates": "지도 위치",
+SUGGESTION_FIELDS = {"name": "장소명", "address": "주소", "coordinates": "지도 위치", "closed": "폐업/휴업",
+                     "category_id": "카테고리", "business": "영업 관련 정보", "opening": "오픈 정보",
                      "map_url": "지도 링크", "website_url": "홈페이지·Instagram", "other": "기타"}
 
 

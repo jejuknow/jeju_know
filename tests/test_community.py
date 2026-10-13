@@ -113,7 +113,7 @@ class CommunityTest(unittest.TestCase):
         for key in ('parking_status','pet_status','child_status','accessible_status'): self.assertEqual(p[key],'미확인')
         self.assertNotIn('submitted_by_user_id',result)
         html=self.visitor.get('/place/'+p['slug']).text
-        self.assertNotIn('JEJU_KNOW 추천 이유',html);self.assertIn('수정 제안하기',html)
+        self.assertNotIn('JEJU_KNOW 추천 이유',html);self.assertIn('정보 바로잡기',html)
 
     def test_04_required_and_length_validation(self):
         for data in ({'name':''},{'region':''},{'address':''},{'name':'가'*121},{'one_line':'가'*601},{'category_id':'9999'}):
@@ -174,6 +174,36 @@ class CommunityTest(unittest.TestCase):
         p=self.place();self.suggestion(p)
         self.assertEqual(self.post(self.admin,'/admin/suggestions/1/review',action='reject').status_code,303)
         self.assertEqual(self.api()[0]['name'],p['name'])
+
+    def test_business_correction_requires_member_and_manual_admin_review(self):
+        p=self.place()
+        path=f"/places/{p['id']}/suggest"
+        guest=self.visitor.get(path,follow_redirects=False)
+        self.assertEqual(guest.status_code,303)
+        self.assertIn('/login',guest.headers['location'])
+        form=self.member.get(path)
+        self.assertIn('정보 바로잡기',form.text)
+        self.assertIn('영업 관련 정보',form.text)
+        before=self.rows('SELECT * FROM places')
+        self.assertEqual(self.post(self.member,path,field='business',new_value='화요일 휴무',reason='현장 안내판을 확인했습니다').status_code,303)
+        self.assertEqual(self.rows('SELECT * FROM places'),before)
+        s=self.rows('SELECT * FROM place_correction_suggestions')[0]
+        self.assertEqual(s['status'],'pending')
+        review=f"/admin/suggestions/{s['id']}/review"
+        self.assertEqual(self.post(self.other,review,action='accept',review_note='임의 처리').status_code,303)
+        page=self.admin.get('/admin/community')
+        self.assertIn('화요일 휴무',page.text)
+        self.assertIn('장소 수정에서 필요한 정보를 반영',page.text)
+        self.assertEqual(self.post(self.admin,review,action='accept').status_code,400)
+        self.assertEqual(self.rows('SELECT status FROM place_correction_suggestions')[0]['status'],'pending')
+        self.assertEqual(self.post(self.admin,review,action='reject',review_note='운영자 확인 결과 기존 정보 유지').status_code,303)
+        self.assertEqual(self.rows('SELECT * FROM places'),before)
+        self.assertEqual(self.rows('SELECT status FROM place_correction_suggestions')[0]['status'],'rejected')
+        self.assertEqual(self.post(self.member,path,field='business',new_value='화요일 정상 영업',reason='운영자 공지에서 확인했습니다').status_code,303)
+        sid=self.rows('SELECT id FROM place_correction_suggestions ORDER BY id DESC')[0]['id']
+        self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='accept',review_note='현재 장소 정보가 운영자 공지와 일치하는지 확인').status_code,303)
+        self.assertEqual(self.rows('SELECT status FROM place_correction_suggestions WHERE id=?',(sid,))[0]['status'],'accepted')
+        self.assertEqual(self.rows('SELECT * FROM places'),before)
 
     def test_14_stale_suggestion_cannot_overwrite_newer_fact(self):
         p=self.place();self.suggestion(p)
@@ -448,7 +478,7 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(len(self.rows('SELECT * FROM images')),1)
         duplicate=self.post(self.member,'/map/register',**self.form())
         self.assertEqual(duplicate.status_code,409)
-        self.assertIn('정보 수정 제안',duplicate.text)
+        self.assertIn('정보 바로잡기',duplicate.text)
         self.assertEqual(len(self.rows('SELECT * FROM places')),1)
         self.assertEqual(self.member.post('/map/register',data=self.form()).status_code,400)
         self.assertEqual(self.post(self.member,'/map/register',**self.form(is_pick='1')).status_code,403)
