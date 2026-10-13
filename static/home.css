@@ -2,6 +2,32 @@
 .hero-subtitle span{display:block}
 .hero-story{container-type:inline-size}
 .hero-story .hero-subtitle{font-size:16px;line-height:1.7;letter-spacing:-.25px}
+/* Quick navigation inherits the shared Korean word-wrapping policy. */
+.hero-discovery{min-width:0;display:flex;flex-direction:column;gap:14px}
+.hero-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:14px;flex:1}
+.hero-board-card{min-width:0;border-radius:24px;padding:22px;display:flex;flex-direction:column;align-items:flex-start;transition:transform .18s,box-shadow .18s}
+.hero-board-icon{display:flex;align-items:center;height:36px;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-size:32px;line-height:1;flex-shrink:0;margin-bottom:18px}
+.hero-board-card strong{font-size:21px;line-height:1.4;letter-spacing:-.6px}
+.hero-board-card p{font-size:14px;line-height:1.6;min-height:3.2em;margin:7px 0 14px}
+.hero-board-card small{font-size:12px;line-height:1.6;font-weight:700;margin-top:auto}
+.hero-board-card.blue{background:#e5edff;color:#244887}
+.hero-board-card.green{background:#e4f7ec;color:#286246}
+.hero-board-card.orange{background:#fff0e5;color:#935131}
+.hero-board-card.lavender{background:#eee9fa;color:#635080}
+.hero-find-cta{padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:#ffffff80;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.hero-find-cta strong{font-size:14px;line-height:1.5}
+.hero-find-cta p{font-size:12px;line-height:1.6;color:var(--muted);margin:6px 0 0}
+.hero-find-cta a{font-size:12px;line-height:1.5;font-weight:800;color:var(--jejuno-blue);background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 12px;white-space:nowrap}
+.hero-board-card:focus-visible,.hero-find-cta a:focus-visible{outline:3px solid var(--jejuno-blue);outline-offset:3px}
+@media(hover:hover) and (pointer:fine){.hero-board-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px #17203312}.hero-find-cta a:hover{border-color:var(--jejuno-blue)}}
+@media(max-width:640px){
+ .hero-board{gap:10px}.hero-board-card{padding:18px 16px;border-radius:18px}
+ .hero-board-icon{font-size:28px;height:32px;margin-bottom:14px}
+ .hero-board-card strong{font-size:18px}.hero-board-card p{font-size:13px;margin:7px 0 12px}.hero-board-card small{font-size:11px}
+ .hero-find-cta{padding:16px}.hero-find-cta a{font-size:13px}
+}
+@media(max-width:360px){.hero-board-card{padding:16px 13px}.hero-board-card strong{font-size:17px}}
+@media(prefers-reduced-motion:reduce){.hero-board-card{transition:none}.hero-board-card:hover{transform:none}}
 #pick,#today{scroll-margin-top:90px}
 .preference-group #preferenceChips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
 .preference-group #preferenceChips .chip{min-width:0;padding:10px 6px}

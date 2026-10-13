@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}JEJU_KNOW | 제주를 아는 사람의 제주 기록{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261012-map-flow">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261013-quick-nav">{% endblock %}
 {% block body %}
 <main id="top">
   <section class="editorial-hero">
@@ -14,12 +14,30 @@
           <a class="hero-secondary" href="/map?pick=current">JEJU_KNOW PICK 보기</a>
         </div>
       </div>
-      <nav class="hero-board" aria-label="빠른 탐색">
-        <a href="#finder" class="hero-board-card blue"><span>☕</span><strong>카페·맛집</strong><small>지역과 동행으로 찾기</small></a>
-        <a href="{{ url_for('news_list') }}" class="hero-board-card green"><span>📰</span><strong>제주 이슈</strong><small>제주의 새로운 소식</small></a>
-        <a href="/map" class="hero-board-card orange"><span>🗺️</span><strong>제주 지도</strong><small>지도에서 장소 찾기</small></a>
-        <a href="/new" class="hero-board-card dark"><span>✨</span><strong>NEW</strong><small>새로 생긴 카페와 맛집</small></a>
-      </nav>
+      <div class="hero-discovery">
+        <nav class="hero-board" aria-label="빠른 탐색">
+          <a href="/new" class="hero-board-card blue">
+            <span class="hero-board-icon" aria-hidden="true">🆕</span>
+            <strong>제주 신상</strong><p>새로 생긴 카페와 맛집</p><small>{{ current_year }} NEW →</small>
+          </a>
+          <a href="{{ url_for('news_list') }}" class="hero-board-card green">
+            <span class="hero-board-icon" aria-hidden="true">📣</span>
+            <strong>제주 이슈</strong><p>지금 알아두면 좋은 제주 소식</p><small>행사 · 팝업 · 지역소식 →</small>
+          </a>
+          <a href="/map" class="hero-board-card orange">
+            <span class="hero-board-icon" aria-hidden="true">🗺️</span>
+            <strong>제주 지도</strong><p>지도에서 제주 장소 찾기</p><small>맛집 · 카페 · 가볼 곳 →</small>
+          </a>
+          <a href="/best" class="hero-board-card lavender">
+            <span class="hero-board-icon" aria-hidden="true">⭐</span>
+            <strong>베스트</strong><p>상황별로 골라본 추천 모음</p><small>데이트 · 부모님 · 혼자 →</small>
+          </a>
+        </nav>
+        <aside class="hero-find-cta" aria-label="FIND 안내">
+          <div><strong>어디 갈지 고민된다면?</strong><p>지역·카테고리·동행에 맞춰<br>나에게 맞는 장소를 찾아보세요.</p></div>
+          <a href="/find">FIND에서 찾아보기 →</a>
+        </aside>
+      </div>
     </div>
   </section>
 
