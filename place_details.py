@@ -1,0 +1,69 @@
+"""Optional visit facts, kept separate from editorial recommendations and filters."""
+from datetime import date
+
+TEXT_LIMITS = {
+    "business_hours": 200, "closed_days": 200, "last_order": 100,
+    "signature_menu": 1000, "recommended_menu": 1000,
+    "dessert_note": 300, "food_taste_note": 300,
+}
+FIELD_LABELS = {
+    "business_hours": "영업시간", "closed_days": "휴무일", "last_order": "라스트오더",
+    "signature_menu": "대표 메뉴", "recommended_menu": "추천 메뉴",
+    "dessert_note": "디저트 특징", "food_taste_note": "음식/맛 특징",
+    "reservation_status": "예약", "waiting_status": "웨이팅", "coffee_taste": "커피 맛 특징",
+}
+USE_OPTIONS = ("미확인", "가능", "불가", "제한")
+WAITING_OPTIONS = ("미확인", "없음", "있음", "주말·성수기 있음")
+COFFEE_OPTIONS = ("미확인", "산미 있음", "산미 적음", "고소한 편", "밸런스형", "기타")
+CHOICE_OPTIONS = {"reservation_status": USE_OPTIONS, "waiting_status": WAITING_OPTIONS, "coffee_taste": COFFEE_OPTIONS}
+DETAIL_FIELDS = (*TEXT_LIMITS, *CHOICE_OPTIONS)
+
+
+def parse_details(form, existing=None):
+    previous = dict(existing or {})
+    return {field: str(form.get(field, previous.get(field) or ("미확인" if field in CHOICE_OPTIONS else ""))).strip()
+            for field in DETAIL_FIELDS}
+
+
+def validate_detail_value(field, value):
+    if field in TEXT_LIMITS and len(value) > TEXT_LIMITS[field]:
+        raise ValueError(f"{FIELD_LABELS[field]}은 {TEXT_LIMITS[field]:,}자 이내로 입력해주세요.")
+    if field in CHOICE_OPTIONS and value not in CHOICE_OPTIONS[field]:
+        raise ValueError(f"{FIELD_LABELS[field]} 선택값을 확인해주세요.")
+    if field == "parking_status" and value not in USE_OPTIONS:
+        raise ValueError("주차는 미확인·가능·불가·제한 중 선택해주세요.")
+    return value
+
+
+def validate_details(data):
+    for field in DETAIL_FIELDS:
+        if field in CHOICE_OPTIONS and not data[field]:
+            data[field] = "미확인"
+        validate_detail_value(field, data[field])
+    checked = data["checked_at"]
+    if checked:
+        try:
+            if len(checked) != 10 or date.fromisoformat(checked).isoformat() != checked:
+                raise ValueError
+        except ValueError:
+            raise ValueError("정보 확인일은 실제 확인한 날짜를 YYYY-MM-DD 형식으로 입력해주세요.") from None
+    if len(data["info_source"]) > 500:
+        raise ValueError("정보 출처는 500자 이내로 입력해주세요.")
+
+
+def save_details(conn, place_id, data):
+    # Column identifiers come only from this module's allowlist.
+    assignments = ",".join(f"{field}=?" for field in DETAIL_FIELDS)
+    conn.execute(f"UPDATE places SET {assignments} WHERE id=?", (*[data[field] for field in DETAIL_FIELDS], place_id))
+
+
+def decorate_details(conn, place):
+    category = conn.execute("SELECT slug FROM categories WHERE id=?", (place.get("category_id"),)).fetchone()
+    place["category_slug"] = category[0] if category else ""
+    for field in (*CHOICE_OPTIONS, "parking_status", "pet_status", "child_status", "accessible_status"):
+        place[field] = place.get(field) or "미확인"
+    for field in ("signature_menu", "recommended_menu"):
+        place[field + "_items"] = [line.strip() for line in (place.get(field) or "").splitlines() if line.strip()]
+    terms = [r[0] for r in conn.execute("SELECT c.name FROM categories c JOIN place_category_links l ON l.category_id=c.id WHERE l.place_id=? AND c.parent_id=? ORDER BY c.sort_order,c.id", (place["id"], place.get("category_id")))]
+    place["detail_features"] = list(dict.fromkeys([*terms, *place.get("features_public", [])]))
+    return place

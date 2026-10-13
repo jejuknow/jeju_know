@@ -14,6 +14,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from place_migrations import backup_before_migration, migrate_place_categories
+from place_detail_migrations import backup_before_place_detail_migration, migrate_place_details
+from place_details import parse_details, validate_details, save_details, decorate_details, COFFEE_OPTIONS, WAITING_OPTIONS
 from user_migrations import backup_before_user_migration, migrate_users
 from home_migrations import backup_before_home_migration, migrate_home
 from taxonomy_migrations import backup_before_taxonomy_migration, migrate_taxonomy, TYPES
@@ -171,6 +173,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        detail_backup_path = backup_before_place_detail_migration(app.state.database)
         community_backup_path = backup_before_community_migration(app.state.database)
         image_backup_path = backup_before_image_migration(app.state.database)
         taxonomy_backup_path = backup_before_taxonomy_migration(app.state.database)
@@ -271,6 +274,7 @@ def create_app(test_config=None):
         migrate_taxonomy(app.state.database, taxonomy_backup_path)
         migrate_images(app.state.database, image_backup_path)
         migrate_community(app.state.database, community_backup_path)
+        migrate_place_details(app.state.database, detail_backup_path)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -339,6 +343,7 @@ def create_app(test_config=None):
         conn = connect_db()
         try:
             decorate_facts(conn, place)
+            decorate_details(conn, place)
         finally:
             conn.close()
         return image_store.decorate(place, "places")
@@ -419,6 +424,7 @@ def create_app(test_config=None):
         form = await request.form(max_files=5, max_fields=100, max_part_size=FORM_BYTES)
         slug = unique_slug(form.get("slug"), existing["id"] if existing else None)
         return form, {
+            **parse_details(form, existing),
             "slug": slug,
             "name": str(form.get("name", "")).strip(),
             "region": str(form.get("region", "")).strip(),
@@ -486,6 +492,7 @@ def create_app(test_config=None):
 
     def validate_place(data, existing=None):
         try:
+            validate_details(data)
             data["opened_year"], data["opened_month"] = opening(data["opened_year"], data["opened_month"])
         except ValueError as exc:
             return str(exc)
@@ -541,6 +548,8 @@ def create_app(test_config=None):
             "companions": options["companions"],
             "features": FEATURES,
             "status_options": STATUS_OPTIONS,
+            "coffee_options": COFFEE_OPTIONS,
+            "waiting_options": WAITING_OPTIONS,
         }
 
     def admin_guard(request: Request):
@@ -1048,6 +1057,7 @@ def create_app(test_config=None):
                 ),
             )
             save_links(conn, cursor.lastrowid, data["term_ids"])
+            save_details(conn, cursor.lastrowid, data)
             plan.apply(conn, cursor.lastrowid)
             save_admin_facts(conn, cursor.lastrowid, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
@@ -1113,6 +1123,7 @@ def create_app(test_config=None):
                 ),
             )
             save_links(conn, place_id, data["term_ids"])
+            save_details(conn, place_id, data)
             plan.apply(conn, place_id)
             save_admin_facts(conn, place_id, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")

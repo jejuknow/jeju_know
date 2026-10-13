@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from auth_security import current_user, rate_limited, safe_external_url
 from community_migrations import today
+from place_details import validate_detail_value
 from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
                               duplicates, editable, facts, merge_places, opening)
 from image_uploads import FORM_BYTES, ImageError, ImagePlan
@@ -217,6 +218,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         value = raw.strip()
         if field not in SUGGESTION_FIELDS or not value or len(value) > 2000:
             raise ValueError("제안 항목과 변경 내용을 확인해주세요. 2,000자까지 입력할 수 있습니다.")
+        validate_detail_value(field, value)
         if field == "category_id":
             category = conn.execute("SELECT id FROM categories WHERE id=? AND type='place' AND is_active=1", (value,)).fetchone()
             if not category:
