@@ -7,7 +7,7 @@
 <p class="section-copy">함께 만드는 제주 장소 정보입니다. 등록 즉시 ‘사용자 등록 · 미확인’으로 공개되며, JEJU_KNOW 추천과는 별도로 표시됩니다.</p>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
 {% if similar %}<section class="form-card duplicate-warning"><h2>비슷한 장소가 이미 등록되어 있습니다.</h2>{% for item in similar %}<p><a href="/place/{{ item.slug }}" target="_blank" rel="noopener">{{ item.name }} →</a> {{ item.address or item.region }} <a href="/places/{{ item.id }}/suggest">정보 바로잡기 →</a></p>{% endfor %}<p>기존 장소가 맞다면 상세페이지에서 수정 제안을 이용해주세요.</p></section>{% endif %}
-<form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form">
+<form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form member-place-form" data-member-place-form>
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="from_new" value="{{ '1' if new_only else '0' }}">
 <section class="form-card"><h2>장소 기본 정보</h2><div class="form-grid two">
 <label>장소명 *<input name="name" required maxlength="120" value="{{ p.get('name','') }}"></label>
@@ -18,12 +18,13 @@
 <label>오픈 월 (선택)<select name="opened_month"><option value="">월 미확인</option>{% for n in range(1,13) %}<option value="{{ n }}" {% if p.get('opened_month')|string==n|string %}selected{% endif %}>{{ n }}월</option>{% endfor %}</select></label>
 </div><p class="form-help">모르는 정보는 미확인으로 남습니다. NEW에는 현재 연도에 오픈한 카페·맛집이 표시됩니다.</p>
 <label>한줄 소개 (선택)<textarea name="one_line" rows="3" maxlength="600">{{ p.get('one_line','') }}</textarea></label>
-<div class="form-grid two"><label>지도 링크 (선택)<input type="url" name="map_url" maxlength="2000" value="{{ p.get('map_url','') }}"></label><label>홈페이지·Instagram (선택)<input type="url" name="website_url" maxlength="2000" value="{{ p.get('website_url','') }}"></label></div>
-<details id="locationPicker"><summary>지도에서 위치 선택 (선택)</summary><p class="form-help">지도를 누르거나 마커를 움직여 위치를 선택하세요. 좌표 없이 등록하면 목록에 표시되며 지도 마커는 생기지 않습니다.</p><div class="location-actions"><button type="button" class="secondary-btn" id="addressLocate" data-kakao-key="{{ kakao_map_key }}">주소로 위치 찾기</button><button type="button" class="text-btn" id="locationClear">위치 지우기</button></div><div id="placeLocationMap" class="place-location-map" aria-label="등록 장소 위치 선택 지도"></div><p id="locationFeedback" class="form-help" role="status"></p><div class="form-grid two"><label>위도<input type="number" name="latitude" step="any" min="-90" max="90" value="{{ p.get('latitude') if p.get('latitude') is not none else '' }}"></label><label>경도<input type="number" name="longitude" step="any" min="-180" max="180" value="{{ p.get('longitude') if p.get('longitude') is not none else '' }}"></label></div></details>
+<label>홈페이지·Instagram (선택)<input type="url" name="website_url" maxlength="2000" value="{{ p.get('website_url','') }}"></label>
+<p id="locationFeedback" class="form-help location-feedback" role="status" aria-live="polite">{{ '위치 확인됨 · 지도에서 확인하거나 수정할 수 있어요.' if p.get('latitude') is not none and p.get('longitude') is not none else '주소를 입력하면 지도 위치를 자동으로 찾습니다.' }}</p>
+<details id="locationPicker" data-auto-address><summary>지도 위치 확인 / 수정</summary><p class="form-help">지도를 누르거나 마커를 움직여 위치를 보정할 수 있어요. 위치 없이 등록하면 목록에는 표시되지만 지도 마커는 생기지 않습니다.</p><div class="location-actions"><button type="button" class="secondary-btn" id="addressLocate" data-kakao-key="{{ kakao_map_key }}">주소로 다시 찾기</button><button type="button" class="text-btn" id="locationClear">위치 지우기</button></div><div id="placeLocationMap" class="place-location-map" aria-label="등록 장소 위치 선택 지도"></div><input type="hidden" name="latitude" value="{{ p.get('latitude') if p.get('latitude') is not none else '' }}"><input type="hidden" name="longitude" value="{{ p.get('longitude') if p.get('longitude') is not none else '' }}"></details>
 </section>
-<p class="photo-rights">본인이 촬영했거나 사용 권한이 있는 사진만 등록해주세요.</p>{{ image_uploads(p,'places',false) }}
+{{ image_uploads(p,'places',false,4,true) }}
 {% if similar %}<label class="member-check"><input type="checkbox" name="duplicate_ack" value="1" required>기존 장소를 확인했으며 서로 다른 장소입니다.</label>{% endif %}
-<div class="form-actions"><a class="secondary-btn" href="/account/places">내 장소</a><button class="primary-inline" type="submit">{{ '수정사항 저장' if p.get('id') else '장소 등록하기' }}</button></div>
+<p class="form-help" data-submit-status role="status" aria-live="polite"></p><div class="form-actions"><a class="secondary-btn" href="/account/places">내 장소</a><button class="primary-inline" type="submit">{{ '수정사항 저장' if p.get('id') else '장소 등록하기' }}</button></div>
 </form></main>{% endblock %}
 
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261012-map-flow"></script><script src="/static/member-place.js?v=20261012-map-flow"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/member-place.js?v=20261012-map-flow"></script>{% endblock %}

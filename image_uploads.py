@@ -8,20 +8,22 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 
 from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 from starlette.formparsers import MultiPartException
-from auth_security import BODY_LIMIT_MESSAGE, safe_external_url
+from auth_security import safe_external_url
+from image_limits import MAX_FILE_BYTES, MAX_PIXELS, MAX_EDGE, FORM_BYTES, BODY_LIMIT_MESSAGE
 
-MAX_FILE_BYTES = 10 * 1024 * 1024
-MAX_PIXELS = 25_000_000
-MAX_EDGE = 1920
-FORM_BYTES = 131072
-FORMATS = {".jpg": ("JPEG", "image/jpeg"), ".jpeg": ("JPEG", "image/jpeg"),
-           ".png": ("PNG", "image/png"), ".webp": ("WEBP", "image/webp")}
+FORMATS = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".webp": "WEBP",
+           ".heic": "HEIF", ".heif": "HEIF"}
+MIME_TYPES = {"JPEG": {"image/jpeg", "image/jpg"}, "PNG": {"image/png"}, "WEBP": {"image/webp"},
+              "HEIF": {"image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"}}
+# Keep libheif/Pillow security limits. Ignore depth/auxiliary images and decode serially.
+register_heif_opener(decode_threads=1, depth_images=False, aux_images=False)
 KINDS = {"places": "place_id", "issues": "issue_id"}
 FILE_PATH = re.compile(r"(?:places|issues)/[0-9a-f]{32}\.webp\Z")
 PROCESS_SLOTS = threading.BoundedSemaphore(1)
@@ -52,36 +54,53 @@ class ClosedFormRoute(APIRoute):
 
 
 def optimize_image(raw, filename, content_type):
+    with PROCESS_SLOTS:
+        return _optimize_image(raw, filename, content_type)
+
+
+def optimize_upload(stream, filename, content_type):
+    # Acquire before reading: concurrent requests do not hold multiple original files in RAM.
+    with PROCESS_SLOTS:
+        return _optimize_image(stream.read(MAX_FILE_BYTES + 1), filename, content_type)
+
+
+def _optimize_image(raw, filename, content_type):
     expected = FORMATS.get(Path(filename).suffix.lower())
-    if not expected or content_type.lower() != expected[1]:
-        raise ImageError("JPG, PNG, WebP 이미지만 업로드할 수 있어요. HEIC 등은 JPG로 변환해주세요.")
-    if not raw or len(raw) > MAX_FILE_BYTES:
-        raise ImageError("이미지는 파일당 10MB 이하로 선택해주세요.")
+    dimensions = None
     try:
-        with PROCESS_SLOTS:
-            with Image.open(io.BytesIO(raw), formats=["JPEG", "PNG", "WEBP"]) as check:
-                if check.format != expected[0]:
-                    raise ImageError("파일 형식과 실제 이미지 형식이 일치하지 않습니다.")
-                if check.width * check.height > MAX_PIXELS:
-                    raise ImageError("이미지 해상도가 너무 큽니다. 2,500만 화소 이하로 줄여주세요.")
-                if getattr(check, "is_animated", False):
-                    raise ImageError("움직이는 이미지는 지원하지 않습니다. 정지 이미지로 선택해주세요.")
-                check.verify()
-            with Image.open(io.BytesIO(raw), formats=["JPEG", "PNG", "WEBP"]) as source:
-                source.load()
-                oriented = ImageOps.exif_transpose(source)
-                oriented.thumbnail((MAX_EDGE, MAX_EDGE), Image.Resampling.LANCZOS)
-                pixels = oriented.convert("RGBA" if "A" in oriented.getbands() or "transparency" in oriented.info else "RGB")
+        if not expected or content_type.lower() not in MIME_TYPES[expected] | {"", "application/octet-stream"}:
+            raise ImageError("지원하지 않는 이미지 형식입니다. JPG, PNG, WebP, HEIC 사진을 선택해주세요.")
+        if not raw or len(raw) > MAX_FILE_BYTES:
+            raise ImageError("파일이 너무 큽니다. 사진은 한 장당 32MB까지 처리할 수 있어요.")
+        with Image.open(io.BytesIO(raw), formats=list(MIME_TYPES)) as check:
+            dimensions = check.size
+            if check.format != expected:
+                raise ImageError("파일 형식과 실제 이미지 형식이 일치하지 않습니다.")
+            if check.width * check.height > MAX_PIXELS:
+                raise ImageError("사진 크기가 처리 가능한 범위를 넘었습니다. 5,000만 화소 이하의 사진을 선택해주세요.")
+            if expected != "HEIF" and getattr(check, "is_animated", False):
+                raise ImageError("움직이는 이미지는 지원하지 않습니다. 정지 이미지로 선택해주세요.")
+            check.verify()
+        with Image.open(io.BytesIO(raw), formats=list(MIME_TYPES)) as source:
+            # JPEG decoder scaling / compatible HEIF thumbnails reduce peak memory.
+            # A square resize bound commutes with EXIF rotation; rotate only the small image.
+            source.draft(None, (MAX_EDGE, MAX_EDGE))
+            source.thumbnail((MAX_EDGE, MAX_EDGE), Image.Resampling.LANCZOS)
+            ImageOps.exif_transpose(source, in_place=True)
+            with source.convert("RGBA" if "A" in source.getbands() or "transparency" in source.info else "RGB") as pixels:
                 # Copy pixels into a fresh image: EXIF/GPS/XMP and profiles never leave the server.
-                clean = Image.new(pixels.mode, pixels.size)
-                clean.paste(pixels)
-                result = io.BytesIO()
-                clean.save(result, "WEBP", quality=86, method=4, exif=b"", icc_profile=None)
-                return result.getvalue(), clean.width, clean.height
-    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError) as error:
+                with Image.new(pixels.mode, pixels.size) as clean:
+                    clean.paste(pixels)
+                    result = io.BytesIO()
+                    clean.save(result, "WEBP", quality=86, method=4, exif=b"", icc_profile=None)
+                    logger.info("Image optimized format=%s bytes=%d dimensions=%s output_bytes=%d output=%sx%s", expected, len(raw), dimensions, result.tell(), clean.width, clean.height)
+                    return result.getvalue(), clean.width, clean.height
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, RuntimeError, MemoryError, Image.DecompressionBombError) as error:
+        # Never log filenames, EXIF, GPS, credentials or the request body.
+        logger.warning("Image processing failed format=%s bytes=%d dimensions=%s error=%s reason=%s", expected, len(raw), dimensions, type(error).__name__, str(error) if isinstance(error, ImageError) else "decoder failure", exc_info=not isinstance(error, ImageError))
         if isinstance(error, ImageError):
             raise
-        raise ImageError("이미지 파일을 읽을 수 없습니다. 정상적인 JPG, PNG, WebP 파일을 선택해주세요.") from error
+        raise ImageError("사진을 처리하지 못했습니다. 파일이 손상되었거나 지원하지 않는 사진입니다. 다른 사진을 선택해주세요.") from error
 
 
 class ImageStore:
@@ -128,13 +147,13 @@ class ImageStore:
             item["image_url"] = item["merged_images"][0]["url"]
         return item
 
-    async def prepare(self, form, kind):
+    async def prepare(self, form, kind, *, slots=None):
         plan = ImagePlan(self, kind)
-        count = 5 if kind == "places" else 1
+        count = slots if slots is not None else (5 if kind == "places" else 1)
         uploads = [(key, value) for key, value in form.multi_items() if isinstance(value, UploadFile) and value.filename]
         valid_names = {f"image_{slot}" for slot in range(count)}
         if len(uploads) > count or len({key for key, _ in uploads}) != len(uploads) or any(key not in valid_names for key, _ in uploads):
-            raise ImageError("장소 사진은 대표 1장과 추가 4장, 제주 이슈 포스터는 1장까지 가능합니다.")
+            raise ImageError(f"사진은 최대 {count}장까지 가능합니다.")
         try:
             for slot in range(count):
                 if form.get(f"remove_image_{slot}") == "1":
@@ -142,12 +161,15 @@ class ImageStore:
                 upload = form.get(f"image_{slot}")
                 if not isinstance(upload, UploadFile) or not upload.filename:
                     continue
-                raw = await upload.read(MAX_FILE_BYTES + 1)
-                output, width, height = await run_in_threadpool(optimize_image, raw, upload.filename, upload.content_type or "")
+                output, width, height = await run_in_threadpool(optimize_upload, upload.file, upload.filename, upload.content_type or "")
                 relative = f"{kind}/{uuid.uuid4().hex}.webp"
                 plan.new[slot] = {"file_path": relative, "width": width, "height": height, "byte_size": len(output)}
                 await run_in_threadpool(self.write, relative, output)
             return plan
+        except OSError as exc:
+            plan.discard()
+            logger.exception("Image storage failed error=%s", type(exc).__name__)
+            raise ImageError("사진 업로드 중 문제가 발생했습니다. 다시 시도해주세요.") from exc
         except BaseException:
             plan.discard()
             raise

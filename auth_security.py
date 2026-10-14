@@ -18,13 +18,13 @@ from starlette.datastructures import MutableHeaders
 from starlette.requests import HTTPConnection
 from starlette.responses import Response
 from starlette.formparsers import MultiPartException
+from image_limits import MAX_FILE_BYTES, FORM_BYTES, BODY_LIMIT_MESSAGE, MEMBER_PLACE_SLOTS, ADMIN_PLACE_SLOTS
 
 # OWASP Argon2id baseline: 19 MiB, two passes, one lane, random salt per hash.
 PASSWORD_HASHER = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1, type=Type.ID)
 DUMMY_HASH = PASSWORD_HASHER.hash(secrets.token_urlsafe(32))
 COOKIE_NAME = "jejuno_session"
 HASH_SLOTS = threading.BoundedSemaphore(2)
-BODY_LIMIT_MESSAGE = "입력 내용이 너무 큽니다. 이미지는 파일당 10MB 이하로 선택해주세요."
 
 
 def hash_password(password):
@@ -124,18 +124,20 @@ class ServerSessionMiddleware:
         data, member, expiry = await run_in_threadpool(self.load, token_hash, int(time.time()))
         scope["session"], scope["member"] = data, member
         original = json.dumps(data, sort_keys=True)
-        # Stream multipart files to Starlette's spooled files instead of buffering 50 MB in RAM.
+        # Stream multipart files to Starlette's spooled files, never buffer a whole request.
         if scope["method"] in ("POST", "PUT", "PATCH", "DELETE"):
-            limit = 131072
+            limit = FORM_BYTES
             if connection.headers.get("content-type", "").lower().startswith("multipart/form-data"):
-                if ((data.get("admin_id") or (member and member["role"] == "admin")) and re.fullmatch(r"/admin/places/(?:new|\d+/edit)", scope["path"])) or (member and re.fullmatch(r"/map/register|/places/(?:new|\d+/edit)", scope["path"])):
-                    limit += 5 * 10 * 1024 * 1024
+                if (data.get("admin_id") or (member and member["role"] == "admin")) and re.fullmatch(r"/admin/places/(?:new|\d+/edit)", scope["path"]):
+                    limit += ADMIN_PLACE_SLOTS * MAX_FILE_BYTES
+                elif member and re.fullmatch(r"/map/register|/places/(?:new|\d+/edit)", scope["path"]):
+                    limit += MEMBER_PLACE_SLOTS * MAX_FILE_BYTES
                 elif ((data.get("admin_id") and re.fullmatch(r"/admin/news/(?:new|\d+/edit)", scope["path"]))
                       or (member and re.fullmatch(r"/issues/(?:new|\d+/edit)", scope["path"]))):
-                    limit += 10 * 1024 * 1024
+                    limit += MAX_FILE_BYTES
             length = connection.headers.get("content-length", "")
             if length.isdigit() and int(length) > limit:
-                return await Response("입력 내용이 너무 큽니다. 이미지는 파일당 10MB 이하로 선택해주세요.", status_code=413)(scope, receive, send)
+                return await Response(BODY_LIMIT_MESSAGE, status_code=413)(scope, receive, send)
             received = 0
             original_receive = receive
             async def bounded_receive():

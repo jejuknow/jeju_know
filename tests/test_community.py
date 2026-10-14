@@ -339,7 +339,9 @@ class CommunityTest(unittest.TestCase):
         output=io.BytesIO();Image.new('RGB',(40,50),'blue').save(output,'PNG')
         files=[(f'image_{n}',(f'{n}.png',output.getvalue(),'image/png')) for n in range(5)]
         for name,address in [('사진 원본','주소1'),('사진 유지','주소2')]:
-            r=self.member.post('/places/new',data={'csrf_token':self.csrf(self.member),**self.form(name=name,address=address)},files=files,follow_redirects=False)
+            # Admin uploads retain five slots; these also model existing five-photo records.
+            p=self.place(name=name,address=address)
+            r=self.admin.post(f"/admin/places/{p['id']}/edit",data={'csrf_token':self.csrf(self.admin,'/admin'),**self.form(name=name,address=address),'published':'1'},files=files,follow_redirects=False)
             self.assertEqual(r.status_code,303,r.text)
         source,target=self.rows('SELECT * FROM places ORDER BY id')
         image_paths=[r['file_path'] for r in self.rows('SELECT * FROM images')]
@@ -356,7 +358,7 @@ class CommunityTest(unittest.TestCase):
         html=self.member.get('/places/new').text
         for field in ('reason','is_pick','verification_status','image_url','published','new_override'):
             self.assertNotIn(f'name="{field}"',html)
-        self.assertIn('multipart/form-data',html);self.assertEqual(html.count('type="file"'),5)
+        self.assertIn('multipart/form-data',html);self.assertEqual(html.count('type="file"'),4)
         self.assertIn('본인이 촬영했거나 사용 권한이 있는 사진만 등록해주세요.',html)
 
     def test_31_admin_pages_and_own_activity_render(self):

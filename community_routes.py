@@ -14,6 +14,7 @@ from place_details import validate_detail_value
 from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
                               duplicates, editable, facts, merge_places, opening)
 from image_uploads import FORM_BYTES, ImageError, ImagePlan
+from image_limits import MEMBER_PLACE_SLOTS
 from place_taxonomy import linked_ids, save_links, validate_terms
 
 
@@ -153,9 +154,9 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             similar = duplicates(conn, data, place_id)
         data.update(id=place_id, images=image_store.list("places", place_id) if place_id else [])
         if similar and form.get("duplicate_ack") != "1":
-            return place_form(request, data, status=409, error="비슷한 장소가 이미 등록되어 있습니다. 기존 장소를 먼저 확인해주세요. 사진은 다시 선택해주세요.", similar=similar, new_only=new_only)
+            return place_form(request, data, status=409, error="비슷한 장소가 이미 등록되어 있습니다. 기존 장소를 먼저 확인해주세요.", similar=similar, new_only=new_only)
         try:
-            plan = await image_store.prepare(form, "places")
+            plan = await image_store.prepare(form, "places", slots=MEMBER_PLACE_SLOTS)
         except ImageError as exc:
             return place_form(request, data, status=400, error=str(exc), new_only=new_only)
         with plan.transaction() as conn:

@@ -18,7 +18,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/images/brand/apple-touch-icon.png" />
   <link rel="stylesheet" href="/static/styles.css?v=20261013-quick-nav" />
   <link rel="stylesheet" href="/static/members.css?v=20261011-wrap" />
-  <link rel="stylesheet" href="/static/images.css?v=20261011-uploads" />
+  <link rel="stylesheet" href="/static/images.css?v=20261014-upload" />
   {% block head %}{% endblock %}
   <link rel="stylesheet" href="/static/community.css?v=20261013-correction">
   <link rel="stylesheet" href="/static/brand.css?v=20261012-brand">
@@ -27,7 +27,7 @@
   {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% include '_site_header.html' %}{% endif %}
   {% block body %}{% endblock %}
   <script src="/static/site-nav.js?v=20261008-home"></script>
-  <script src="/static/image-uploads.js?v=20261011-uploads" defer></script>
+  <script src="/static/image-uploads.js?v=20261014-upload" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

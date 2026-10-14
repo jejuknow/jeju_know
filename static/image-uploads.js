@@ -1,53 +1,136 @@
-/* Native file inputs work without JavaScript; previews stay local until form submission. */
-document.querySelectorAll('[data-image-slot]').forEach(slot => {
-  const input = slot.querySelector('input[type=file]');
-  const remove = slot.querySelector('input[type=checkbox]');
-  const preview = slot.querySelector('.image-preview');
-  const image = preview.querySelector('img');
-  const placeholder = preview.querySelector('.image-placeholder');
-  const status = slot.querySelector('.image-feedback');
-  const label = slot.querySelector('.image-file-button span');
-  let objectUrl;
-  function render() {
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-    objectUrl = undefined;
-    const file = input.files[0];
-    const url = !remove.checked && (file ? (objectUrl = URL.createObjectURL(file)) : preview.dataset.original);
-    image.hidden = !url;
-    placeholder.hidden = !!url;
-    if (url) image.src = url; else image.removeAttribute('src');
-    label.textContent = url ? '이미지 변경' : '+ 이미지 업로드';
+/* Best-effort, serial browser optimization. The server always validates the pixels again. */
+(function (root) {
+  'use strict';
+  const MAX_BYTES=32*1024*1024, MAX_PIXELS=50000000, EDGE=1920;
+  function dimensions(bytes) {
+    const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+    if(bytes.length>=24&&view.getUint32(0)===0x89504e47) return {width:view.getUint32(16),height:view.getUint32(20)};
+    if(bytes[0]===255&&bytes[1]===216) {
+      let p=2;
+      while(p+8<bytes.length) {
+        if(bytes[p]!==255)break;
+        const marker=bytes[p+1],length=view.getUint16(p+2);
+        if([192,193,194,195,197,198,199,201,202,203,205,206,207].includes(marker))return {width:view.getUint16(p+7),height:view.getUint16(p+5)};
+        if(length<2)break;p+=length+2;
+      }
+    }
+    if(bytes.length>=30&&view.getUint32(0)===0x52494646&&view.getUint32(8)===0x57454250&&view.getUint32(12)===0x56503858) {
+      const le24=p=>bytes[p]+bytes[p+1]*256+bytes[p+2]*65536;
+      return {width:le24(24)+1,height:le24(27)+1};
+    }
+    return null; // Unknown headers go to the bounded server decoder.
   }
-  input.addEventListener('change', () => {
-    const file = input.files[0];
-    status.textContent = '';
-    input.setCustomValidity('');
-    if (file && (!/\.(jpe?g|png|webp)$/i.test(file.name) || !['image/jpeg','image/png','image/webp'].includes(file.type))) {
-      status.textContent = 'JPG·PNG·WebP만 지원합니다. HEIC 등은 JPG로 변환해주세요.';
-      input.value = '';
-    } else if (file && file.size > 10 * 1024 * 1024) {
-      status.textContent = '이미지는 파일당 10MB 이하로 선택해주세요.';
-      input.value = '';
-    } else if (file) {
-      remove.checked = false;
-      status.textContent = '새 이미지를 선택했어요. 저장하면 반영됩니다.';
+  function boundedSize(width,height) {
+    const ratio=Math.min(1,EDGE/Math.max(width,height));
+    return {width:Math.max(1,Math.round(width*ratio)),height:Math.max(1,Math.round(height*ratio))};
+  }
+  async function optimizePhoto(file) {
+    if(!root.createImageBitmap||!/\.(jpe?g|png|webp)$/i.test(file.name))return file;
+    let bitmap;
+    try {
+      const size=dimensions(new Uint8Array(await file.slice(0,524288).arrayBuffer()));
+      if(!size||!size.width||!size.height||size.width*size.height>MAX_PIXELS||Math.max(size.width,size.height)/Math.min(size.width,size.height)>10)return file;
+      // Specify one dimension so EXIF rotation cannot distort the aspect ratio.
+      bitmap=await root.createImageBitmap(file,{imageOrientation:'from-image',resizeWidth:Math.min(EDGE,size.width,size.height),resizeQuality:'high'});
+      const target=boundedSize(bitmap.width,bitmap.height),canvas=document.createElement('canvas');
+      canvas.width=target.width;canvas.height=target.height;
+      canvas.getContext('2d').drawImage(bitmap,0,0,target.width,target.height);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.86));
+      canvas.width=canvas.height=1;
+      if(!blob||blob.type!=='image/webp'||blob.size>=file.size)return file;
+      return new File([blob],'optimized-photo.webp',{type:'image/webp'});
+    } catch (_) { return file; }
+    finally { bitmap?.close(); }
+  }
+  if(typeof module==='object'&&module.exports)module.exports={dimensions,boundedSize,optimizePhoto};
+  if(typeof document==='undefined')return;
+  let queue=Promise.resolve();
+  document.querySelectorAll('form').forEach(form=>{
+    const slots=[...form.querySelectorAll('[data-image-slot]')];if(!slots.length)return;
+    const states=[],buttons=[...form.querySelectorAll('button[type=submit]')];
+    const feedback=form.querySelector('[data-submit-status]')||form.appendChild(Object.assign(document.createElement('p'),{className:'form-help'}));
+    feedback.setAttribute('role','status');
+    let sending=false;
+    function busy(){buttons.forEach(b=>{b.disabled=sending||states.some(s=>s.busy);});}
+    slots.forEach(slot=>{
+      const input=slot.querySelector('input[type=file]'),remove=slot.querySelector('input[type=checkbox]');
+      const preview=slot.querySelector('.image-preview'),image=preview.querySelector('img'),placeholder=preview.querySelector('.image-placeholder');
+      const status=slot.querySelector('.image-feedback'),label=slot.querySelector('.image-file-button span');
+      const state={input,remove,file:null,busy:false,revision:0,promise:Promise.resolve(),url:null};states.push(state);
+      function render(){
+        if(state.url)URL.revokeObjectURL(state.url);state.url=null;
+        const url=!remove.checked&&(state.file?(state.url=URL.createObjectURL(state.file)):preview.dataset.original);
+        image.hidden=!url;placeholder.hidden=!!url;
+        placeholder.textContent='선택한 사진 미리보기';
+        if(url)image.src=url;else image.removeAttribute('src');
+        label.textContent=url?'사진 변경':'사진 선택';
+      }
+      input.addEventListener('change',()=>{
+        const revision=++state.revision,file=input.files[0];state.file=null;state.busy=false;
+        input.setCustomValidity('');status.textContent='';
+        if(!file){render();busy();return;}
+        if(!/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)||file.size>MAX_BYTES){
+          status.textContent=file.size>MAX_BYTES?'파일이 너무 큽니다. 사진은 한 장당 32MB까지 처리할 수 있어요.':'지원하지 않는 이미지 형식입니다. JPG, PNG, WebP, HEIC 사진을 선택해주세요.';
+          input.value='';render();busy();return;
+        }
+        remove.checked=false;state.file=file;render();
+        state.busy=true;status.textContent='사진 최적화 중...';busy();
+        state.promise=queue=queue.catch(()=>{}).then(async()=>{
+          if(revision!==state.revision)return;
+          const optimized=await optimizePhoto(file);
+          if(revision!==state.revision)return;
+          state.file=optimized;render();
+          status.textContent=optimized!==file?'사진 최적화 완료 · 저장하면 반영됩니다.':'사진 선택 완료 · 서버에서 안전하게 최적화합니다.';
+        }).finally(()=>{if(revision===state.revision){state.busy=false;busy();}});
+      });
+      image.addEventListener('error',()=>{
+        if(!state.file)return;
+        image.hidden=true;placeholder.hidden=false;
+        placeholder.textContent='저장 후 미리보기';
+        status.textContent='이 브라우저에서는 미리보기를 지원하지 않습니다. 원본을 서버에서 처리합니다.';
+        // HEIC preview failure is not a validation failure.
+      });
+      remove.addEventListener('change',()=>{
+        state.revision++;state.busy=false;
+        if(remove.checked){input.value='';state.file=null;input.setCustomValidity('');}
+        status.textContent=remove.checked?'저장하면 이 사진이 삭제됩니다.':'';render();busy();
+      });
+      root.addEventListener('pagehide',()=>{if(state.url)URL.revokeObjectURL(state.url);});
+    });
+    function showDuplicate(doc){
+      const warning=doc.querySelector('.duplicate-warning');
+      if(!warning)return;
+      form.parentNode.querySelector('.duplicate-warning')?.remove();
+      // This is our escaped, same-origin server form, never an external response.
+      form.before(warning);
+      if(!form.querySelector('[name=duplicate_ack]')){
+        const label=document.createElement('label');label.className='member-check';
+        const check=document.createElement('input');check.type='checkbox';check.name='duplicate_ack';check.value='1';check.required=true;
+        label.append(check,document.createTextNode('기존 장소를 확인했으며 서로 다른 장소입니다.'));feedback.before(label);
+      }
     }
-    render();
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();if(sending)return;
+      sending=true;busy();feedback.textContent='사진과 지도 위치를 확인하고 있어요.';
+      try {
+        await Promise.all(states.map(s=>s.promise));
+        await form.prepareLocation?.();
+        if(!form.reportValidity())return;
+        const data=new FormData(form);
+        states.forEach(s=>{if(s.file&&!s.remove.checked)data.set(s.input.name,s.file,s.file.name);});
+        feedback.textContent=form.hasAttribute('data-member-place-form')?'장소 등록 중...':'사진과 내용을 저장 중...';
+        const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'});
+        if(response.redirected&&response.ok){location.assign(response.url);return;}
+        const text=await response.text(),doc=new DOMParser().parseFromString(text,'text/html');
+        if(response.status===409)showDuplicate(doc);
+        const message=doc.querySelector('.member-error,.flash.error,[role=alert]')?.textContent?.trim();
+        feedback.textContent=message||(!/<(?:html|body)/i.test(text)&&text.length<500?text:'사진 업로드 중 문제가 발생했습니다. 입력 내용을 확인하고 다시 시도해주세요.');
+        feedback.setAttribute('role','alert');feedback.scrollIntoView({block:'nearest'});
+      } catch (_) {
+        feedback.textContent='사진 업로드 중 연결 문제가 발생했습니다. 내 장소에서 등록 여부를 확인한 뒤 다시 시도해주세요.';
+        feedback.setAttribute('role','alert');
+      } finally {sending=false;busy();}
+    });
+    root.addEventListener('pageshow',()=>{sending=false;busy();});
   });
-  image.addEventListener('error', () => {
-    if (!objectUrl) return;
-    input.setCustomValidity('이미지 파일을 읽을 수 없습니다. 다른 이미지를 선택해주세요.');
-    status.textContent = input.validationMessage;
-    image.hidden = true;
-    placeholder.hidden = false;
-  });
-  remove.addEventListener('change', () => {
-    if (remove.checked) {
-      input.value = '';
-      input.setCustomValidity('');
-    }
-    status.textContent = remove.checked ? '저장하면 업로드 이미지가 삭제됩니다.' : '';
-    render();
-  });
-  window.addEventListener('pagehide', () => { if (objectUrl) URL.revokeObjectURL(objectUrl); });
-});
+})(typeof window==='undefined'?globalThis:window);

@@ -49,6 +49,9 @@ def coordinates(lat, lng):
 
 def facts(form, conn, regions, *, new_only=False, existing=None):
     data = {key: str(form.get(key, "")).strip() for key in FACT_LIMITS}
+    # The member form no longer asks for a map URL; retain earlier links on edit.
+    if "map_url" not in form and existing:
+        data["map_url"] = existing["map_url"]
     if any(len(data[k]) > limit or any(ord(c) < 32 and c not in '\n\r\t' for c in data[k]) for k, limit in FACT_LIMITS.items()):
         raise ValueError("입력 길이를 확인해주세요. 장소명 120자, 주소 300자, 소개 600자까지 가능합니다.")
     if not data["name"] or not data["address"] or data["region"] not in regions:

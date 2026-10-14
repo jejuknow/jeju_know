@@ -23,3 +23,18 @@
 .article-hero.uploaded-poster{height:auto;min-height:200px;max-height:none;background:#f3f5fa;display:block}
 .uploaded-poster img{display:block;width:100%;max-height:80vh;object-fit:contain}
 @media(max-width:640px){.image-upload-grid{grid-template-columns:minmax(0,1fr)}.image-upload-slot{padding:14px}.image-upload-actions{gap:10px}.image-feedback,.image-editor .form-help{line-height:1.6}.place-gallery{gap:10px}}
+.compact-image-editor .image-upload-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.compact-image-editor .image-upload-slot{padding:12px;border-radius:14px}
+.compact-image-editor .image-upload-slot:first-child{border-color:var(--brand)}
+.compact-image-editor .image-upload-slot h3{font-size:14px;margin-bottom:8px}
+.compact-image-editor .image-preview{height:130px;aspect-ratio:auto}
+.compact-image-editor .image-placeholder{font-size:12px;padding:8px;text-align:center}
+.compact-image-editor .image-upload-actions{gap:8px;margin-top:8px}
+.compact-image-editor .image-file-button{font-size:12px;padding:9px 10px;min-height:44px;white-space:nowrap}
+.compact-image-editor .image-remove{min-height:44px;font-size:12px;display:inline-flex;align-items:center}
+.compact-image-editor .image-feedback{font-size:12px;line-height:1.6;margin:6px 0 0}
+.compact-image-editor .photo-rights{font-size:13px;padding:0}
+.preserved-photos{margin-top:16px}.preserved-photos summary{cursor:pointer;min-height:44px;line-height:1.7}
+.member-place-form .location-feedback{padding:12px 14px;border-radius:12px;background:var(--soft);line-height:1.6}
+.member-place-form [data-submit-status]{line-height:1.7;word-break:keep-all;overflow-wrap:break-word}
+@media(max-width:400px){.compact-image-editor .image-upload-grid{gap:8px}.compact-image-editor .image-upload-slot{padding:8px}.compact-image-editor .image-preview{height:100px}.compact-image-editor .image-upload-actions{gap:2px}.compact-image-editor .image-file-button{padding:8px}.compact-image-editor .image-feedback{font-size:12px}}
