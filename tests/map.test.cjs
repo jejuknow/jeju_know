@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {hasCoordinates,createMapView}=require('../static/map.js');
+const {hasCoordinates,placeStatus,makeStatusBadge,makeStatusPin,createMapView}=require('../static/map.js');
 function fixture(){
  const calls={bounds:[],pans:[],overlays:[],centers:[],levels:[]};
  const sdk={
@@ -35,4 +35,41 @@ test('list selection pans and highlights; marker selection calls list callback',
 test('resize preserves center without repeating fit; missing coordinates do not pan',()=>{
  const {view,calls}=fixture();view.render([cafe,food]);view.resize();view.resize();assert.equal(calls.bounds.length,1);
  view.select(999);assert.equal(calls.pans.length,0);view.fit();assert.equal(calls.bounds.length,2);
+});
+
+test('current monthly PICK takes priority over explicit verification, independently of category',()=>{
+ for(const category of ['food','cafe','attraction']){
+  assert.equal(placeStatus({category,is_pick:true,verification_status:'jejuno_verified'}).key,'pick');
+  assert.equal(placeStatus({category,is_pick:false,verification_status:'jejuno_verified'}).key,'verified');
+ }
+ assert.equal(placeStatus({is_pick:1}).key,'pick');
+ assert.equal(placeStatus({is_pick:0,source_type:'user'}).key,'unverified');
+});
+
+test('authorship, missing status and community confirmation never imply editorial verification',()=>{
+ for(const source_type of ['admin','user',undefined]){
+  for(const verification_status of ['unverified','community_confirmed','unknown',undefined]){
+   assert.equal(placeStatus({source_type,verification_status}).key,'unverified');
+  }
+ }
+ assert.equal(placeStatus({source_type:'user'}).label,'사용자 등록 · 미확인');
+ assert.equal(placeStatus({source_type:'admin'}).label,'JEJU_KNOW 등록 · 미확인');
+ assert.equal(placeStatus({source_type:'user',verification_status:'community_confirmed'}).label,'사용자 등록 · 정보 확인됨');
+});
+
+test('marker and card share status, with accessible text and a distinct symbol for each status',()=>{
+ const doc={createElement:tag=>({tag,attributes:{},events:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(k,v){this.events[k]=v;}})};
+ for(const data of [{source_type:'user'},{verification_status:'jejuno_verified'},{is_pick:true,verification_status:'jejuno_verified'}]){
+  const place={name:'<img onerror=alert(1)>',...data},status=placeStatus(place);
+  let clicks=0;
+  const pin=makeStatusPin(place,2,()=>clicks++,doc),badge=makeStatusBadge(place,doc);
+  assert.ok(pin.className.includes(`map-status--${status.key}`));
+  assert.ok(badge.className.includes(`map-status--${status.key}`));
+  assert.equal(pin.textContent,`${status.symbol} 2`);
+  assert.equal(badge.textContent,`${status.symbol} ${status.label}`);
+  assert.ok(pin.attributes['aria-label'].includes(status.label));
+  assert.equal(pin.innerHTML,undefined);
+  assert.equal(pin.attributes['aria-pressed'],'false');
+  pin.events.click();assert.equal(clicks,1);
+ }
 });

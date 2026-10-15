@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}제주 지도 | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261013-correction2">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261015-status">{% endblock %}
 {% block body_class %}map-body{% endblock %}
 {% block body %}
 <main class="map-workspace" id="mapWorkspace" data-kakao-key="{{ kakao_map_key }}">
@@ -14,7 +14,9 @@
     <div class="map-filter-panel"><nav class="map-categories" aria-label="장소 카테고리"><button type="button" class="map-category is-selected" data-category="" aria-pressed="true">전체</button>{% for category in categories %}<button type="button" class="map-category" data-category="{{ category.slug }}" aria-pressed="false">{{ category.name }}</button>{% endfor %}<button type="button" class="map-category" data-pick="current" aria-pressed="false">JEJU_KNOW PICK</button></nav><nav id="mapDetails" class="map-details" aria-label="세부 분류" hidden></nav></div>
     <section class="map-canvas-panel" aria-label="제주 장소 지도">
       <div id="kakaoMap" aria-label="장소 위치 지도"></div>
-      <div class="map-canvas-actions"><button id="mapFit" class="map-fit" type="button" disabled>장소 전체 범위</button><a id="mapRegisterLink" class="primary-inline" href="/map/register">+ 장소 알려주기</a></div>
+      <div class="map-canvas-actions"><button id="mapFit" class="map-fit" type="button" disabled>장소 전체 범위</button><a id="mapRegisterLink" class="primary-inline" href="/map/register">+ 장소 알려주기</a>
+        <details class="map-legend" id="mapLegend"><summary>마커 안내</summary><ul aria-label="지도 마커 상태 안내"><li><span class="map-legend-symbol map-status--unverified" aria-hidden="true">○</span>일반 등록 <small>JEJU_KNOW 확인 전</small></li><li><span class="map-legend-symbol map-status--verified" aria-hidden="true">✓</span>JEJU_KNOW 확인</li><li><span class="map-legend-symbol map-status--pick" aria-hidden="true">★</span>JEJU_KNOW PICK</li></ul></details>
+      </div>
       <p id="mapNotice" class="map-notice" role="status">지도를 불러오고 있어요.</p>
       <aside id="mapSelected" class="map-selected" aria-label="선택한 장소" hidden></aside>
     </section>
@@ -23,4 +25,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261012-map-flow"></script><script src="/static/map.js?v=20261013-correction2"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261012-map-flow"></script><script src="/static/map.js?v=20261015-status"></script>{% endblock %}

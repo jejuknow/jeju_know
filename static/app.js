@@ -6,7 +6,6 @@ const $=id=>document.getElementById(id);
 $('finderMapLink').href=search.href('/map',state);
 $('finderRegisterLink').href=search.registrationHref(state);
 function buildFilters(){
-  $('finderQuery').value=state.q;
   search.chips($('regionChips'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:search.regionLabel(v)}))],state.region);
   search.chips($('categoryChips'),[{value:'',label:'전체'},...taxonomy.categories.map(v=>({value:v.slug,label:v.name}))],state.category);
   search.chips($('companionChips'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:v}))],state.companions);
@@ -41,9 +40,8 @@ document.querySelector('.compact-finder').addEventListener('click',event=>{
   const button=event.target.closest('.chip');if(!button||!taxonomy)return;
   search.select(state,button.closest('[data-filter]').dataset.filter,button.dataset.value);buildFilters();
 });
-$('findBtn').addEventListener('click',()=>{state.q=$('finderQuery').value.trim();renderResults(true);});
-$('finderQuery').addEventListener('input',()=>{state.q=$('finderQuery').value.trim();});
-$('finderQuery').addEventListener('keydown',event=>{if(event.key==='Enter'&&taxonomy){event.preventDefault();$('findBtn').click();}});
+// Keep keywords received from MAP/shared URLs; FIND only edits the three filter groups.
+$('findBtn').addEventListener('click',()=>renderResults(true));
 addEventListener('popstate',()=>{if(taxonomy){Object.assign(state,search.fromParams(new URLSearchParams(location.search)));buildFilters();renderResults(false,false);}});
 $('resetBtn').addEventListener('click',()=>{if(!taxonomy)return;Object.assign(state,search.defaultState());buildFilters();renderResults();});
 document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListener('click',event=>{

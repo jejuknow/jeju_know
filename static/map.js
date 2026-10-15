@@ -5,6 +5,29 @@
       Number.isFinite(place.latitude) && Number.isFinite(place.longitude) &&
       Math.abs(place.latitude) <= 90 && Math.abs(place.longitude) <= 180;
   }
+  // is_pick is supplied by the API's current monthly PICK lookup, not a category.
+  // Only explicit editorial verification earns a blue marker, regardless of author.
+  function placeStatus(place) {
+    if(place.is_pick===true||place.is_pick===1)return {key:'pick',symbol:'★',label:'JEJU_KNOW PICK'};
+    if(place.verification_status==='jejuno_verified')return {key:'verified',symbol:'✓',label:'JEJU_KNOW 확인'};
+    const source=place.source_type==='user'?'사용자 등록':'JEJU_KNOW 등록';
+    const verification=place.verification_status==='community_confirmed'?'정보 확인됨':'미확인';
+    return {key:'unverified',symbol:'○',label:`${source} · ${verification}`};
+  }
+  function makeStatusBadge(place,doc) {
+    const status=placeStatus(place),badge=doc.createElement('span');
+    badge.className=`map-status map-status--${status.key}`;
+    badge.textContent=`${status.symbol} ${status.label}`;
+    return badge;
+  }
+  function makeStatusPin(place,index,select,doc) {
+    const status=placeStatus(place),pin=doc.createElement('button');
+    pin.className=`map-pin map-status--${status.key}`;pin.type='button';
+    pin.textContent=`${status.symbol} ${index}`;
+    pin.setAttribute('aria-label',`${place.name} 지도 마커 · ${status.label}`);
+    pin.setAttribute('title',status.label);pin.setAttribute('aria-pressed','false');
+    pin.addEventListener('click',select);return pin;
+  }
   function createMapView(maps, canvas, onSelect, makePin) {
     const map = new maps.Map(canvas, {center:new maps.LatLng(33.38,126.55), level:10});
     const pins = new Map();
@@ -45,7 +68,7 @@
       fit
     };
   }
-  if (typeof module !== 'undefined' && module.exports) { module.exports={hasCoordinates,createMapView}; return; }
+  if (typeof module !== 'undefined' && module.exports) { module.exports={hasCoordinates,placeStatus,makeStatusBadge,makeStatusPin,createMapView}; return; }
 
   const workspace=document.getElementById('mapWorkspace');
   if (!workspace) return;
@@ -58,6 +81,10 @@
   const coordinateCount=document.getElementById('mapCoordinateCount');
   const fitButton=document.getElementById('mapFit');
   const sheetToggle=document.getElementById('mapSheetToggle');
+  const legend=document.getElementById('mapLegend');
+  const mobileLegend=root.matchMedia('(max-width:700px)');
+  legend.open=!mobileLegend.matches;
+  mobileLegend.addEventListener('change',event=>{legend.open=!event.matches;});
   const taxonomy=JSON.parse(document.getElementById('mapCategoriesData').textContent);
   const categories=taxonomy.categories, filters=root.PlaceSearch;
   const detailNav=document.getElementById('mapDetails');
@@ -102,6 +129,7 @@
     const place=state.places.find(p=>p.id===id);
     if(!place) return;
     state.selected=id;
+    if(mobileLegend.matches)legend.open=false;
     // Make room for the selected place before panning on a resized mobile map.
     if(workspace.classList.contains('is-list-expanded')) {
       setListExpanded(false);
@@ -123,8 +151,7 @@
     const body=element('div','map-selected-body');
     const content=element('div','map-selected-content');
     content.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
-    content.append(element('p','place-provenance',place.status_label||''));
-    if(place.is_pick)content.append(element('span','badge pick','JEJU_KNOW PICK'));
+    content.append(makeStatusBadge(place,document));
     if(!hasCoordinates(place)) content.append(element('p','map-location-missing','지도 위치 미등록'));
     const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
     const correction=element('a','detail-link','정보 바로잡기');correction.href=`/places/${encodeURIComponent(place.id)}/suggest`;
@@ -151,8 +178,7 @@
       const button=element('button','map-place-select');button.type='button';button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',`${place.name} 위치 보기`);
       const body=element('div','map-card-body');
       body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
-      body.append(element('p','place-provenance',place.status_label||''));
-      if(place.is_pick) body.append(element('span','badge pick','JEJU_KNOW PICK'));
+      body.append(makeStatusBadge(place,document));
       if(!hasCoordinates(place)) body.append(element('span','map-location-missing','지도 위치 미등록'));
       button.append(thumbnail(place),body);button.addEventListener('click',()=>selectPlace(place.id));
       const link=element('a','map-card-detail','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
@@ -192,9 +218,7 @@
   sheetToggle.addEventListener('click',()=>setListExpanded(!workspace.classList.contains('is-list-expanded')));
   renderDetails();search(false);
   root.JejunoKakao.load(workspace.dataset.kakaoKey).then(maps=>{
-    view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,index,select)=>{
-      const pin=element('button','map-pin'+(place.is_pick?' is-pick':''),String(index));pin.type='button';pin.setAttribute('aria-label',`${place.name} 지도 마커`);pin.setAttribute('aria-pressed','false');pin.addEventListener('click',select);return pin;
-    });
+    view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,index,select)=>makeStatusPin(place,index,select,document));
     view.render(state.places);fitButton.disabled=!state.places.some(hasCoordinates);updateNotice();
     new ResizeObserver(()=>view.resize()).observe(document.getElementById('kakaoMap'));
     if(state.selected!==null) view.select(state.selected);
