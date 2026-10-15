@@ -115,6 +115,21 @@ class CommunityTest(unittest.TestCase):
         html=self.visitor.get('/place/'+p['slug']).text
         self.assertNotIn('JEJU_KNOW 추천 이유',html);self.assertIn('정보 바로잡기',html)
 
+    def test_member_optional_cafe_focus_create_edit_limit_and_permission(self):
+        for selected in (['taste','space','experience'],['invalid']):
+            self.assertEqual(self.create(cafe_focus_present='1',cafe_focus=selected).status_code,400)
+        p=self.place(cafe_focus_present='1',cafe_focus=['space','experience'])
+        self.assertEqual(self.api()[0]['cafe_focus'],['space','experience'])
+        self.assertEqual(self.api()[0]['verification_status'],'unverified')
+        url=f"/places/{p['id']}/edit"
+        self.assertEqual(self.post(self.other,url,**self.form(cafe_focus=['taste'])).status_code,403)
+        self.assertEqual(self.post(self.member,url,**self.form(cafe_focus_present='1',cafe_focus=['taste'])).status_code,303)
+        self.assertEqual(self.api()[0]['cafe_focus'],['taste'])
+        self.assertEqual(self.post(self.member,url,**self.form()).status_code,303)
+        self.assertEqual(self.api()[0]['cafe_focus'],['taste'])
+        self.assertEqual(self.post(self.member,url,**self.form(cafe_focus_present='1')).status_code,303)
+        self.assertEqual(self.api()[0]['cafe_focus'],[])
+
     def test_04_required_and_length_validation(self):
         for data in ({'name':''},{'region':''},{'address':''},{'name':'가'*121},{'one_line':'가'*601},{'category_id':'9999'}):
             self.assertEqual(self.create(**data).status_code,400,data)

@@ -1,4 +1,5 @@
 {% extends "base.html" %}{% from "_image_uploads.html" import image_uploads %}
+{% from "_cafe_focus.html" import cafe_focus_fields %}
 {% block title %}{{ '장소 수정' if place and place.id else '신상 장소 알려주기' if new_only else '장소 알려주기' }} | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% set p=place or {} %}
@@ -12,6 +13,7 @@
 <section class="form-card"><h2>장소 기본 정보</h2><div class="form-grid two">
 <label>장소명 *<input name="name" required maxlength="120" value="{{ p.get('name','') }}"></label>
 <label>카테고리 *<select name="category_id" id="memberPlaceCategory" required><option value="">선택해주세요</option>{% for c in categories if not new_only or c.slug in ['cafe','food'] %}<option value="{{ c.id }}" {% if p.get('category_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+{{ cafe_focus_fields(taxonomy, p, true) }}
 <div class="member-place-terms" id="memberPlaceTerms">{% for c in categories %}<fieldset data-category-id="{{ c.id }}" {% if p.get('category_id')|string != c.id|string %}hidden{% endif %}><legend>{{ c.name }} 세부 분류 (선택)</legend><div class="chips">{% for t in taxonomy.terms if t.parent_id == c.id and (t.is_active or t.id in p.get('term_ids',[])) %}<label class="member-term"><input type="checkbox" name="term_ids" value="{{ t.id }}" {% if t.id in p.get('term_ids',[]) %}checked{% endif %} {% if p.get('category_id')|string != c.id|string %}disabled{% endif %}>{{ t.name }}</label>{% endfor %}</div></fieldset>{% endfor %}</div><input type="hidden" name="taxonomy_present" value="1"><label>지역 *<select name="region" required><option value="">선택해주세요</option>{% for r in regions %}<option value="{{ r }}" {% if p.get('region')==r %}selected{% endif %}>{{ {'제주시':'제주시내','서귀포시':'서귀포시내'}.get(r,r) }}</option>{% endfor %}</select></label>
 <label>주소 *<input name="address" required maxlength="300" value="{{ p.get('address','') }}"></label>
 <label>오픈 연도{{ ' *' if new_only else ' (선택)' }}<input type="number" name="opened_year" min="1900" max="{{ current_year }}" {% if new_only %}required{% endif %} value="{{ p.get('opened_year') or '' }}" placeholder="예: {{ current_year }}"></label>
@@ -27,4 +29,4 @@
 <p class="form-help" data-submit-status role="status" aria-live="polite"></p><div class="form-actions"><a class="secondary-btn" href="/account/places">내 장소</a><button class="primary-inline" type="submit">{{ '수정사항 저장' if p.get('id') else '장소 등록하기' }}</button></div>
 </form></main>{% endblock %}
 
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/member-place.js?v=20261012-map-flow"></script>{% endblock %}
+{% block scripts %}<script src="/static/cafe-focus.js?v=20261015-discovery"></script><script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/member-place.js?v=20261012-map-flow"></script>{% endblock %}

@@ -16,6 +16,7 @@ from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABEL
 from image_uploads import FORM_BYTES, ImageError, ImagePlan
 from image_limits import MEMBER_PLACE_SLOTS
 from place_taxonomy import linked_ids, save_links, validate_terms
+from cafe_focus import parse_focus, validate_focus, save_focus, FOCUS_LABELS
 
 
 def register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
@@ -109,6 +110,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if category:
                 slugs = query.get("detail", "").split(",")
                 data["term_ids"] = [r["id"] for r in conn.execute("SELECT id,slug FROM categories WHERE parent_id=? AND type!='place' AND is_active=1", (category["id"],)) if r["slug"] in slugs]
+                data["cafe_focus"] = list(dict.fromkeys(v for v in query.get("focus", "").split(",") if v in FOCUS_LABELS))[:2] if category["slug"] == "cafe" else []
         return place_form(request, data, new_only=new_only)
 
     @app.get("/places/{place_id}/edit")
@@ -131,7 +133,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if form is None:
             return bad_csrf()
         # Reject every non-fact field, including forged editorial/ownership/visibility values.
-        allowed = set(FACT_FIELDS) | {"csrf_token", "from_new", "duplicate_ack", "taxonomy_present", "term_ids"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
+        allowed = set(FACT_FIELDS) | {"csrf_token", "from_new", "duplicate_ack", "taxonomy_present", "term_ids", "cafe_focus", "cafe_focus_present"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
         if any(k not in allowed for k in form):
             return HTMLResponse("사용자 장소 등록에서는 기본 정보와 사진만 변경할 수 있습니다.", status_code=403)
         if limited(request, "community-place"):
@@ -145,10 +147,13 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             try:
                 data = facts(form, conn, regions, new_only=new_only, existing=existing)
                 data.update(term_ids=form.getlist("term_ids") if form.get("taxonomy_present") == "1" else None, features=[])
+                data["cafe_focus"] = parse_focus(form, existing)
+                validate_focus(conn, data)
                 if error := validate_terms(conn, data, existing):
                     raise ValueError(error)
             except ValueError as exc:
                 values = {k: str(form.get(k, "")) for k in FACT_FIELDS}
+                values["cafe_focus"] = form.getlist("cafe_focus")
                 values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
             similar = duplicates(conn, data, place_id)
@@ -177,6 +182,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 fields = (*FACT_FIELDS, "category")
                 place_id = conn.execute("INSERT INTO places (" + ",".join(fields) + ",slug,submitted_by_user_id,source_type,verification_status,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user','unverified',1)", (*[data[k] for k in fields],slug,user_id)).lastrowid
             save_links(conn, place_id, data["term_ids"])
+            save_focus(conn, place_id, data["cafe_focus"])
             plan.apply(conn, place_id)
         flash(request, "장소를 저장했습니다. 사용자 등록 · 미확인으로 표시됩니다.")
         return redirect("/place/" + slug)

@@ -150,13 +150,28 @@
     });
     const body=element('div','map-selected-body');
     const content=element('div','map-selected-content');
-    content.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
-    content.append(makeStatusBadge(place,document));
+    const header=element('div','map-selected-header'),intro=element('div','map-selected-intro');
+    intro.append(element('h3','',place.name),element('p','map-meta',`${regionLabel(place.region)} · ${place.category}`));
+    header.append(thumbnail(place),intro);
+    content.append(header,element('p','map-recommendation',place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
+    const statuses=element('div','map-selected-statuses');
+    statuses.append(makeStatusBadge(place,document));
+    if(place.is_pick)statuses.append(makeStatusBadge({...place,is_pick:false},document));
+    content.append(statuses);
+    const attributes=filters.discoveryAttributes(place,taxonomy),discovery=element('dl','map-discovery');
+    for(const [label,value] of [['① 어디',attributes.region],['② 무엇',attributes.what],['③ 누구랑',attributes.companions]]){
+      const row=element('div'),description=element('dd','',value);
+      if(label==='③ 누구랑'&&attributes.moreCompanions){
+        const more=element('a','map-companions-more',` +${attributes.moreCompanions}`);more.href=`/place/${encodeURIComponent(place.slug)}`;more.setAttribute('aria-label',`동행 ${attributes.moreCompanions}개 더 보기`);description.append(more);
+      }
+      row.append(element('dt','',label),description);discovery.append(row);
+    }
+    content.append(discovery);
     if(!hasCoordinates(place)) content.append(element('p','map-location-missing','지도 위치 미등록'));
     const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
     const correction=element('a','detail-link','정보 바로잡기');correction.href=`/places/${encodeURIComponent(place.id)}/suggest`;
     const actions=element('div','map-selected-actions');actions.append(link,correction);
-    body.append(content,actions);selected.append(close,thumbnail(place),body);selected.hidden=false;
+    body.append(content,actions);selected.append(close,body);selected.hidden=false;
   }
   function render() {
     const name=categoryName();

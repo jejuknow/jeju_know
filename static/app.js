@@ -10,7 +10,13 @@ function buildFilters(){
   search.chips($('categoryChips'),[{value:'',label:'전체'},...taxonomy.categories.map(v=>({value:v.slug,label:v.name}))],state.category);
   search.chips($('companionChips'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:v}))],state.companions);
   const terms=search.termsFor(taxonomy,state.category);
-  $('categoryDetails').hidden=!terms.length;
+  const isCafe=state.category==='cafe';
+  $('categoryDetails').hidden=!terms.length&&!isCafe;
+  $('cafeFocusGroup').hidden=!isCafe;
+  search.chips($('cafeFocusChips'),taxonomy.cafe_focus||[],state.focus);
+  const more=$('categoryFeatureDetails');
+  if(more.dataset.category!==state.category){more.open=!isCafe||!!state.terms.length;more.dataset.category=state.category;}
+  $('categoryFeatureSummary').hidden=!isCafe;
   $('categoryDetailTitle').textContent=state.category==='food'?'어떤 음식을 찾나요?':'어떤 카페가 좋아요?';
   $('categoryDetailCount').textContent=state.terms.length?`${state.terms.length}개 선택`:'';
   search.chips($('categoryDetailChips'),terms.map(v=>({value:v.slug,label:v.name})),state.terms);

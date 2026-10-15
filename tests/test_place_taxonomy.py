@@ -106,6 +106,41 @@ class TaxonomyTest(unittest.TestCase):
         response=self.post('/admin/places/new',name='잘못된 분류',region='애월',category_id=self.term('food-korean')['id'])
         self.assertEqual(response.status_code,400)
 
+    def test_cafe_focus_shared_search_optional_multiple_and_feature_independence(self):
+        self.setup_admin_and_login()
+        mood=self.term('cafe-mood')
+        a=self.place(slug='focus-a',cafe_focus_present='1',cafe_focus=['taste','space'],taxonomy_present='1',term_ids=[str(mood['id'])],companions=['연인','친구'])
+        self.place(slug='focus-b',cafe_focus_present='1',cafe_focus=['experience'])
+        self.place(slug='focus-empty')
+        self.assertEqual(a['cafe_focus'],['taste','space'])
+        self.assertEqual(a['cafe_focus_labels'],['맛 중심','공간 중심'])
+        self.assertEqual(a['classification_terms'][0]['name'],mood['name'])
+        def slugs(**params):return {p['slug'] for p in self.client.get('/api/places',params=params).json()}
+        self.assertEqual(slugs(category='cafe',focus='taste'),{'focus-a'})
+        self.assertEqual(slugs(category='cafe',focus='space',detail='cafe-mood',companion='연인,친구'),{'focus-a'})
+        self.assertEqual(slugs(category='cafe',focus='taste,experience'),{'focus-a','focus-b'})
+        self.assertEqual(slugs(category='cafe',focus='experience',detail='cafe-mood'),set())
+        self.assertEqual(slugs(category='food',focus='taste'),set())
+        self.assertEqual(slugs(category='cafe',focus='bogus'),set())
+        self.assertEqual(slugs(category='cafe'),{'focus-a','focus-b','focus-empty'})
+        self.assertIn('카페 성향',self.client.get('/place/focus-a').text)
+        self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='cafe_feature']),10)
+
+    def test_cafe_focus_validation_legacy_edit_clear_and_category_switch(self):
+        self.setup_admin_and_login()
+        p=self.place(slug='focus-edit',cafe_focus=['space'],cafe_focus_present='1')
+        payload=dict(name=p['name'],slug=p['slug'],region='애월',category_id=self.category('cafe')['id'],published='1')
+        url=f"/admin/places/{p['id']}/edit"
+        for invalid in (['taste','space','experience'],['unknown'],['x'*1000]):
+            self.assertEqual(self.post(url,**payload,cafe_focus_present='1',cafe_focus=invalid).status_code,400)
+        self.assertEqual(self.post(url,**payload).status_code,200)
+        self.assertEqual(self.client.get('/api/places').json()[0]['cafe_focus'],['space'])
+        self.post(url,**payload,cafe_focus_present='1')
+        self.assertEqual(self.client.get('/api/places').json()[0]['cafe_focus'],[])
+        self.post(url,**payload,cafe_focus_present='1',cafe_focus=['taste'])
+        self.post(url,**{**payload,'category_id':self.category('food')['id']})
+        self.assertEqual(self.client.get('/api/places').json()[0]['cafe_focus'],[])
+
 
 class TaxonomyMigrationTest(unittest.TestCase):
     def test_backup_preserves_all_rows_maps_tags_and_restart_is_idempotent(self):

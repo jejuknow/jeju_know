@@ -22,6 +22,8 @@ from taxonomy_migrations import backup_before_taxonomy_migration, migrate_taxono
 from image_migrations import backup_before_image_migration, migrate_images
 from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedFormRoute
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
+from cafe_focus import parse_focus, validate_focus, save_focus, decorate_focus
+from cafe_focus_migrations import backup_before_cafe_focus, migrate_cafe_focus
 from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
 from member_routes import register_member_routes, validate_news
 from community_migrations import backup_before_community_migration, migrate_community, today as community_today
@@ -173,6 +175,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        focus_backup_path = backup_before_cafe_focus(app.state.database)
         detail_backup_path = backup_before_place_detail_migration(app.state.database)
         community_backup_path = backup_before_community_migration(app.state.database)
         image_backup_path = backup_before_image_migration(app.state.database)
@@ -275,6 +278,7 @@ def create_app(test_config=None):
         migrate_images(app.state.database, image_backup_path)
         migrate_community(app.state.database, community_backup_path)
         migrate_place_details(app.state.database, detail_backup_path)
+        migrate_cafe_focus(app.state.database, focus_backup_path)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -344,6 +348,7 @@ def create_app(test_config=None):
         try:
             decorate_facts(conn, place)
             decorate_details(conn, place)
+            decorate_focus(place)
         finally:
             conn.close()
         return image_store.decorate(place, "places")
@@ -438,6 +443,7 @@ def create_app(test_config=None):
             "companions": form.getlist("companions"),
             "features": form.getlist("features"),
             "term_ids": form.getlist("term_ids") if form.get("taxonomy_present") == "1" else None,
+            "cafe_focus": parse_focus(form, existing),
             "parking_status": str(form.get("parking_status", "미확인")),
             "pet_status": str(form.get("pet_status", "미확인")),
             "child_status": str(form.get("child_status", "미확인")),
@@ -514,6 +520,9 @@ def create_app(test_config=None):
         conn = connect_db()
         try:
             error = validate_terms(conn, data, existing)
+            validate_focus(conn, data)
+        except ValueError as exc:
+            return str(exc)
         finally:
             conn.close()
         if error:
@@ -586,10 +595,10 @@ def create_app(test_config=None):
         return templates.TemplateResponse(request=request, name="place_detail.html", context={"place": row_to_place(row)})
 
     @app.get("/api/places")
-    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = ""):
+    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = "", focus: str = ""):
         conn = connect_db()
         try:
-            rows = public_search(conn, category, q, region, companion, detail, condition, pick, new)
+            rows = public_search(conn, category, q, region, companion, detail, condition, pick, new, focus)
             places = [row_to_place(row) for row in rows]
             if pick == "current":
                 places.sort(key=lambda p: (p["pick_order"],p["id"]))
@@ -1057,6 +1066,7 @@ def create_app(test_config=None):
                 ),
             )
             save_links(conn, cursor.lastrowid, data["term_ids"])
+            save_focus(conn, cursor.lastrowid, data["cafe_focus"])
             save_details(conn, cursor.lastrowid, data)
             plan.apply(conn, cursor.lastrowid)
             save_admin_facts(conn, cursor.lastrowid, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
@@ -1123,6 +1133,7 @@ def create_app(test_config=None):
                 ),
             )
             save_links(conn, place_id, data["term_ids"])
+            save_focus(conn, place_id, data["cafe_focus"])
             save_details(conn, place_id, data)
             plan.apply(conn, place_id)
             save_admin_facts(conn, place_id, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))

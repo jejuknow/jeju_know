@@ -1,6 +1,7 @@
 """Shared DB classifications and public search used by home, list and map."""
 from taxonomy_migrations import json_list, legacy_term_ids
 from community_migrations import today
+from cafe_focus import CAFE_FOCUS, FOCUS_LABELS
 
 CORE_ORDER = {"food": 0, "cafe": 1, "attraction": 2}
 
@@ -18,7 +19,7 @@ def taxonomy(conn, regions, companions, include_inactive=False):
     for r in conn.execute("SELECT region,companions FROM places"):
         stored_regions.append(r[0])
         stored_companions.extend(json_list(r[1]))
-    return {"categories": parents, "terms": terms,
+    return {"categories": parents, "terms": terms, "cafe_focus": CAFE_FOCUS,
             "regions": list(dict.fromkeys([*regions, *stored_regions])),
             "companions": list(dict.fromkeys([*companions, *stored_companions]))}
 
@@ -49,8 +50,11 @@ def save_links(conn, place_id, term_ids):
     conn.executemany("INSERT INTO place_category_links(place_id,category_id) VALUES (?,?)", [(place_id, i) for i in term_ids])
 
 
-def public_search(conn, category="", q="", region="", companion="", detail="", condition="", pick="", new=""):
+def public_search(conn, category="", q="", region="", companion="", detail="", condition="", pick="", new="", focus=""):
     if any(len(v) > limit for v, limit in ((category, 80), (q, 200), (region, 100), (companion, 1000), (detail, 8100), (condition, 40))):
+        return []
+    focuses = list(dict.fromkeys(v for v in focus.split(",") if v))
+    if len(focus) > 80 or (focuses and (category != "cafe" or not set(focuses).issubset(FOCUS_LABELS))):
         return []
     clauses, params = ["p.published=1", "p.deleted_at IS NULL", "p.merged_into_id IS NULL"], []
     if pick not in ("", "current") or new not in ("", "current"):
@@ -81,6 +85,8 @@ def public_search(conn, category="", q="", region="", companion="", detail="", c
     companions = [v for v in companion.split(",") if v]
     results = []
     for row in rows:
+        if focuses and not set(focuses).intersection(json_list(row["cafe_focus"])):
+            continue
         if region and region_label(row["region"]) != region_label(region):
             continue
         if not all(v in json_list(row["companions"]) for v in companions):

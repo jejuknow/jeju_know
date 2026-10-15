@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_image_uploads.html" import image_uploads %}
+{% from "_cafe_focus.html" import cafe_focus_fields %}
 {% block title %}{{ '장소 수정' if mode == 'edit' else '새 장소 등록' }} | JEJU_KNOW{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/place-details.css?v=20261013-details">{% endblock %}
 {% block body_class %}admin-body{% endblock %}
@@ -19,6 +20,7 @@
 {% for field,label in [('reservation_status','예약'),('waiting_status','웨이팅'),('parking_status','주차'),('pet_status','반려동물'),('child_status','아이 동반'),('accessible_status','무장애')] %}<label>{{ label }}<select name="{{ field }}">{% for item in (waiting_options if field == 'waiting_status' else status_options) %}<option value="{{ item }}" {% if (p.get(field) or '미확인') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>{% endfor %}</div></div></details>
 
 <details class="form-card place-admin-section" open><summary><strong>3. 카테고리별 정보</strong><span>메뉴·카페 특징·맛집 세부유형</span></summary><div class="place-section-body"><input type="hidden" name="taxonomy_present" value="1">
+    {{ cafe_focus_fields(taxonomy, p) }}
     {% for parent in taxonomy.categories %}
     {% set terms = taxonomy.terms|selectattr('parent_id', 'equalto', parent.id)|list %}
     {% if terms %}<section class="form-card place-term-group" data-parent-id="{{ parent.id }}" {% if p.get('category_id')|string != parent.id|string %}hidden{% endif %}><h2>{{ '맛집 세부유형' if parent.slug == 'food' else '카페 특징' }}</h2><p class="form-help">선택사항 · 여러 개를 선택할 수 있습니다.</p><div class="check-grid">
@@ -38,4 +40,4 @@
 </main>
 {% endblock %}
 
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/admin-place-filters.js?v=20261013-details"></script>{% endblock %}
+{% block scripts %}<script src="/static/cafe-focus.js?v=20261015-discovery"></script><script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/admin-place-filters.js?v=20261013-details"></script>{% endblock %}
