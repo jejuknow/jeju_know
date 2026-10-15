@@ -151,7 +151,7 @@
     const body=element('div','map-selected-body');
     const content=element('div','map-selected-content');
     const header=element('div','map-selected-header'),intro=element('div','map-selected-intro');
-    intro.append(element('h3','',place.name),element('p','map-meta',`${regionLabel(place.region)} · ${place.category}`));
+    intro.append(element('h3','',place.name),element('p','map-meta',`${(place.region_label||regionLabel(place.region))} · ${place.category}`));
     header.append(thumbnail(place),intro);
     content.append(header,element('p','map-recommendation',place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
     const statuses=element('div','map-selected-statuses');
@@ -192,7 +192,7 @@
       const card=element('article','map-place-card');card.dataset.placeId=place.id;
       const button=element('button','map-place-select');button.type='button';button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',`${place.name} 위치 보기`);
       const body=element('div','map-card-body');
-      body.append(element('p','map-meta',`${place.category} · ${regionLabel(place.region)}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
+      body.append(element('p','map-meta',`${place.category} · ${(place.region_label||regionLabel(place.region))}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
       body.append(makeStatusBadge(place,document));
       if(!hasCoordinates(place)) body.append(element('span','map-location-missing','지도 위치 미등록'));
       button.append(thumbnail(place),body);button.addEventListener('click',()=>selectPlace(place.id));

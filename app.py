@@ -6,6 +6,7 @@ import re
 import secrets
 import sqlite3
 import uuid
+from contextlib import closing
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -29,6 +30,9 @@ from member_routes import register_member_routes, validate_news
 from community_migrations import backup_before_community_migration, migrate_community, today as community_today
 from community_places import decorate_facts, opening, save_admin_facts, VERIFICATION_LABELS
 from community_routes import register_community_routes
+from admin_ui import AdminUI, admin_context, admin_return
+from admin_settings import read_settings, catalog
+from admin_ui_migrations import backup_before_admin_ui, migrate_admin_ui
 from starlette.concurrency import run_in_threadpool
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -158,7 +162,16 @@ def create_app(test_config=None):
         if "csrf_token" not in request.session:
             request.session["csrf_token"] = secrets.token_urlsafe(32)
         flashes = request.session.pop("flashes", [])
+        with closing(connect_db()) as conn:
+            settings = read_settings(conn)
+            admin_data = admin_context(request, conn) if request.url.path.startswith('/admin') else {}
+            region_labels = {i['value']: i['label'] for i in catalog(conn, 'region', True)}
+            companion_labels = {i['value']: i['label'] for i in catalog(conn, 'companion', True)}
+            active_regions = [i['value'] for i in catalog(conn, 'region')]
+            active_companions = [i['value'] for i in catalog(conn, 'companion')]
         return {
+            "site_settings": settings, "region_labels": region_labels, "companion_labels": companion_labels, **admin_data,
+            "active_regions": active_regions, "active_companions": active_companions,
             "csrf_token": request.session["csrf_token"], "flashes": flashes,
             "news_categories": NEWS_CATEGORIES, "news_category_labels": NEWS_CATEGORY_LABELS,
             "member": current_user(request),
@@ -175,6 +188,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        admin_backup_path = backup_before_admin_ui(app.state.database)
         focus_backup_path = backup_before_cafe_focus(app.state.database)
         detail_backup_path = backup_before_place_detail_migration(app.state.database)
         community_backup_path = backup_before_community_migration(app.state.database)
@@ -279,6 +293,7 @@ def create_app(test_config=None):
         migrate_community(app.state.database, community_backup_path)
         migrate_place_details(app.state.database, detail_backup_path)
         migrate_cafe_focus(app.state.database, focus_backup_path)
+        migrate_admin_ui(app.state.database, admin_backup_path)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -348,7 +363,8 @@ def create_app(test_config=None):
         try:
             decorate_facts(conn, place)
             decorate_details(conn, place)
-            decorate_focus(place)
+            decorate_focus(place, conn)
+            place['region_label'] = {i['value']:i['label'] for i in catalog(conn,'region',True)}.get(place['region'],place['region'])
         finally:
             conn.close()
         return image_store.decorate(place, "places")
@@ -520,7 +536,14 @@ def create_app(test_config=None):
         conn = connect_db()
         try:
             error = validate_terms(conn, data, existing)
-            validate_focus(conn, data)
+            validate_focus(conn, data, existing)
+            region_values = {i['value'] for i in catalog(conn, 'region')}
+            companion_values = {i['value'] for i in catalog(conn, 'companion')}
+            if existing:
+                region_values.add(existing['region'])
+                companion_values.update(parse_json_list(existing['companions']))
+            if data['region'] not in region_values or not set(data['companions']).issubset(companion_values):
+                return "활성 지역과 동행을 선택해주세요. 기존 장소의 비활성 분류는 유지할 수 있습니다."
         except ValueError as exc:
             return str(exc)
         finally:
@@ -760,21 +783,7 @@ def create_app(test_config=None):
 
     @app.get("/admin", response_class=HTMLResponse)
     async def admin_dashboard(request: Request):
-        guard = admin_guard(request)
-        if guard:
-            return guard
-        conn = connect_db()
-        rows = conn.execute("SELECT * FROM places WHERE deleted_at IS NULL AND merged_into_id IS NULL ORDER BY updated_at DESC, id DESC").fetchall()
-        news_rows = conn.execute("SELECT * FROM news_posts WHERE deleted_at IS NULL ORDER BY updated_at DESC, id DESC").fetchall()
-        conn.close()
-        return templates.TemplateResponse(
-            request=request,
-            name="admin_dashboard.html",
-            context={
-                "places": [row_to_place(row) for row in rows],
-                "news_items": [row_to_news(row) for row in news_rows],
-            },
-        )
+        return app.state.admin_ui.dashboard(request)
 
     @app.get("/admin/news/new", response_class=HTMLResponse)
     async def admin_news_new_get(request: Request):
@@ -822,7 +831,7 @@ def create_app(test_config=None):
             )
             plan.apply(conn, cursor.lastrowid)
         flash(request, "제주 소식을 저장했습니다.", "success")
-        return RedirectResponse(url="/admin#news-admin", status_code=303)
+        return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
     @app.get("/admin/news/{news_id}/edit", response_class=HTMLResponse)
     async def admin_news_edit_get(request: Request, news_id: int):
@@ -880,7 +889,7 @@ def create_app(test_config=None):
             )
             plan.apply(conn, news_id)
         flash(request, "제주 소식을 수정했습니다.", "success")
-        return RedirectResponse(url="/admin#news-admin", status_code=303)
+        return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
     @app.post("/admin/news/{news_id}/toggle-published")
     async def admin_news_toggle_published(request: Request, news_id: int):
@@ -903,7 +912,7 @@ def create_app(test_config=None):
         conn.commit()
         conn.close()
         flash(request, f"소식을 {'공개' if new_value else '비공개'}로 변경했습니다.", "success")
-        return RedirectResponse(url="/admin#news-admin", status_code=303)
+        return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
     @app.post("/admin/news/{news_id}/delete")
     async def admin_news_delete(request: Request, news_id: int):
@@ -924,17 +933,11 @@ def create_app(test_config=None):
             plan.delete_owner(conn, news_id)
             conn.execute("DELETE FROM news_posts WHERE id=?", (news_id,))
         flash(request, f"‘{row['title']}’ 소식을 삭제했습니다.", "success")
-        return RedirectResponse(url="/admin#news-admin", status_code=303)
+        return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
     @app.get("/admin/categories", response_class=HTMLResponse)
     async def admin_categories(request: Request):
-        guard = admin_guard(request)
-        if guard:
-            return guard
-        conn = connect_db()
-        rows = conn.execute("SELECT c.*, (SELECT COUNT(*) FROM places p WHERE p.category_id=c.id) + (SELECT COUNT(*) FROM place_category_links l WHERE l.category_id=c.id) AS place_count, (SELECT COUNT(*) FROM categories child WHERE child.parent_id=c.id) AS child_count FROM categories c ORDER BY c.sort_order,c.id").fetchall()
-        conn.close()
-        return templates.TemplateResponse(request=request, name="admin_categories.html", context={"categories": [dict(r) for r in rows], "classification_types": TYPES})
+        return app.state.admin_ui.categories(request)
 
     async def save_category(request, category_id=None):
         guard = admin_guard(request)
@@ -953,7 +956,7 @@ def create_app(test_config=None):
             order = -1
         if not name or len(name) > 40 or name == "전체" or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) or len(slug) > 80 or order < 0:
             flash(request, "이름(1~40자, ‘전체’ 제외), 영문 슬러그(소문자·숫자·하이픈), 순서(0~9999)를 확인해 주세요.", "error")
-            return RedirectResponse("/admin/categories", status_code=303)
+            return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
         kind = str(form.get("type", "place"))
         conn = connect_db()
         try:
@@ -965,7 +968,7 @@ def create_app(test_config=None):
                     parent = conn.execute("SELECT id FROM categories WHERE slug=? AND type='place'", (parent_slug,)).fetchone()
                     if not parent:
                         flash(request, "상위 카테고리를 확인해 주세요.", "error")
-                        return RedirectResponse("/admin/categories", status_code=303)
+                        return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
                     parent_id = parent[0]
                 if kind not in TYPES:
                     return HTMLResponse("분류 유형을 확인해 주세요.", status_code=400)
@@ -986,7 +989,7 @@ def create_app(test_config=None):
             flash(request, "이미 사용 중인 카테고리 이름 또는 슬러그입니다.", "error")
         finally:
             conn.close()
-        return RedirectResponse("/admin/categories", status_code=303)
+        return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
 
     @app.post("/admin/categories/new")
     async def admin_category_new(request: Request):
@@ -1019,7 +1022,7 @@ def create_app(test_config=None):
                     flash(request, "사용하지 않는 카테고리를 삭제했습니다.")
         finally:
             conn.close()
-        return RedirectResponse("/admin/categories", status_code=303)
+        return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
 
     @app.get("/admin/places/new", response_class=HTMLResponse)
     async def admin_place_new_get(request: Request):
@@ -1071,7 +1074,7 @@ def create_app(test_config=None):
             plan.apply(conn, cursor.lastrowid)
             save_admin_facts(conn, cursor.lastrowid, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
-        return RedirectResponse(url="/admin", status_code=303)
+        return RedirectResponse(url=admin_return(form), status_code=303)
 
     @app.get("/admin/places/{place_id}/edit", response_class=HTMLResponse)
     async def admin_place_edit_get(request: Request, place_id: int):
@@ -1138,7 +1141,7 @@ def create_app(test_config=None):
             plan.apply(conn, place_id)
             save_admin_facts(conn, place_id, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")
-        return RedirectResponse(url="/admin", status_code=303)
+        return RedirectResponse(url=admin_return(form), status_code=303)
 
     @app.post("/admin/places/{place_id}/toggle-published")
     async def admin_place_toggle_published(request: Request, place_id: int):
@@ -1158,7 +1161,7 @@ def create_app(test_config=None):
         conn.commit()
         conn.close()
         flash(request, f"{'공개' if new_value else '비공개'} 상태로 즉시 변경했습니다.", "success")
-        return RedirectResponse(url="/admin", status_code=303)
+        return RedirectResponse(url=admin_return(form), status_code=303)
 
     @app.post("/admin/places/{place_id}/delete")
     async def admin_place_delete(request: Request, place_id: int):
@@ -1185,12 +1188,14 @@ def create_app(test_config=None):
                 plan.delete_owner(conn, place_id)
                 conn.execute("DELETE FROM places WHERE id=?", (place_id,))
         flash(request, f"‘{row['name']}’을(를) 즉시 삭제했습니다.", "success")
-        return RedirectResponse(url="/admin", status_code=303)
+        return RedirectResponse(url=admin_return(form), status_code=303)
 
     register_member_routes(app, templates, connect_db, require_csrf, flash,
                            parse_news_form, row_to_news, admin_guard, NEWS_CATEGORIES, secret_key, image_store)
     register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
                               row_to_place, form_options, REGIONS, secret_key, image_store)
+    app.state.admin_ui = AdminUI(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place, row_to_news, NEWS_CATEGORIES, NEWS_CATEGORY_ALIASES)
+    app.state.admin_ui.register()
     return app
 
 

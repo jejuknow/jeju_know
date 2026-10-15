@@ -319,11 +319,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
 
     @app.get("/admin/users", response_class=HTMLResponse)
     async def admin_users(request: Request):
-        if response := admin_guard(request):
-            return response
-        with closing(connect_db()) as conn:
-            users = conn.execute("SELECT u.id,u.username,u.nickname,u.created_at,u.status,(SELECT count(*) FROM news_posts n WHERE n.author_id=u.id AND n.author_type='user' AND n.deleted_at IS NULL) AS post_count FROM users u ORDER BY u.id DESC").fetchall()
-        return render(request, "admin_users.html", users=users)
+        return app.state.admin_ui.users(request)
 
     @app.post("/admin/users/{user_id}/status")
     async def admin_user_status(request: Request, user_id: int):
@@ -346,8 +342,4 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
 
     @app.get("/admin/user-posts", response_class=HTMLResponse)
     async def admin_user_posts(request: Request):
-        if response := admin_guard(request):
-            return response
-        with closing(connect_db()) as conn:
-            rows = conn.execute("SELECT * FROM news_posts WHERE author_type='user' ORDER BY id DESC").fetchall()
-        return render(request, "admin_user_posts.html", posts=[row_to_news(row) for row in rows])
+        return app.state.admin_ui.issues(request, user_only=True)

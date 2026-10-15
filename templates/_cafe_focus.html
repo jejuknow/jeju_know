@@ -4,7 +4,7 @@
 <fieldset class="cafe-focus-group" data-cafe-focus data-parent-id="{{ c.id }}" {% if p.get('category_id')|string != c.id|string %}hidden{% endif %}>
   <legend>{{ '이 카페는 어떤 곳인가요? (선택)' if member else '카페 성향 (선택)' }}</legend>
   <p class="form-help" data-focus-feedback role="status" aria-live="polite">최대 2개 선택 · 모르면 선택하지 않아도 괜찮아요.</p>
-  <div class="chips">{% for option in taxonomy.cafe_focus %}<label class="member-term"><input type="checkbox" name="cafe_focus" value="{{ option.value }}" {% if option.value in p.get('cafe_focus',[]) %}checked{% endif %} {% if p.get('category_id')|string != c.id|string %}disabled{% endif %}>{{ option.label }}</label>{% endfor %}</div>
+  <div class="chips">{% for option in taxonomy.cafe_focus if option.is_active or option.value in p.get('cafe_focus',[]) %}<label class="member-term"><input type="checkbox" name="cafe_focus" value="{{ option.value }}" {% if option.value in p.get('cafe_focus',[]) %}checked{% endif %} {% if p.get('category_id')|string != c.id|string %}disabled{% endif %}>{{ option.label }}</label>{% endfor %}</div>
 </fieldset>
 {% endfor %}
 {% endmacro %}

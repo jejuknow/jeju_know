@@ -1,7 +1,7 @@
 """Shared DB classifications and public search used by home, list and map."""
 from taxonomy_migrations import json_list, legacy_term_ids
 from community_migrations import today
-from cafe_focus import CAFE_FOCUS, FOCUS_LABELS
+from admin_settings import catalog
 
 CORE_ORDER = {"food": 0, "cafe": 1, "attraction": 2}
 
@@ -15,13 +15,12 @@ def taxonomy(conn, regions, companions, include_inactive=False):
     parents = navigation_order([r for r in rows if r["type"] == "place" and (include_inactive or r["is_active"])])
     parent_ids = {r["id"] for r in parents}
     terms = [r for r in rows if r["type"] != "place" and r["parent_id"] in parent_ids and (include_inactive or r["is_active"])]
-    stored_regions, stored_companions = [], []
-    for r in conn.execute("SELECT region,companions FROM places"):
-        stored_regions.append(r[0])
-        stored_companions.extend(json_list(r[1]))
-    return {"categories": parents, "terms": terms, "cafe_focus": CAFE_FOCUS,
-            "regions": list(dict.fromkeys([*regions, *stored_regions])),
-            "companions": list(dict.fromkeys([*companions, *stored_companions]))}
+    region_items, companion_items = catalog(conn, 'region', include_inactive), catalog(conn, 'companion', include_inactive)
+    return {"categories": parents, "terms": terms, "cafe_focus": catalog(conn, 'cafe_focus', include_inactive),
+            "cafe_focus_labels": {i['value']:i['label'] for i in catalog(conn, 'cafe_focus', True)},
+            "region_labels": {i['value']:i['label'] for i in catalog(conn, 'region', True)},
+            "companion_labels": {i['value']:i['label'] for i in catalog(conn, 'companion', True)},
+            "regions": [i['value'] for i in region_items], "companions": [i['value'] for i in companion_items]}
 
 
 def linked_ids(conn, place_id):
@@ -54,7 +53,7 @@ def public_search(conn, category="", q="", region="", companion="", detail="", c
     if any(len(v) > limit for v, limit in ((category, 80), (q, 200), (region, 100), (companion, 1000), (detail, 8100), (condition, 40))):
         return []
     focuses = list(dict.fromkeys(v for v in focus.split(",") if v))
-    if len(focus) > 80 or (focuses and (category != "cafe" or not set(focuses).issubset(FOCUS_LABELS))):
+    if len(focus) > 400 or (focuses and (category != "cafe" or not set(focuses).issubset({i['value'] for i in catalog(conn,'cafe_focus')}))):
         return []
     clauses, params = ["p.published=1", "p.deleted_at IS NULL", "p.merged_into_id IS NULL"], []
     if pick not in ("", "current") or new not in ("", "current"):

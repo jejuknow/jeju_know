@@ -1,0 +1,15 @@
+/* Admin navigation and confirmations only; server permissions remain authoritative. */
+(()=>{'use strict';
+const toggle=document.getElementById('adminMenuToggle'), sidebar=document.getElementById('adminSidebar'), shade=document.getElementById('adminDrawerShade');
+function drawer(open){document.body.classList.toggle('admin-drawer-open',open);toggle.setAttribute('aria-expanded',String(open));shade.hidden=!open;if(open)sidebar.querySelector('a').focus();else toggle.focus();}
+toggle?.addEventListener('click',()=>drawer(toggle.getAttribute('aria-expanded')!=='true'));
+shade?.addEventListener('click',()=>drawer(false));sidebar?.querySelector('.admin-drawer-close').addEventListener('click',()=>drawer(false));
+window.matchMedia('(max-width:1050px)').addEventListener('change',event=>{if(!event.matches){document.body.classList.remove('admin-drawer-open');toggle?.setAttribute('aria-expanded','false');if(shade)shade.hidden=true;}});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('admin-drawer-open'))drawer(false);if(event.key==='Tab'&&document.body.classList.contains('admin-drawer-open')){const nodes=[...sidebar.querySelectorAll('a,button,summary')].filter(n=>n.getClientRects().length);let first=nodes[0],last=nodes.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
+const modal=document.getElementById('adminConfirm'), message=document.getElementById('adminConfirmMessage'), label=document.getElementById('adminConfirmLabel'), input=document.getElementById('adminConfirmInput'), confirm=document.getElementById('adminConfirmSubmit');let pending=null;
+document.addEventListener('submit',event=>{const form=event.target;if(!form.dataset.confirm||form.dataset.confirmed==='true'){delete form.dataset.confirmed;return;}event.preventDefault();pending={form,button:event.submitter};message.textContent=form.dataset.confirm;input.value='';label.hidden=!form.dataset.confirmWord;input.placeholder=form.dataset.confirmWord||'';confirm.disabled=!!form.dataset.confirmWord;modal.returnValue='';modal.showModal();if(!label.hidden)input.focus();});
+input?.addEventListener('input',()=>{confirm.disabled=input.value!==pending?.form.dataset.confirmWord;});
+modal?.addEventListener('close',()=>{if(modal.returnValue==='confirm'&&pending){const {form,button}=pending;form.dataset.confirmed='true';form.requestSubmit(button||undefined);}pending=null;});
+document.querySelectorAll('[data-select-all]').forEach(all=>all.addEventListener('change',()=>{document.querySelectorAll('[data-row-select]').forEach(c=>c.checked=all.checked);document.getElementById('adminSelectionCount').textContent=all.checked?`${document.querySelectorAll('[data-row-select]').length}개 선택`:'';}));
+document.querySelectorAll('[data-row-select]').forEach(c=>c.addEventListener('change',()=>{document.getElementById('adminSelectionCount').textContent=`${document.querySelectorAll('[data-row-select]:checked').length}개 선택`;}));
+})();

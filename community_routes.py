@@ -16,7 +16,8 @@ from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABEL
 from image_uploads import FORM_BYTES, ImageError, ImagePlan
 from image_limits import MEMBER_PLACE_SLOTS
 from place_taxonomy import linked_ids, save_links, validate_terms
-from cafe_focus import parse_focus, validate_focus, save_focus, FOCUS_LABELS
+from cafe_focus import parse_focus, validate_focus, save_focus
+from admin_settings import catalog
 
 
 def register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
@@ -52,7 +53,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         return conn.execute("SELECT * FROM places WHERE id=? AND deleted_at IS NULL AND merged_into_id IS NULL", (place_id,)).fetchone()
 
     def collection_list(conn, public=True):
-        return [dict(r) for r in conn.execute("SELECT * FROM best_collections" + (" WHERE published=1" if public else "") + " ORDER BY sort_order,id")]
+        return [dict(r) for r in conn.execute("SELECT * FROM best_collections WHERE deleted_at IS NULL" + (" AND published=1" if public else "") + " ORDER BY sort_order,id")]
 
     @app.get("/find")
     async def find_page(request: Request):
@@ -76,7 +77,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
     @app.get("/best/{slug}")
     async def best_detail(request: Request, slug: str):
         with closing(connect_db()) as conn:
-            collection = conn.execute("SELECT * FROM best_collections WHERE slug=? AND published=1", (slug,)).fetchone()
+            collection = conn.execute("SELECT * FROM best_collections WHERE slug=? AND published=1 AND deleted_at IS NULL", (slug,)).fetchone()
             if not collection:
                 return HTMLResponse("추천 모음을 찾을 수 없습니다.", status_code=404)
             rows = conn.execute("""SELECT p.* FROM best_collection_places b JOIN places p ON p.id=b.place_id
@@ -106,11 +107,11 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if new_only and category and category["slug"] not in ("cafe", "food"):
                 category = None
             data = {"category_id": category["id"] if category else None,
-                    "region": query.get("region", "") if query.get("region") in regions else "", "term_ids": []}
+                    "region": query.get("region", "") if query.get("region") in {i['value'] for i in catalog(conn,'region')} else "", "term_ids": []}
             if category:
                 slugs = query.get("detail", "").split(",")
                 data["term_ids"] = [r["id"] for r in conn.execute("SELECT id,slug FROM categories WHERE parent_id=? AND type!='place' AND is_active=1", (category["id"],)) if r["slug"] in slugs]
-                data["cafe_focus"] = list(dict.fromkeys(v for v in query.get("focus", "").split(",") if v in FOCUS_LABELS))[:2] if category["slug"] == "cafe" else []
+                data["cafe_focus"] = list(dict.fromkeys(v for v in query.get("focus", "").split(",") if v in {i['value'] for i in catalog(conn,'cafe_focus')}))[:2] if category["slug"] == "cafe" else []
         return place_form(request, data, new_only=new_only)
 
     @app.get("/places/{place_id}/edit")
@@ -145,10 +146,12 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if place_id and (not existing or not editable(existing, user_id)):
                 return HTMLResponse("본인의 미확인 장소만 수정할 수 있습니다.", status_code=403)
             try:
-                data = facts(form, conn, regions, new_only=new_only, existing=existing)
+                allowed_regions = [i['value'] for i in catalog(conn, 'region')]
+                if existing and existing['region'] not in allowed_regions: allowed_regions.append(existing['region'])
+                data = facts(form, conn, allowed_regions, new_only=new_only, existing=existing)
                 data.update(term_ids=form.getlist("term_ids") if form.get("taxonomy_present") == "1" else None, features=[])
                 data["cafe_focus"] = parse_focus(form, existing)
-                validate_focus(conn, data)
+                validate_focus(conn, data, existing)
                 if error := validate_terms(conn, data, existing):
                     raise ValueError(error)
             except ValueError as exc:
@@ -294,18 +297,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
 
     @app.get("/admin/community")
     async def community_admin(request: Request, status: str = "unverified"):
-        if response := admin_guard(request):
-            return response
-        with closing(connect_db()) as conn:
-            clauses = {"unverified":"p.source_type='user' AND p.verification_status='unverified'", "user":"p.source_type='user'", "verified":"p.verification_status!='unverified'", "hidden":"p.published=0", "all":"1=1", "duplicates":"1=1"}
-            rows = conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE p.deleted_at IS NULL AND p.merged_into_id IS NULL AND " + clauses.get(status,clauses["unverified"]) + " ORDER BY p.id DESC").fetchall()
-            items = []
-            for r in rows:
-                matches = duplicates(conn, dict(r), r["id"], True)
-                if status != "duplicates" or matches:
-                    items.append({**row_to_place(r),"nickname":r["nickname"],"similar":matches})
-            suggestions = conn.execute("SELECT s.*,p.name,p.slug,u.nickname FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id JOIN users u ON u.id=s.user_id ORDER BY CASE WHEN s.status='pending' THEN 0 ELSE 1 END,s.id DESC").fetchall()
-        return render(request, "admin_community.html", places=items, suggestions=suggestions, selected_status=status)
+        return app.state.admin_ui.places(request, "community")
 
     @app.post("/admin/suggestions/{suggestion_id}/review")
     async def review_suggestion(request: Request, suggestion_id: int):
@@ -352,7 +344,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                         conn.execute("DELETE FROM place_category_links WHERE place_id=?", (place["id"],))
             conn.execute("UPDATE place_correction_suggestions SET status=?,reviewed_at=CURRENT_TIMESTAMP,reviewed_by=?,review_note=? WHERE id=?", ("accepted" if action == "accept" else "rejected",actor(request),note,suggestion_id))
         flash(request, "제안을 반영했습니다." if action == "accept" else "제안을 거절했습니다.")
-        return redirect("/admin/community#suggestions")
+        return redirect("/admin/suggestions")
 
     @app.get("/admin/places/{place_id}/merge")
     async def merge_get(request: Request, place_id: int, target_id: int = 0):
@@ -387,12 +379,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
 
     @app.get("/admin/picks")
     async def picks_admin(request: Request):
-        if response := admin_guard(request):
-            return response
-        with closing(connect_db()) as conn:
-            places = conn.execute("SELECT id,name,region FROM places WHERE merged_into_id IS NULL AND deleted_at IS NULL ORDER BY name").fetchall()
-            periods = conn.execute("SELECT k.*,p.name,p.slug,p.merged_into_id,p.deleted_at FROM place_pick_periods k JOIN places p ON p.id=k.place_id ORDER BY year DESC,month DESC,sort_order,k.id").fetchall()
-        return render(request, "admin_picks.html", places=places, periods=periods)
+        return app.state.admin_ui.picks(request)
 
     @app.post("/admin/picks")
     async def picks_save(request: Request):
@@ -418,18 +405,11 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if (year,month) == (today().year,today().month):
                 conn.execute("UPDATE places SET is_pick=? WHERE id=?", (active,place_id))
         flash(request, "월별 PICK을 저장했습니다. 과거 기록은 유지됩니다.")
-        return redirect("/admin/picks")
+        return redirect(f"/admin/picks?year={year}&month={month}")
 
     @app.get("/admin/best")
     async def best_admin(request: Request):
-        if response := admin_guard(request):
-            return response
-        with closing(connect_db()) as conn:
-            collections = collection_list(conn, False)
-            places = conn.execute("SELECT id,name FROM places WHERE merged_into_id IS NULL AND deleted_at IS NULL ORDER BY name").fetchall()
-            for collection in collections:
-                collection["places"] = conn.execute("SELECT p.id,p.name,b.sort_order FROM best_collection_places b JOIN places p ON p.id=b.place_id WHERE b.collection_id=? AND p.merged_into_id IS NULL ORDER BY b.sort_order,p.id", (collection["id"],)).fetchall()
-        return render(request, "admin_best.html", collections=collections, places=places)
+        return app.state.admin_ui.best(request)
 
     @app.post("/admin/best/{collection_id}/places")
     async def best_membership(request: Request, collection_id: int):
@@ -446,11 +426,12 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             return HTMLResponse("장소와 순서를 확인해주세요.", status_code=400)
         with closing(connect_db()) as conn, conn:
             place_exists = (get_place(conn, place_id) if form.get("action") == "add" else conn.execute("SELECT id FROM places WHERE id=?", (place_id,)).fetchone())
-            if not conn.execute("SELECT 1 FROM best_collections WHERE id=?", (collection_id,)).fetchone() or not place_exists:
+            if not conn.execute("SELECT 1 FROM best_collections WHERE id=? AND deleted_at IS NULL", (collection_id,)).fetchone() or not place_exists:
                 return HTMLResponse("장소 또는 모음을 찾을 수 없습니다.", status_code=404)
             if form.get("action") == "remove":
                 conn.execute("DELETE FROM best_collection_places WHERE collection_id=? AND place_id=?", (collection_id,place_id))
             else:
                 conn.execute("INSERT INTO best_collection_places VALUES (?,?,?) ON CONFLICT(collection_id,place_id) DO UPDATE SET sort_order=excluded.sort_order", (collection_id,place_id,order))
+            conn.execute("UPDATE best_collections SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (collection_id,))
         flash(request, "추천 모음 구성을 저장했습니다.")
-        return redirect("/admin/best")
+        return redirect(f"/admin/best/{collection_id}/edit")

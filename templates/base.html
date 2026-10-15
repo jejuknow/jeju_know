@@ -4,10 +4,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  {% set brand_description = 'JEJU_KNOW | 제주 카페·맛집·가볼 곳과 제주 이슈, 함께 만드는 제주 장소 기록' %}
+  {% set brand_description = site_settings.site_description %}
   <meta name="description" content="{{ brand_description }}" />
   <title>{% block title %}JEJU_KNOW{% endblock %}</title>
-  <meta property="og:site_name" content="JEJU_KNOW" />
+  <meta property="og:site_name" content="{{ site_settings.site_name }}" />
   <meta property="og:title" content="{{ self.title()|striptags|trim }}" />
   <meta property="og:description" content="{{ brand_description }}" />
   <meta property="og:type" content="website" />
@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="/static/members.css?v=20261011-wrap" />
   <link rel="stylesheet" href="/static/images.css?v=20261014-upload" />
   {% block head %}{% endblock %}
-  <link rel="stylesheet" href="/static/community.css?v=20261015-discovery">
+  <link rel="stylesheet" href="/static/community.css?v=20261015-admin">
   <link rel="stylesheet" href="/static/brand.css?v=20261012-brand">
 </head>
 <body class="{% block body_class %}{% endblock %}">

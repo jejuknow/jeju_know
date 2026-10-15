@@ -6,9 +6,9 @@ const $=id=>document.getElementById(id);
 $('finderMapLink').href=search.href('/map',state);
 $('finderRegisterLink').href=search.registrationHref(state);
 function buildFilters(){
-  search.chips($('regionChips'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:search.regionLabel(v)}))],state.region);
+  search.chips($('regionChips'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:taxonomy.region_labels?.[v]||search.regionLabel(v)}))],state.region);
   search.chips($('categoryChips'),[{value:'',label:'전체'},...taxonomy.categories.map(v=>({value:v.slug,label:v.name}))],state.category);
-  search.chips($('companionChips'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:v}))],state.companions);
+  search.chips($('companionChips'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:taxonomy.companion_labels?.[v]||v}))],state.companions);
   const terms=search.termsFor(taxonomy,state.category);
   const isCafe=state.category==='cafe';
   $('categoryDetails').hidden=!terms.length&&!isCafe;
@@ -33,7 +33,7 @@ async function renderResults(scroll=false,updateUrl=true){
     const response=await fetch('/api/places?'+query,{signal:pending.signal,headers:{Accept:'application/json'}});
     if(!response.ok)throw new Error('장소 검색 실패');
     const places=await response.json();if(request!==requestId)return;
-    $('placeGrid').innerHTML=places.slice(0,5).map(p=>cards.placeCard(p,search.regionLabel(p.region))).join('');
+    $('placeGrid').innerHTML=places.slice(0,5).map(p=>cards.placeCard(p,(p.region_label||search.regionLabel(p.region)))).join('');
     $('placeGrid').hidden=!places.length;$('emptyState').hidden=!!places.length;
     $('allResultsBtn').hidden=places.length<5;$('allResultsBtn').href='/places?'+query;
     $('allResultsBtn').textContent=`전체 결과 ${places.length}곳 보기 →`;
@@ -63,7 +63,7 @@ async function boot(){
     if(!config.ok||!places.ok)throw new Error('데이터 로딩 실패');
     taxonomy=await config.json();const all=await places.json();
     const picks=all.filter(p=>p.is_pick).slice(0,3);
-    if($('pickGrid'))$('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,search.regionLabel(p.region))).join(''):'<p>아직 공개된 JEJU_KNOW PICK이 없습니다.</p>';
+    if($('pickGrid'))$('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,(p.region_label||search.regionLabel(p.region)))).join(''):'<p>아직 공개된 JEJU_KNOW PICK이 없습니다.</p>';
     buildFilters();await renderResults(false,false);$('findBtn').disabled=false;
   }catch{$('resultSummary').textContent='장소 데이터를 불러오지 못했습니다. 새로고침해 주세요.';}
 }

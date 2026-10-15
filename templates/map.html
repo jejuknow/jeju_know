@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}제주 지도 | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261015-discovery">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261015-admin">{% endblock %}
 {% block body_class %}map-body{% endblock %}
 {% block body %}
 <main class="map-workspace" id="mapWorkspace" data-kakao-key="{{ kakao_map_key }}">
@@ -25,4 +25,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261015-discovery"></script><script src="/static/map.js?v=20261015-discovery"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261015-admin"></script><script src="/static/map.js?v=20261015-admin"></script>{% endblock %}

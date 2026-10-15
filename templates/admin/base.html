@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% from 'admin/_ui.html' import icon %}
+{% block title %}{{ admin_title }} | JEJU_KNOW ADMIN{% endblock %}
+{% block body_class %}admin-body admin-shell{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin.css?v=20261015-admin">{% endblock %}
+{% block body %}
+<a class="admin-skip" href="#adminContent">본문으로 건너뛰기</a>
+<div class="admin-drawer-shade" id="adminDrawerShade" hidden></div>
+<aside class="admin-sidebar" id="adminSidebar" aria-label="관리자 메뉴">
+  <div class="admin-sidebar-brand">{{ brand_logo('ADMIN') }}<button type="button" class="admin-drawer-close" aria-label="메뉴 닫기">×</button></div>
+  <nav class="admin-navigation">
+    <p class="admin-nav-caption">DASHBOARD</p>
+    <a href="/admin" class="admin-nav-link" {% if admin_active=='dashboard' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}대시보드</a>
+    <p class="admin-nav-caption">MANAGEMENT</p>
+    {% for group, symbol, links in [
+      ('장소 관리','place',[('places','전체 장소','/admin/places'),('community','사용자 등록','/admin/community'),('suggestions','정보 바로잡기','/admin/suggestions'),('new','신상 장소','/admin/new'),('picks','JEJU_KNOW PICK','/admin/picks')]),
+      ('분류 관리','classification',[]),
+      ('콘텐츠 관리','content',[('issues','ISSUE','/admin/issues'),('best','BEST','/admin/best')]),
+      ('회원 관리','user',[('users','회원 목록','/admin/users')]),
+      ('운영 설정','settings',[('home','홈 화면','/admin/settings/home'),('general','기본 설정','/admin/settings/general')])
+    ] %}
+    <details class="admin-nav-group" {% if admin_section==group %}open{% endif %}><summary>{{ icon(symbol) }}{{ group }}<span class="admin-chevron" aria-hidden="true">⌄</span></summary>
+      {% if group=='분류 관리' %}{% for key,label in classification_kinds.items() %}<a href="/admin/classifications/{{ key }}" {% if admin_active=='class-'~key %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+      {% else %}{% for key,label,href in links %}<a href="{{ href }}" {% if admin_active==key %}aria-current="page"{% endif %}>{{ label }}{% if key=='community' %}<span class="admin-count" aria-label="미확인 {{ admin_counts.unverified }}건">{{ admin_counts.unverified }}</span>{% elif key=='suggestions' %}<span class="admin-count" aria-label="대기 {{ admin_counts.suggestions }}건">{{ admin_counts.suggestions }}</span>{% endif %}</a>{% endfor %}{% endif %}
+    </details>{% endfor %}
+  </nav>
+  <div class="admin-account"><span class="admin-avatar" aria-hidden="true">{{ icon('user') }}</span><div><strong>{{ admin_account.name }}</strong><small>{{ admin_account.username }} · {{ admin_account.role }}</small></div><form method="post" action="/admin/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="admin-logout">로그아웃</button></form></div>
+</aside>
+<div class="admin-workspace">
+  <header class="admin-topbar"><button type="button" class="admin-menu-toggle" id="adminMenuToggle" aria-controls="adminSidebar" aria-expanded="false" aria-label="관리자 메뉴 열기">{{ icon('menu') }}</button><span>JEJU_KNOW <small>ADMIN</small></span><a href="/" target="_blank" rel="noopener">사이트 보기 ↗</a></header>
+  <main id="adminContent" class="admin-content">
+    <div class="admin-page-heading"><nav aria-label="현재 위치"><a href="/admin">대시보드</a>{% if admin_active!='dashboard' %}<span>/</span><span>{{ admin_section }}</span><span>/</span><span>{{ admin_parent_title }}</span>{% if admin_is_detail %}<span>/</span><span>{{ admin_title }}</span>{% endif %}{% endif %}</nav><h1>{{ admin_title }}</h1></div>
+    {% include '_flashes.html' %}
+    {% block admin_content %}{% endblock %}
+  </main>
+</div>
+<dialog class="admin-confirm" id="adminConfirm"><form method="dialog"><h2>작업을 확인해주세요</h2><p id="adminConfirmMessage"></p><label id="adminConfirmLabel" hidden>확인 문구 <input id="adminConfirmInput" autocomplete="off"></label><div class="row-actions"><button value="cancel" class="secondary-btn">취소</button><button value="confirm" class="primary-inline" id="adminConfirmSubmit">확인</button></div></form></dialog>
+<script src="/static/admin.js?v=20261015-admin" defer></script>
+{% endblock %}

@@ -53,7 +53,7 @@ class MapCategoryTest(unittest.TestCase):
         self.assertFalse(food['has_coordinates'])
         self.assertTrue(cafe['has_coordinates'])
         self.assertTrue(cafe['is_pick'])
-        self.assertIn('지도 위치 미등록', self.client.get('/admin').text)
+        self.assertIn('지도 위치 미등록', self.client.get('/admin/places').text)
         self.assertEqual(public.get('/place/map-cafe').status_code, 200)
 
     def test_category_create_rename_order_disable_delete_and_restart(self):

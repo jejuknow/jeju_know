@@ -36,15 +36,15 @@
     return parent?taxonomy.terms.filter(t=>t.parent_id===parent.id):[];
   }
   function labels(state,taxonomy){
-    return [state.pick==='current'?'이달의 JEJU_KNOW PICK':'',state.new==='current'?'신상':'',regionLabel(state.region),taxonomy.categories.find(c=>c.slug===state.category)?.name||state.category,...state.companions,
+    return [state.pick==='current'?'이달의 JEJU_KNOW PICK':'',state.new==='current'?'신상':'',(taxonomy.region_labels?.[state.region]||regionLabel(state.region)),taxonomy.categories.find(c=>c.slug===state.category)?.name||state.category,...state.companions.map(v=>taxonomy.companion_labels?.[v]||v),
       ...(state.focus||[]).map(value=>(taxonomy.cafe_focus||[]).find(t=>t.value===value)?.label||value),...state.terms.map(slug=>taxonomy.terms.find(t=>t.slug===slug)?.name||slug),state.q,state.condition==='rain'?'비 오는 날':state.condition].filter(Boolean);
   }
   function discoveryAttributes(place,taxonomy){
     const details=place.category_slug==='food'?(place.classification_terms||[]).filter(t=>t.type==='restaurant_subcategory').map(t=>t.name):
-      place.category_slug==='cafe'?(place.cafe_focus||[]).map(value=>(taxonomy.cafe_focus||[]).find(t=>t.value===value)?.label).filter(Boolean):[];
+      place.category_slug==='cafe'?(place.cafe_focus||[]).map(value=>(taxonomy.cafe_focus_labels?.[value]||(taxonomy.cafe_focus||[]).find(t=>t.value===value)?.label)).filter(Boolean):[];
     const companions=Array.isArray(place.companions)?place.companions:[];
-    return {region:regionLabel(place.region)||'미확인',what:[place.category,...details].filter(Boolean).join(' · '),
-      companions:companions.slice(0,3).join(' · ')||'미확인',moreCompanions:Math.max(0,companions.length-3)};
+    return {region:taxonomy.region_labels?.[place.region]||regionLabel(place.region)||'미확인',what:[place.category,...details].filter(Boolean).join(' · '),
+      companions:companions.slice(0,3).map(v=>taxonomy.companion_labels?.[v]||v).join(' · ')||'미확인',moreCompanions:Math.max(0,companions.length-3)};
   }
   function chips(container,options,selected,css='chip'){
     container.replaceChildren();

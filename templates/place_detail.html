@@ -10,7 +10,7 @@
       {% if gallery %}<section aria-label="추가사진" class="place-gallery">{% for image in gallery %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ loop.index }}" loading="lazy"></a><figcaption>추가사진 {{ loop.index }}</figcaption></figure>{% endfor %}</section>{% endif %}
     </div>
     <div class="detail-content">
-      <div class="meta-row"><span class="badge primary">{{ place.region }}</span><span class="badge">{{ place.category }}</span>{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
+      <div class="meta-row"><span class="badge primary">{{ region_labels.get(place.region,place.region) }}</span><span class="badge">{{ place.category }}</span>{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       <h1 class="detail-title">{{ place.name }}</h1>
       <p class="place-provenance">{{ place.status_label }}</p>
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
@@ -28,7 +28,7 @@
       {% if place.category_slug == 'food' and place.food_taste_note %}<section class="detail-section"><h2>음식/맛 특징</h2><p class="place-paragraph">{{ place.food_taste_note }}</p></section>{% endif %}
       {% endif %}
       {% if place.pick_note or place.reason %}<section class="detail-section"><h2>👍 JEJU_KNOW 추천 이유</h2><p class="place-paragraph">{{ place.pick_note or place.reason }}</p></section>{% endif %}
-      <section class="detail-section"><h2>👥 잘 맞는 동행</h2><div class="tag-row">{% for item in place.companions %}<span class="tag">#{{ item }}</span>{% else %}<span class="muted">미확인</span>{% endfor %}</div></section>
+      <section class="detail-section"><h2>👥 잘 맞는 동행</h2><div class="tag-row">{% for item in place.companions %}<span class="tag">#{{ companion_labels.get(item, item) }}</span>{% else %}<span class="muted">미확인</span>{% endfor %}</div></section>
       <section class="detail-section"><h2>✨ 장소 특징</h2><div class="tag-row">{% for item in place.detail_features %}<span class="tag">#{{ item }}</span>{% else %}<span class="muted">미확인</span>{% endfor %}</div></section>
       {% if place.note %}<section class="detail-section place-visit-note"><h2>📝 방문 전 알아둘 점</h2><p class="place-paragraph">{{ place.note }}</p></section>{% endif %}
       <section class="detail-section"><h2>ℹ️ 이용 정보</h2><div class="status-grid">{% for field,label in [('parking_status','주차'),('pet_status','반려동물'),('child_status','아이 동반'),('accessible_status','무장애'),('reservation_status','예약'),('waiting_status','웨이팅')] %}<div><span>{{ label }}</span><strong>{{ place.get(field) or '미확인' }}</strong></div>{% endfor %}</div></section>
