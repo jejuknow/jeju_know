@@ -109,14 +109,15 @@ class AdminUITest(unittest.TestCase):
     def test_managed_focus_add_rename_disable_and_used_delete_guard(self):
         route='/admin/classifications/cafe_focus'
         self.assertEqual(self.post(self.admin,route,action='new',value='garden',name='정원 중심',sort_order=4,is_active='1').status_code,303)
-        p=self.place(cafe_focus_present='1',cafe_focus=['garden'])
+        p=self.place()
+        self.assertEqual(self.post(self.admin,f"/admin/places/{p['id']}/edit",**self.form(published='1',cafe_focus_present='1',cafe_focus=['garden'])).status_code,303)
         self.assertEqual(self.api('?category=cafe&focus=garden')[0]['id'],p['id'])
         self.assertEqual(self.post(self.admin,route,action='delete',value='garden').status_code,409)
         self.post(self.admin,route,action='edit',value='garden',name='정원 있는 카페',sort_order=4)
         self.assertEqual(self.api()[0]['cafe_focus_labels'],['정원 있는 카페'])
         self.assertEqual(self.api('?category=cafe&focus=garden'),[])
-        self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.form(name='기존 값 유지',cafe_focus_present='1',cafe_focus=['garden'])).status_code,303)
-        self.assertEqual(self.create(name='신규 비활성 분류',cafe_focus_present='1',cafe_focus=['garden']).status_code,400)
+        self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.form(name='기존 값 유지')).status_code,303)
+        self.assertEqual(self.post(self.admin,'/admin/places/new',**self.form(name='신규 비활성 분류',cafe_focus_present='1',cafe_focus=['garden'])).status_code,400)
 
     def test_region_and_companion_management_preserves_stable_values(self):
         self.post(self.admin,'/admin/classifications/region',action='new',value='추자',name='추자도',sort_order=15,is_active='1')

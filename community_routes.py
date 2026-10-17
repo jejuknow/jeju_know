@@ -6,18 +6,22 @@ from contextlib import closing
 from urllib.parse import quote
 
 from fastapi import Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
 
 from auth_security import current_user, rate_limited, safe_external_url
 from community_migrations import today
 from place_details import validate_detail_value
 from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
                               duplicates, editable, facts, merge_places, opening)
-from image_uploads import FORM_BYTES, ImageError, ImagePlan
+from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
 from image_limits import MEMBER_PLACE_SLOTS
-from place_taxonomy import linked_ids, save_links, validate_terms
-from cafe_focus import parse_focus, validate_focus, save_focus
+from place_taxonomy import linked_ids
 from admin_settings import catalog
+from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
+from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, USAGE_LABELS,
+                                    parse_proposal, queue_proposal, approve_proposal, display_proposal)
 
 
 def register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
@@ -38,7 +42,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         return "admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])
 
     async def checked(request, files=0):
-        form = await request.form(max_files=files, max_fields=60, max_part_size=FORM_BYTES)
+        form = await request.form(max_files=files, max_fields=160, max_part_size=FORM_BYTES)
         return form if require_csrf(request, form) else None
 
     def bad_csrf():
@@ -86,7 +90,27 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
 
     def place_form(request, data=None, *, status=200, error=None, similar=None, new_only=False):
         return render(request, "member_place_form.html", status, place=data, error=error,
-                      similar=similar or [], new_only=new_only, **form_options(data.get("category_id") if data else None))
+                      similar=similar or [], new_only=new_only, hours_ui=controls(data or {}),
+                      time_options=TIME_OPTIONS, weekdays=WEEKDAYS, usage_labels=USAGE_LABELS,
+                      **form_options(data.get("category_id") if data else None))
+
+    @app.post("/api/place-photos/prepare")
+    async def prepare_member_photo(request: Request):
+        if not current_user(request):
+            return JSONResponse({"error": "로그인이 만료되었습니다. 로그인 후 다시 시도해주세요."}, status_code=401)
+        form = await checked(request, 1)
+        if form is None:
+            return JSONResponse({"error": "화면을 새로고침한 뒤 다시 시도해주세요."}, status_code=400)
+        if rate_limited(connect_db, secret, "prepare-member-photo", [("user", str(current_user(request)["id"]))], limit=80, window=3600):
+            return JSONResponse({"error": "사진 요청이 많습니다. 잠시 후 다시 시도해주세요."}, status_code=429)
+        photo = form.get("photo")
+        if not isinstance(photo, UploadFile):
+            return JSONResponse({"error": "사진을 선택해주세요."}, status_code=400)
+        try:
+            output, _, _ = await run_in_threadpool(optimize_upload, photo.file, photo.filename or "", photo.content_type or "")
+        except ImageError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        return Response(output, media_type="image/webp", headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     @app.get("/places/new")
     async def legacy_submit_get(request: Request):
@@ -111,7 +135,6 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if category:
                 slugs = query.get("detail", "").split(",")
                 data["term_ids"] = [r["id"] for r in conn.execute("SELECT id,slug FROM categories WHERE parent_id=? AND type!='place' AND is_active=1", (category["id"],)) if r["slug"] in slugs]
-                data["cafe_focus"] = list(dict.fromkeys(v for v in query.get("focus", "").split(",") if v in {i['value'] for i in catalog(conn,'cafe_focus')}))[:2] if category["slug"] == "cafe" else []
         return place_form(request, data, new_only=new_only)
 
     @app.get("/places/{place_id}/edit")
@@ -125,7 +148,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         if not editable(place, current_user(request)["id"]):
             return HTMLResponse("본인이 등록한 미확인 장소만 수정할 수 있습니다. 확인된 장소는 수정 제안을 이용해주세요.", status_code=403)
-        return place_form(request, {**row_to_place(place), "term_ids": term_ids})
+        return place_form(request, {**row_to_place(place), "term_ids": [], "approved_term_ids": term_ids})
 
     async def save_submission(request, place_id=None):
         if response := member_guard(request):
@@ -133,10 +156,10 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         form = await checked(request, 5)
         if form is None:
             return bad_csrf()
-        # Reject every non-fact field, including forged editorial/ownership/visibility values.
-        allowed = set(FACT_FIELDS) | {"csrf_token", "from_new", "duplicate_ack", "taxonomy_present", "term_ids", "cafe_focus", "cafe_focus_present"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
+        # Only basic facts and explicitly namespaced pending details are accepted.
+        allowed = set(FACT_FIELDS) | CONTROL_FIELDS | INPUT_FIELDS | {"csrf_token", "from_new", "duplicate_ack"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
         if any(k not in allowed for k in form):
-            return HTMLResponse("사용자 장소 등록에서는 기본 정보와 사진만 변경할 수 있습니다.", status_code=403)
+            return HTMLResponse("허용하지 않는 입력 항목입니다. 기본 정보·사진과 선택형 세부 정보만 제출해주세요.", status_code=403)
         if limited(request, "community-place"):
             return HTMLResponse("등록 요청이 많습니다. 잠시 후 다시 시도해주세요.", status_code=429)
         user_id = current_user(request)["id"]
@@ -146,17 +169,18 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if place_id and (not existing or not editable(existing, user_id)):
                 return HTMLResponse("본인의 미확인 장소만 수정할 수 있습니다.", status_code=403)
             try:
+                normalized = normalize_controls(form)
                 allowed_regions = [i['value'] for i in catalog(conn, 'region')]
                 if existing and existing['region'] not in allowed_regions: allowed_regions.append(existing['region'])
-                data = facts(form, conn, allowed_regions, new_only=new_only, existing=existing)
-                data.update(term_ids=form.getlist("term_ids") if form.get("taxonomy_present") == "1" else None, features=[])
-                data["cafe_focus"] = parse_focus(form, existing)
-                validate_focus(conn, data, existing)
-                if error := validate_terms(conn, data, existing):
-                    raise ValueError(error)
+                data = facts(normalized, conn, allowed_regions, new_only=new_only, existing=existing)
+                proposal = parse_proposal(form, conn, data["category_id"])
+                data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS})
+                data.update(term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isdigit() and len(str(v)) <= 10],
+                            detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"))
             except ValueError as exc:
                 values = {k: str(form.get(k, "")) for k in FACT_FIELDS}
-                values["cafe_focus"] = form.getlist("cafe_focus")
+                values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS})
+                values.update(detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"))
                 values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
             similar = duplicates(conn, data, place_id)
@@ -173,9 +197,11 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if place_id and (not fresh or not editable(fresh, user_id)):
                 plan.discard()
                 return HTMLResponse("정보 확인 상태가 변경되었습니다. 수정 제안을 이용해주세요.", status_code=403)
-            if error := validate_terms(conn, data, fresh):
+            try:
+                proposal = parse_proposal(form, conn, data["category_id"])
+            except ValueError as exc:
                 plan.discard()
-                return HTMLResponse(error + " 새로고침 후 다시 시도해주세요.", status_code=400)
+                return HTMLResponse(str(exc) + " 새로고침 후 다시 시도해주세요.", status_code=400)
             if place_id:
                 fields = (*FACT_FIELDS, "category")
                 conn.execute("UPDATE places SET " + ",".join(k + "=?" for k in fields) + ",updated_at=CURRENT_TIMESTAMP WHERE id=?", (*[data[k] for k in fields],place_id))
@@ -184,10 +210,10 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 slug = "place-" + secrets.token_hex(12)
                 fields = (*FACT_FIELDS, "category")
                 place_id = conn.execute("INSERT INTO places (" + ",".join(fields) + ",slug,submitted_by_user_id,source_type,verification_status,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user','unverified',1)", (*[data[k] for k in fields],slug,user_id)).lastrowid
-            save_links(conn, place_id, data["term_ids"])
-            save_focus(conn, place_id, data["cafe_focus"])
+            # Existing approved classifications and cafe_focus are retained, never cleared by this form.
+            queue_proposal(conn, get_place(conn, place_id), user_id, proposal)
             plan.apply(conn, place_id)
-        flash(request, "장소를 저장했습니다. 사용자 등록 · 미확인으로 표시됩니다.")
+        flash(request, "장소를 저장했습니다. 사용자 등록 · 미확인으로 표시됩니다." + (" 세부 정보는 관리자 확인을 기다리고 있습니다." if proposal else ""))
         return redirect("/place/" + slug)
 
     @app.post("/map/register")
@@ -222,6 +248,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         with closing(connect_db()) as conn:
             rows = conn.execute("SELECT * FROM places WHERE submitted_by_user_id=? AND deleted_at IS NULL ORDER BY id DESC", (current_user(request)["id"],)).fetchall()
             suggestions = conn.execute("SELECT s.*,p.name,p.slug FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id WHERE s.user_id=? ORDER BY s.id DESC", (current_user(request)["id"],)).fetchall()
+            suggestions = [{**dict(s), "display_value": display_proposal(conn, s["new_value"]) if s["field"] == DETAIL_FIELD else s["new_value"]} for s in suggestions]
         return render(request, "member_places.html", places=[{**row_to_place(r),"can_edit":editable(r,current_user(request)["id"])} for r in rows], suggestions=suggestions)
 
     def suggestion_value(conn, field, raw):
@@ -249,7 +276,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             raise ValueError("링크는 http 또는 https URL로 입력해주세요.")
         elif field == "name" and len(value) > 120 or field == "address" and len(value) > 300:
             raise ValueError("장소명은 120자, 주소는 300자 이내로 입력해주세요.")
-        return value
+        return str(value) if value is not None else ""
 
     def original_value(place, field):
         if field == "opening":
@@ -258,7 +285,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             return json.dumps([place["latitude"],place["longitude"]])
         if field in ("closed","business","other"):
             return ""
-        return str(place[field] or "")
+        return str(place[field]) if place[field] is not None else ""
 
     @app.get("/places/{place_id}/suggest")
     async def suggest_get(request: Request, place_id: int):
@@ -319,11 +346,18 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 if not place:
                     return HTMLResponse("삭제·병합된 장소를 먼저 확인해주세요.", status_code=409)
                 field, value = suggestion["field"], suggestion["new_value"]
-                if field not in SUGGESTION_FIELDS:
+                if field == DETAIL_FIELD:
+                    try:
+                        approve_proposal(conn, place, suggestion)
+                    except ValueError as exc:
+                        return HTMLResponse(str(exc), status_code=409)
+                elif field not in SUGGESTION_FIELDS:
                     return HTMLResponse("지원하지 않는 제안 항목입니다.", status_code=400)
-                if original_value(place, field) != suggestion["original_value"]:
+                elif original_value(place, field) != suggestion["original_value"]:
                     return HTMLResponse("제안 이후 원본 정보가 변경되었습니다. 최신 장소를 확인하고 이 제안을 거절하거나 새 제안으로 처리해주세요.", status_code=409)
-                if field in ("opening","coordinates"):
+                if field == DETAIL_FIELD:
+                    pass
+                elif field in ("opening","coordinates"):
                     parts = json.loads(value)
                     values = opening(*parts) if field == "opening" else coordinates(*parts)
                     columns = ("opened_year","opened_month") if field == "opening" else ("latitude","longitude")

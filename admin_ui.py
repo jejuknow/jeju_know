@@ -13,6 +13,8 @@ from admin_settings import catalog, catalog_usage, read_settings, write_setting,
 from auth_security import current_user, safe_external_url
 from community_migrations import today
 from community_places import SUGGESTION_FIELDS
+from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal, snapshot
+SUGGESTION_LABELS = {**SUGGESTION_FIELDS, DETAIL_FIELD: DETAIL_LABEL}
 from taxonomy_migrations import TYPES
 
 ACTIVE = "p.deleted_at IS NULL AND p.merged_into_id IS NULL"
@@ -129,7 +131,7 @@ class AdminUI:
         with closing(self.db()) as conn:
             places = conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE " + ACTIVE + " AND p.source_type='user' AND p.verification_status='unverified' ORDER BY p.id DESC LIMIT 5").fetchall()
             suggestions = conn.execute("SELECT s.*,p.name FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id WHERE s.status='pending' ORDER BY s.id DESC LIMIT 5").fetchall()
-        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_FIELDS)
+        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS)
 
     def places(self, request, mode="all"):
         if response := self.guard(request):
@@ -190,8 +192,13 @@ class AdminUI:
                     for key in ("current_value", "original_value", "new_value"):
                         category = conn.execute("SELECT name FROM categories WHERE id=?", (item[key],)).fetchone()
                         if category: item[key] = category[0]
+                if field == DETAIL_FIELD:
+                    proposal = json.loads(row["new_value"])
+                    item["current_value"] = display_proposal(conn, snapshot(conn, p, proposal))
+                    item["original_value"] = display_proposal(conn, row["original_value"])
+                    item["new_value"] = display_proposal(conn, row["new_value"])
                 items.append(item)
-        return self.render(request, "suggestions.html", suggestions=items, pagination=page, selected_status=status, suggestion_fields=SUGGESTION_FIELDS)
+        return self.render(request, "suggestions.html", suggestions=items, pagination=page, selected_status=status, suggestion_fields=SUGGESTION_LABELS)
 
     def issues(self, request, user_only=False):
         if response := self.guard(request): return response

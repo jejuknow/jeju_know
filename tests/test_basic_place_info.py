@@ -125,15 +125,15 @@ class BasicPlaceInfoTest(unittest.TestCase):
 
     def test_focus_does_not_duplicate_feature_taxonomy(self):
         term = self.rows("SELECT id FROM categories WHERE name='맛 중심' AND type='cafe_feature'")[0]['id']
-        p = self.place(cafe_focus_present='1', cafe_focus=['taste','space'], taxonomy_present='1')
-        self.assertEqual(json.loads(p['cafe_focus']), ['taste','space'])
-        self.assertFalse(self.rows('SELECT * FROM place_category_links'))
-        response = self.post(self.member, f"/places/{p['id']}/edit", **self.form(cafe_focus_present='1', taxonomy_present='1', term_ids=[str(term)]))
+        p = self.place()
+        self.execute('UPDATE places SET cafe_focus=?', (json.dumps(['taste','space']),))
+        response = self.post(self.member, f"/places/{p['id']}/edit", **self.form(details_enabled='1', term_ids=[str(term)]))
         self.assertEqual(response.status_code, 303)
-        self.assertEqual(json.loads(self.rows('SELECT cafe_focus FROM places')[0]['cafe_focus']), [])
-        self.assertEqual(self.rows('SELECT category_id FROM place_category_links')[0]['category_id'], term)
-        response = self.post(self.member, f"/places/{p['id']}/edit", **self.form(cafe_focus=['taste','space','experience']))
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(self.rows('SELECT cafe_focus FROM places')[0]['cafe_focus']), ['taste','space'])
+        self.assertEqual(self.rows('SELECT * FROM place_category_links'), [])
+        sid = self.rows('SELECT id FROM place_correction_suggestions')[0]['id']
+        self.assertEqual(self.post(self.admin, f'/admin/suggestions/{sid}/review',action='accept').status_code,303)
+        self.assertEqual(self.rows('SELECT category_id FROM place_category_links')[0]['category_id'],term)
 
 
 class BasicPlaceMigrationTest(unittest.TestCase):

@@ -15,7 +15,7 @@
         <span class="image-placeholder" {% if saved %}hidden{% endif %}>선택한 이미지가 여기 표시됩니다.</span>
       </div>
       <div class="image-upload-actions">
-        <label class="secondary-btn image-file-button"><span>{{ '사진 변경' if saved else '사진 선택' }}</span><input type="file" id="image-{{ slot }}" name="image_{{ slot }}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" aria-label="{{ '대표사진' if kind == 'places' and slot == 0 else '대표 포스터' if slot == 0 else '추가사진 ' ~ slot }} 업로드" aria-describedby="image-upload-help"></label>
+        <label class="secondary-btn image-file-button"><span>{{ '사진 변경' if saved else '사진 선택' }}</span><input type="file" id="image-{{ slot }}" name="image_{{ slot }}" accept="image/*" aria-label="{{ '대표사진' if kind == 'places' and slot == 0 else '대표 포스터' if slot == 0 else '추가사진 ' ~ slot }} 업로드" aria-describedby="image-upload-help"></label>
         <label class="image-remove"><input type="checkbox" name="remove_image_{{ slot }}" value="1">삭제</label>
       </div>
       <p class="image-feedback" role="status" aria-live="polite"></p>

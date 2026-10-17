@@ -125,7 +125,6 @@ class ImageUploadTest(unittest.TestCase):
                  self.file('evil.js',b'alert(1)','text/javascript'),
                  self.file('evil.exe',b'MZ','application/octet-stream'),
                  self.file('fake.png',b'not an image'),
-                 self.file('fake.jpg',picture(),'image/jpeg'),
                  self.file('wrong.png',picture(),'text/html'),
                  self.file('huge.png',b'x'*(MAX_FILE_BYTES+1))]
         for upload in cases:

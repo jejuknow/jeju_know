@@ -1,0 +1,11 @@
+<section class="form-card submission-details"><h2>세부 정보 작성</h2>
+<p class="form-help">이 장소를 더 잘 알고 있다면 추가 정보를 알려주세요. 작성한 정보는 관리자가 확인한 뒤 반영됩니다.</p>
+<label class="member-check"><input type="checkbox" name="details_enabled" value="1" role="switch" aria-controls="submissionDetails" {% if p.get('details_enabled') == '1' %}checked{% endif %}>세부 정보도 알려줄게요</label>
+<div id="submissionDetails" {% if p.get('details_enabled') != '1' %}hidden{% endif %}>
+<fieldset class="submission-field"><legend>잘 맞는 동행 (선택)</legend><div class="chips">{% for item in companions if item in active_companions %}<label class="member-term"><input type="checkbox" name="detail_companions" value="{{ item }}" {% if item in p.get('detail_companions',[]) %}checked{% endif %}>{{ companion_labels.get(item,item) }}</label>{% endfor %}</div></fieldset>
+<div class="submission-field"><h3>장소 특징 (선택)</h3><p class="form-help">여러 개를 선택할 수 있어요. 확인된 기존 분류는 그대로 유지됩니다.</p>
+<div class="member-place-terms" id="memberPlaceTerms">{% for c in categories %}<fieldset data-category-id="{{ c.id }}" {% if p.get('category_id')|string != c.id|string %}hidden{% endif %}><legend>{{ c.name }} 세부 분류 (선택)</legend><div class="chips">{% for t in taxonomy.terms if t.parent_id == c.id and t.is_active %}<label class="member-term"><input type="checkbox" name="term_ids" value="{{ t.id }}" {% if t.id in p.get('term_ids',[]) %}checked{% endif %}>{{ t.name }}</label>{% else %}<p class="form-help">등록된 세부 분류가 없습니다.</p>{% endfor %}</div></fieldset>{% endfor %}</div>
+</div>
+<fieldset class="submission-field"><legend>이용 정보 (선택)</legend><div class="form-grid two">{% for key,label in usage_labels.items() %}<label>{{ label }}<select name="detail_{{ key }}">{% for value in ['미확인','가능','불가','제한'] %}<option value="{{ value }}" {% if p.get('detail_' ~ key,'미확인') == value %}selected{% endif %}>{{ value }}{% if key == 'waiting_status' and value != '미확인' %} ({{ {'가능':'웨이팅 있음','불가':'웨이팅 없음','제한':'주말·성수기'}[value] }}){% endif %}</option>{% endfor %}</select></label>{% endfor %}</div></fieldset>
+<p class="form-help">선택한 동행·특징은 기존 정보에 추가됩니다. 이용 정보는 알려주신 항목만 검토하며, 미확인은 기존 값을 바꾸지 않습니다.</p>
+</div></section>

@@ -132,6 +132,8 @@ class ServerSessionMiddleware:
                     limit += ADMIN_PLACE_SLOTS * MAX_FILE_BYTES
                 elif member and re.fullmatch(r"/map/register|/places/(?:new|\d+/edit)", scope["path"]):
                     limit += MEMBER_PLACE_SLOTS * MAX_FILE_BYTES
+                elif member and scope["path"] == "/api/place-photos/prepare":
+                    limit += MAX_FILE_BYTES
                 elif ((data.get("admin_id") and re.fullmatch(r"/admin/news/(?:new|\d+/edit)", scope["path"]))
                       or (member and re.fullmatch(r"/issues/(?:new|\d+/edit)", scope["path"]))):
                     limit += MAX_FILE_BYTES

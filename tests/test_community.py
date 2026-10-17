@@ -115,20 +115,15 @@ class CommunityTest(unittest.TestCase):
         html=self.visitor.get('/place/'+p['slug']).text
         self.assertNotIn('JEJU_KNOW 추천 이유',html);self.assertIn('정보 바로잡기',html)
 
-    def test_member_optional_cafe_focus_create_edit_limit_and_permission(self):
-        for selected in (['taste','space','experience'],['invalid']):
-            self.assertEqual(self.create(cafe_focus_present='1',cafe_focus=selected).status_code,400)
-        p=self.place(cafe_focus_present='1',cafe_focus=['space','experience'])
+    def test_member_preserves_admin_cafe_focus_and_cannot_submit_it(self):
+        p=self.place()
+        self.assertEqual(self.post(self.admin,f"/admin/places/{p['id']}/edit",**self.form(published='1',cafe_focus_present='1',cafe_focus=['space','experience'])).status_code,303)
         self.assertEqual(self.api()[0]['cafe_focus'],['space','experience'])
-        self.assertEqual(self.api()[0]['verification_status'],'unverified')
-        url=f"/places/{p['id']}/edit"
-        self.assertEqual(self.post(self.other,url,**self.form(cafe_focus=['taste'])).status_code,403)
-        self.assertEqual(self.post(self.member,url,**self.form(cafe_focus_present='1',cafe_focus=['taste'])).status_code,303)
-        self.assertEqual(self.api()[0]['cafe_focus'],['taste'])
-        self.assertEqual(self.post(self.member,url,**self.form()).status_code,303)
-        self.assertEqual(self.api()[0]['cafe_focus'],['taste'])
-        self.assertEqual(self.post(self.member,url,**self.form(cafe_focus_present='1')).status_code,303)
-        self.assertEqual(self.api()[0]['cafe_focus'],[])
+        path=f"/places/{p['id']}/edit"
+        self.assertEqual(self.post(self.member,path,**self.form()).status_code,303)
+        self.assertEqual(self.api()[0]['cafe_focus'],['space','experience'])
+        self.assertEqual(self.post(self.member,path,**self.form(cafe_focus=['taste'])).status_code,403)
+        self.assertEqual(self.post(self.other,path,**self.form()).status_code,403)
 
     def test_04_required_and_length_validation(self):
         for data in ({'name':''},{'region':''},{'address':''},{'name':'가'*121},{'one_line':'가'*601},{'category_id':'9999'}):
@@ -460,11 +455,13 @@ class CommunityTest(unittest.TestCase):
 
     def test_39_one_map_record_discovered_by_find_map_and_new(self):
         term=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
-        r=self.post(self.member,'/map/register',**self.form(category_id=self.category['food'],opened_year=str(self.now.year),from_new='1',taxonomy_present='1',term_ids=[str(term)],latitude='33.45',longitude='126.4'))
+        r=self.post(self.member,'/map/register',**self.form(category_id=self.category['food'],opened_year=str(self.now.year),from_new='1',details_enabled='1',term_ids=[str(term)],latitude='33.45',longitude='126.4'))
         self.assertEqual(r.status_code,303,r.text)
         self.assertEqual(len(self.rows('SELECT id FROM places')),1)
         p=self.rows('SELECT * FROM places')[0]
         self.assertEqual(r.headers['location'],'/place/'+p['slug'])
+        sid=self.rows('SELECT id FROM place_correction_suggestions')[0]['id']
+        self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='accept').status_code,303)
         for query in ('?category=food&region=애월&detail=food-western','?new=current&category=food'):
             results=self.api(query)
             self.assertEqual([item['id'] for item in results],[p['id']])
@@ -473,18 +470,20 @@ class CommunityTest(unittest.TestCase):
             self.assertFalse(results[0]['is_pick'])
         self.assertEqual(self.visitor.get('/place/'+p['slug']).status_code,200)
 
-    def test_40_member_terms_validate_preserve_and_switch_category(self):
+    def test_40_member_terms_validate_pending_and_preserve_existing(self):
         cafe=self.rows("SELECT id FROM categories WHERE slug='cafe-view'")[0]['id']
         food=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
         for term in (str(food),'99999','bad','9'*5000):
-            r=self.post(self.member,'/map/register',**self.form(taxonomy_present='1',term_ids=[term]))
+            r=self.post(self.member,'/map/register',**self.form(details_enabled='1',term_ids=[term]))
             self.assertEqual(r.status_code,400)
-        p=self.place(taxonomy_present='1',term_ids=[str(cafe)])
-        self.assertIn(f'value="{cafe}" checked',self.member.get(f"/places/{p['id']}/edit").text)
+        p=self.place(details_enabled='1',term_ids=[str(cafe)])
+        self.assertEqual(self.rows('SELECT * FROM place_category_links'),[])
+        sid=self.rows('SELECT id FROM place_correction_suggestions')[0]['id']
+        self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='accept').status_code,303)
         self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.form()).status_code,303)
         self.assertEqual(self.rows('SELECT category_id FROM place_category_links'),[{'category_id':cafe}])
-        self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.form(category_id=self.category['attraction'],taxonomy_present='1')).status_code,303)
-        self.assertEqual(self.rows('SELECT * FROM place_category_links'),[])
+        self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.form(category_id=self.category['attraction'])).status_code,303)
+        self.assertEqual(self.rows('SELECT category_id FROM place_category_links'),[{'category_id':cafe}])
 
     def test_41_canonical_map_upload_duplicate_and_security(self):
         image=io.BytesIO();Image.effect_noise((500,500),100).convert('RGB').save(image,format='PNG')

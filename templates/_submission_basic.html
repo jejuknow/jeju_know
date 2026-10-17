@@ -1,0 +1,17 @@
+<fieldset class="submission-field span-2" id="hoursFields"><legend>영업시간 (선택)</legend>
+  <input type="hidden" name="hours_present" value="1">
+  <div class="submission-switches"><label class="member-check"><input type="checkbox" name="hours_same" value="1" role="switch" {% if hours_ui.hours_same == '1' %}checked{% endif %}>모든 영업일 동일</label><label class="member-check"><input type="checkbox" name="hours_unknown" value="1" {% if hours_ui.hours_unknown == '1' %}checked{% endif %}>영업시간 미확인</label></div>
+  <div class="submission-time-row" data-hours-times>
+    {% for key,label in [('hours_start','시작시간'),('hours_end','종료시간')] %}<label>{{ label }}<select name="{{ key }}"><option value="">시간 선택</option>{% set selected = hours_ui[key] %}{% if selected and selected not in time_options %}<option value="{{ selected }}" selected>{{ selected }}</option>{% endif %}{% for time in time_options %}<option value="{{ time }}" {% if selected == time %}selected{% endif %}>{{ time }}</option>{% endfor %}</select></label>{% endfor %}
+  </div>
+  <label data-hours-custom>요일별 시간·별도 안내<textarea name="business_hours" rows="2" maxlength="200" placeholder="예: 평일 10:00 ~ 18:00, 주말 11:00 ~ 19:00">{{ p.get('business_hours') or '' }}</textarea></label>
+</fieldset>
+<fieldset class="submission-field span-2" id="closedFields"><legend>휴무일 (선택)</legend><input type="hidden" name="closed_present" value="1">
+  <label>휴무일 선택<select name="closed_mode">{% for value,label in [('unknown','휴무일 미확인'),('days','휴무 요일 선택'),('everyday','연중무휴'),('custom','별도 안내')] %}<option value="{{ value }}" {% if hours_ui.closed_mode == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <div class="chips" data-closed-days>{% for day in weekdays %}<label class="member-term"><input type="checkbox" name="closed_weekdays" value="{{ day }}" {% if day in hours_ui.closed_weekdays %}checked{% endif %}>{{ day }}</label>{% endfor %}</div>
+  <label data-closed-custom>휴무 안내<textarea name="closed_days" rows="2" maxlength="200">{{ p.get('closed_days') or '' }}</textarea></label>
+</fieldset>
+<label>전화번호 (선택)<input type="tel" inputmode="tel" name="phone" maxlength="80" value="{{ p.get('phone') or '' }}" placeholder="예: 0647992122"></label>
+<label data-menu-field>대표메뉴 (선택)<textarea name="signature_menu" maxlength="1000" rows="2" placeholder="예: 아메리카노">{{ p.get('signature_menu') or '' }}</textarea></label>
+<label data-menu-field>가격 (선택)<input name="representative_price" inputmode="numeric" maxlength="12" value="{{ p.get('representative_price') if p.get('representative_price') is not none else '' }}" placeholder="예: 5500"><small>대표메뉴 가격 · 원</small></label>
+<label>탐나는전 결제 (선택)<select name="tamnaneunjeon_status">{% for value in ['미확인','가능','불가'] %}<option value="{{ value }}" {% if (p.get('tamnaneunjeon_status') or '미확인') == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>

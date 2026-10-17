@@ -10,9 +10,12 @@ TEXT_LIMITS = {
 }
 # Keep the historical detail migration's field list stable.
 CONTACT_TEXT_LIMITS = {"phone": 80}
-BASIC_INFO_LIMITS = {"business_hours": TEXT_LIMITS["business_hours"], **CONTACT_TEXT_LIMITS}
+BASIC_INFO_LIMITS = {k: TEXT_LIMITS[k] for k in ("business_hours", "closed_days", "signature_menu")}
+BASIC_INFO_LIMITS.update(CONTACT_TEXT_LIMITS)
+SUBMISSION_CHOICES = {"tamnaneunjeon_status": ("미확인", "가능", "불가")}
 FIELD_LABELS = {
     "phone": "전화번호",
+    "representative_price": "가격", "tamnaneunjeon_status": "탐나는전",
     "business_hours": "영업시간", "closed_days": "휴무일", "last_order": "라스트오더",
     "signature_menu": "대표 메뉴", "recommended_menu": "추천 메뉴",
     "dessert_note": "디저트 특징", "food_taste_note": "음식/맛 특징",
@@ -22,11 +25,24 @@ USE_OPTIONS = ("미확인", "가능", "불가", "제한")
 WAITING_OPTIONS = ("미확인", "없음", "있음", "주말·성수기 있음")
 COFFEE_OPTIONS = ("미확인", "산미 있음", "산미 적음", "고소한 편", "밸런스형", "기타")
 CHOICE_OPTIONS = {"reservation_status": USE_OPTIONS, "waiting_status": WAITING_OPTIONS, "coffee_taste": COFFEE_OPTIONS}
-DETAIL_FIELDS = (*TEXT_LIMITS, *CONTACT_TEXT_LIMITS, *CHOICE_OPTIONS)
+DETAIL_FIELDS = (*TEXT_LIMITS, *CONTACT_TEXT_LIMITS, *CHOICE_OPTIONS, "representative_price", *SUBMISSION_CHOICES)
 
 
 def normalize_phone(value):
-    return " ".join(str(value or "").split())
+    value = " ".join(str(value or "").split())
+    if re.fullmatch(r"0[0-9]{8,10}", value):
+        prefix = 2 if value.startswith("02") else 3
+        return value[:prefix] + "-" + value[prefix:-4] + "-" + value[-4:]
+    return value
+
+
+def parse_price(value):
+    value = str(value if value is not None else "").strip().replace(",", "").removesuffix("원").strip()
+    if not value:
+        return None
+    if not re.fullmatch(r"[0-9]{1,8}", value):
+        raise ValueError("가격은 0~99,999,999원 사이의 숫자로 입력해주세요.")
+    return int(value)
 
 
 def phone_link(value):
@@ -40,19 +56,23 @@ def phone_link(value):
 
 def parse_details(form, existing=None):
     previous = dict(existing or {})
-    data = {field: str(form.get(field, previous.get(field) or ("미확인" if field in CHOICE_OPTIONS else ""))).strip()
+    data = {field: str(form.get(field, previous.get(field) if previous.get(field) is not None else ("미확인" if field in CHOICE_OPTIONS or field in SUBMISSION_CHOICES else ""))).strip()
             for field in DETAIL_FIELDS}
     data["phone"] = normalize_phone(data["phone"])
     return data
 
 
 def validate_detail_value(field, value):
+    if field == "representative_price":
+        return parse_price(value)
     limits = {**TEXT_LIMITS, **CONTACT_TEXT_LIMITS}
     if field == "phone":
         value = normalize_phone(value)
     if field in limits and len(value) > limits[field]:
         raise ValueError(f"{FIELD_LABELS[field]}은 {limits[field]:,}자 이내로 입력해주세요.")
     if field in CHOICE_OPTIONS and value not in CHOICE_OPTIONS[field]:
+        raise ValueError(f"{FIELD_LABELS[field]} 선택값을 확인해주세요.")
+    if field in SUBMISSION_CHOICES and value not in SUBMISSION_CHOICES[field]:
         raise ValueError(f"{FIELD_LABELS[field]} 선택값을 확인해주세요.")
     if field == "parking_status" and value not in USE_OPTIONS:
         raise ValueError("주차는 미확인·가능·불가·제한 중 선택해주세요.")
@@ -83,6 +103,9 @@ def save_details(conn, place_id, data):
 
 def decorate_details(conn, place):
     place["phone_href"] = phone_link(place.get("phone"))
+    price = place.get("representative_price")
+    place["price_label"] = f"{price:,}원" if price is not None else "미확인"
+    place["tamnaneunjeon_status"] = place.get("tamnaneunjeon_status") or "미확인"
     category = conn.execute("SELECT slug FROM categories WHERE id=?", (place.get("category_id"),)).fetchone()
     place["category_slug"] = category[0] if category else ""
     for field in (*CHOICE_OPTIONS, "parking_status", "pet_status", "child_status", "accessible_status"):

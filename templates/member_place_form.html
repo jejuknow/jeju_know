@@ -1,5 +1,4 @@
 {% extends "base.html" %}{% from "_image_uploads.html" import image_uploads %}
-{% from "_cafe_focus.html" import cafe_focus_fields %}
 {% block title %}{{ '장소 수정' if place and place.id else '신상 장소 알려주기' if new_only else '장소 알려주기' }} | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% set p=place or {} %}
@@ -8,19 +7,16 @@
 <p class="section-copy">함께 만드는 제주 장소 정보입니다. 등록 즉시 ‘사용자 등록 · 미확인’으로 공개되며, JEJU_KNOW 추천과는 별도로 표시됩니다.</p>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
 {% if similar %}<section class="form-card duplicate-warning"><h2>비슷한 장소가 이미 등록되어 있습니다.</h2>{% for item in similar %}<p><a href="/place/{{ item.slug }}" target="_blank" rel="noopener">{{ item.name }} →</a> {{ item.address or item.region }} <a href="/places/{{ item.id }}/suggest">정보 바로잡기 →</a></p>{% endfor %}<p>기존 장소가 맞다면 상세페이지에서 수정 제안을 이용해주세요.</p></section>{% endif %}
-<form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form member-place-form" data-member-place-form>
+<form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form member-place-form" data-member-place-form data-photo-prepare="/api/place-photos/prepare">
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="from_new" value="{{ '1' if new_only else '0' }}">
 <section class="form-card"><h2>장소 기본 정보</h2><div class="form-grid two">
 <label>장소명 *<input name="name" required maxlength="120" value="{{ p.get('name','') }}"></label>
-<label>카테고리 *<select name="category_id" id="memberPlaceCategory" required><option value="">선택해주세요</option>{% for c in categories if not new_only or c.slug in ['cafe','food'] %}<option value="{{ c.id }}" {% if p.get('category_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+<label>카테고리 *<select name="category_id" id="memberPlaceCategory" required><option value="">선택해주세요</option>{% for c in categories if not new_only or c.slug in ['cafe','food'] %}<option value="{{ c.id }}" data-slug="{{ c.slug }}" {% if p.get('category_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
 <label>지역 *<select name="region" required><option value="">선택해주세요</option>{% for r in regions if r in active_regions or p.get('region')==r %}<option value="{{ r }}" {% if p.get('region')==r %}selected{% endif %}>{{ region_labels.get(r,r) }}</option>{% endfor %}</select></label>
 <label>주소 *<input name="address" required maxlength="300" value="{{ p.get('address','') }}"></label>
-<label>영업시간 (선택)<textarea name="business_hours" rows="2" maxlength="200" placeholder="예) 매일 10:00 ~ 18:00 / 화요일 휴무">{{ p.get('business_hours') or '' }}</textarea></label>
-<label>전화번호 (선택)<input type="tel" inputmode="tel" name="phone" maxlength="80" value="{{ p.get('phone') or '' }}" placeholder="예) 064-123-4567"></label>
+{% include "_submission_basic.html" %}
 <label>오픈 연도{{ ' *' if new_only else ' (선택)' }}<input type="number" name="opened_year" min="1900" max="{{ current_year }}" {% if new_only %}required{% endif %} value="{{ p.get('opened_year') or '' }}" placeholder="예: {{ current_year }}"></label>
 <label>오픈 월 (선택)<select name="opened_month"><option value="">월 미확인</option>{% for n in range(1,13) %}<option value="{{ n }}" {% if p.get('opened_month')|string==n|string %}selected{% endif %}>{{ n }}월</option>{% endfor %}</select></label>
-{{ cafe_focus_fields(taxonomy, p, true) }}
-<div class="member-place-terms" id="memberPlaceTerms">{% for c in categories %}<fieldset data-category-id="{{ c.id }}" {% if p.get('category_id')|string != c.id|string %}hidden{% endif %}><legend>{{ c.name }} 세부 분류 (선택)</legend><div class="chips">{% for t in taxonomy.terms if t.parent_id == c.id and (t.is_active or t.id in p.get('term_ids',[])) %}<label class="member-term"><input type="checkbox" name="term_ids" value="{{ t.id }}" {% if t.id in p.get('term_ids',[]) %}checked{% endif %} {% if p.get('category_id')|string != c.id|string %}disabled{% endif %}>{{ t.name }}</label>{% endfor %}</div></fieldset>{% endfor %}</div><input type="hidden" name="taxonomy_present" value="1">
 </div><p class="form-help">모르는 정보는 미확인으로 남습니다. NEW에는 현재 연도에 오픈한 카페·맛집이 표시됩니다.</p>
 <label>한줄 소개 (선택)<textarea name="one_line" rows="3" maxlength="600">{{ p.get('one_line','') }}</textarea></label>
 <label>홈페이지·Instagram (선택)<input type="url" name="website_url" maxlength="2000" value="{{ p.get('website_url','') }}"></label>
@@ -28,8 +24,9 @@
 <details id="locationPicker" data-auto-address><summary>지도 위치 확인 / 수정</summary><p class="form-help">지도를 누르거나 마커를 움직여 위치를 보정할 수 있어요. 위치 없이 등록하면 목록에는 표시되지만 지도 마커는 생기지 않습니다.</p><div class="location-actions"><button type="button" class="secondary-btn" id="addressLocate" data-kakao-key="{{ kakao_map_key }}">주소로 다시 찾기</button><button type="button" class="text-btn" id="locationClear">위치 지우기</button></div><div id="placeLocationMap" class="place-location-map" aria-label="등록 장소 위치 선택 지도"></div><input type="hidden" name="latitude" value="{{ p.get('latitude') if p.get('latitude') is not none else '' }}"><input type="hidden" name="longitude" value="{{ p.get('longitude') if p.get('longitude') is not none else '' }}"></details>
 </section>
 {{ image_uploads(p,'places',false,4,true) }}
+{% include '_submission_details.html' %}
 {% if similar %}<label class="member-check"><input type="checkbox" name="duplicate_ack" value="1" required>기존 장소를 확인했으며 서로 다른 장소입니다.</label>{% endif %}
 <p class="form-help" data-submit-status role="status" aria-live="polite"></p><div class="form-actions"><a class="secondary-btn" href="/account/places">내 장소</a><button class="primary-inline" type="submit">{{ '수정사항 저장' if p.get('id') else '장소 등록하기' }}</button></div>
 </form></main>{% endblock %}
 
-{% block scripts %}<script src="/static/cafe-focus.js?v=20261017-basic-info"></script><script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/member-place.js?v=20261012-map-flow"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/member-place.js?v=20261017-upgrade"></script>{% endblock %}

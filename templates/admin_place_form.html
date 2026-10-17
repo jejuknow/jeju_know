@@ -12,6 +12,8 @@
 <details class="form-card place-admin-section" ><summary><strong>2. 방문 정보</strong><span>영업시간·휴무·이용 조건</span></summary><div class="place-section-body"><p class="form-help">모든 항목은 선택사항입니다. 확인하지 않은 이용 조건은 미확인으로 남겨주세요.</p><div class="form-grid two">
 <label>영업시간 (선택)<textarea name="business_hours" rows="2" maxlength="200" placeholder="예) 매일 10:00 ~ 18:00 / 화요일 휴무">{{ p.get('business_hours') or '' }}</textarea></label>
 <label>전화번호 (선택)<input type="tel" inputmode="tel" name="phone" maxlength="80" value="{{ p.get('phone') or '' }}" placeholder="예) 064-123-4567"></label>
+<label>탐나는전 결제<select name="tamnaneunjeon_status">{% for value in ['미확인','가능','불가'] %}<option value="{{ value }}" {% if (p.get('tamnaneunjeon_status') or '미확인') == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+<label>대표메뉴 가격<input name="representative_price" inputmode="numeric" maxlength="12" value="{{ p.get('representative_price') if p.get('representative_price') is not none else '' }}" placeholder="예: 5500"></label>
 {% for field,label,limit,placeholder in [('closed_days','휴무일',200,'예: 매주 화요일'),('last_order','라스트오더',100,'예: 17:30')] %}<label>{{ label }}<input name="{{ field }}" maxlength="{{ limit }}" value="{{ p.get(field,'') }}" placeholder="{{ placeholder }}"></label>{% endfor %}
 {% for field,label in [('reservation_status','예약'),('waiting_status','웨이팅'),('parking_status','주차'),('pet_status','반려동물'),('child_status','아이 동반'),('accessible_status','무장애')] %}<label>{{ label }}<select name="{{ field }}">{% for item in (waiting_options if field == 'waiting_status' else status_options) %}<option value="{{ item }}" {% if (p.get(field) or '미확인') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>{% endfor %}</div></div></details>
 

@@ -25,3 +25,21 @@
 .cafe-focus-group{grid-column:1/-1;min-width:0;border:0;padding:0;margin:12px 0 20px}.cafe-focus-group[hidden]{display:none}.cafe-focus-group legend{font-size:15px;font-weight:750;line-height:1.5;padding:0;margin-bottom:8px}.cafe-focus-body{display:flex;flex-direction:column;gap:12px;min-width:0}.cafe-focus-group .form-help{margin:0;line-height:1.6;word-break:keep-all;overflow-wrap:break-word}.member-place-form .form-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.finder-detail-more{margin-top:16px}.finder-detail-more summary{font-size:13px;font-weight:750;cursor:pointer;padding:10px 0;min-height:44px}.finder-detail-more summary[hidden]{display:none}
 
 @media(max-width:640px){.member-place-form .form-grid.two{grid-template-columns:minmax(0,1fr)}}
+
+/* Mobile submission controls stay in normal document flow. */
+.member-place-form .form-help{margin:0;line-height:1.6}
+.member-place-form .form-card{min-width:0}
+.submission-field{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:12px}
+.submission-field legend{font-weight:750;margin-bottom:12px;padding:0}
+.submission-field h3{font-size:16px;margin:0}
+.submission-field .chips{display:flex;flex-wrap:wrap;gap:8px}
+.submission-switches{display:flex;flex-wrap:wrap;gap:12px 24px}
+.submission-time-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.submission-details>label{margin:18px 0}
+#submissionDetails{display:flex;flex-direction:column;gap:28px}
+.member-place-form [hidden]{display:none!important}
+.member-place-form input,.member-place-form select,.member-place-form textarea{min-width:0;max-width:100%}
+.member-place-form .member-check input{width:20px;height:20px;flex:0 0 20px;accent-color:var(--brand)}
+.member-place-form .member-check{display:flex;align-items:center;gap:8px;min-height:44px}
+.admin-review-detail dd{white-space:pre-line}
+@media(max-width:640px){.member-place-form .span-2{grid-column:1/-1}.member-place-form .form-card{padding:18px 14px}.member-place-form input,.member-place-form select,.member-place-form textarea{font-size:16px}.member-place-form .member-term{padding:8px 11px}.submission-switches{gap:6px 16px}}

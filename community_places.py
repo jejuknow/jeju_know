@@ -10,9 +10,10 @@ from place_details import BASIC_INFO_LIMITS, validate_detail_value
 
 FACT_LIMITS = {"name": 120, "region": 40, "address": 300, "one_line": 600,
                "map_url": 2000, "website_url": 2000, **BASIC_INFO_LIMITS}
-FACT_FIELDS = (*FACT_LIMITS, "category_id", "opened_year", "opened_month", "latitude", "longitude")
+FACT_FIELDS = (*FACT_LIMITS, "category_id", "opened_year", "opened_month", "latitude", "longitude", "representative_price", "tamnaneunjeon_status")
 VERIFICATION_LABELS = {"unverified": "미확인", "community_confirmed": "정보 확인됨", "jejuno_verified": "JEJU_KNOW 확인"}
 SUGGESTION_FIELDS = {"name": "장소명", "address": "주소", "coordinates": "지도 위치",
+                     "signature_menu": "대표메뉴", "representative_price": "가격", "tamnaneunjeon_status": "탐나는전 가능 여부",
                      "business_hours": "영업시간", "phone": "전화번호", "closed_days": "휴무일", "closed": "폐업/휴업",
                      "reservation_status": "예약", "parking_status": "주차",
                      "category_id": "카테고리", "business": "영업 관련 정보", "opening": "오픈 정보",
@@ -67,6 +68,11 @@ def facts(form, conn, regions, *, new_only=False, existing=None):
     if new_only and category["slug"] not in ("food", "cafe"):
         raise ValueError("신상 장소는 카페 또는 맛집으로 등록해주세요.")
     data["category_id"], data["category"] = category["id"], category["name"]
+    for field, default in (("representative_price", None), ("tamnaneunjeon_status", "미확인")):
+        data[field] = validate_detail_value(field, form.get(field, existing[field] if existing else default))
+    if category["slug"] not in ("cafe", "food"):
+        data["signature_menu"] = existing["signature_menu"] if existing else ""
+        data["representative_price"] = existing["representative_price"] if existing else None
     data["opened_year"], data["opened_month"] = opening(form.get("opened_year"), form.get("opened_month"))
     if new_only and data["opened_year"] is None:
         raise ValueError("신상 장소의 오픈 연도를 입력해주세요.")

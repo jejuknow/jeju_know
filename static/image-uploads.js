@@ -48,6 +48,23 @@
   document.querySelectorAll('form').forEach(form=>{
     const slots=[...form.querySelectorAll('[data-image-slot]')];if(!slots.length)return;
     const states=[],buttons=[...form.querySelectorAll('button[type=submit]')];
+    const prepareUrl=form.dataset.photoPrepare;
+    async function preparePhoto(file){
+      if(!prepareUrl)return optimizePhoto(file);
+      const data=new FormData();data.set('csrf_token',form.elements.csrf_token.value);data.set('photo',file,file.name);
+      let response;
+      try{response=await fetch(prepareUrl,{method:'POST',body:data,credentials:'same-origin'});}
+      catch(_){throw new Error('사진 업로드 중 문제가 발생했습니다. 다시 시도해주세요.');}
+      if(!response.ok){
+        let message='사진을 처리하지 못했습니다. 다시 시도해주세요.';
+        if(response.status===413)message='사진 파일이 너무 큽니다. 한 장당 32MB까지 처리할 수 있어요.';
+        else {try{message=(await response.json()).error||message;}catch(_){}}
+        throw new Error(message);
+      }
+      const blob=await response.blob();
+      if(blob.type!=='image/webp')throw new Error('사진을 처리하지 못했습니다. 다시 시도해주세요.');
+      return new File([blob],'optimized-photo.webp',{type:'image/webp'});
+    }
     const feedback=form.querySelector('[data-submit-status]')||form.appendChild(Object.assign(document.createElement('p'),{className:'form-help'}));
     feedback.setAttribute('role','status');
     let sending=false;
@@ -56,6 +73,7 @@
       const input=slot.querySelector('input[type=file]'),remove=slot.querySelector('input[type=checkbox]');
       const preview=slot.querySelector('.image-preview'),image=preview.querySelector('img'),placeholder=preview.querySelector('.image-placeholder');
       const status=slot.querySelector('.image-feedback'),label=slot.querySelector('.image-file-button span');
+      const retry=document.createElement('button');retry.type='button';retry.className='text-btn';retry.textContent='다시 시도';retry.hidden=true;status.after(retry);
       const state={input,remove,file:null,busy:false,revision:0,promise:Promise.resolve(),url:null};states.push(state);
       function render(){
         if(state.url)URL.revokeObjectURL(state.url);state.url=null;
@@ -65,35 +83,41 @@
         if(url)image.src=url;else image.removeAttribute('src');
         label.textContent=url?'사진 변경':'사진 선택';
       }
-      input.addEventListener('change',()=>{
+      function selectPhoto(){
         const revision=++state.revision,file=input.files[0];state.file=null;state.busy=false;
-        input.setCustomValidity('');status.textContent='';
+        input.setCustomValidity('');status.textContent='';retry.hidden=true;
         if(!file){render();busy();return;}
-        if(!/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)||file.size>MAX_BYTES){
-          status.textContent=file.size>MAX_BYTES?'파일이 너무 큽니다. 사진은 한 장당 32MB까지 처리할 수 있어요.':'지원하지 않는 이미지 형식입니다. JPG, PNG, WebP, HEIC 사진을 선택해주세요.';
-          input.value='';render();busy();return;
+        if(file.size>MAX_BYTES){
+          status.textContent='파일이 너무 큽니다. 사진은 한 장당 32MB까지 처리할 수 있어요.';
+          input.setCustomValidity(status.textContent);render();busy();return;
         }
         remove.checked=false;state.file=file;render();
-        state.busy=true;status.textContent='사진 최적화 중...';busy();
+        state.busy=true;status.textContent='사진 처리 대기 중...';busy();
         state.promise=queue=queue.catch(()=>{}).then(async()=>{
           if(revision!==state.revision)return;
-          const optimized=await optimizePhoto(file);
+          status.textContent='사진 업로드·최적화 중...';
+          const optimized=await preparePhoto(file);
           if(revision!==state.revision)return;
           state.file=optimized;render();
           status.textContent=optimized!==file?'사진 최적화 완료 · 저장하면 반영됩니다.':'사진 선택 완료 · 서버에서 안전하게 최적화합니다.';
+        }).catch(error=>{
+          if(revision!==state.revision)return;
+          status.textContent=error.message||'사진을 처리하지 못했습니다.';
+          input.setCustomValidity(status.textContent);retry.hidden=false;
         }).finally(()=>{if(revision===state.revision){state.busy=false;busy();}});
-      });
+      }
+      input.addEventListener('change',selectPhoto);retry.addEventListener('click',selectPhoto);
       image.addEventListener('error',()=>{
         if(!state.file)return;
         image.hidden=true;placeholder.hidden=false;
         placeholder.textContent='저장 후 미리보기';
-        status.textContent='이 브라우저에서는 미리보기를 지원하지 않습니다. 원본을 서버에서 처리합니다.';
+        if(!state.busy&&!prepareUrl)status.textContent='이 브라우저에서는 미리보기를 지원하지 않습니다. 원본을 서버에서 처리합니다.';
         // HEIC preview failure is not a validation failure.
       });
       remove.addEventListener('change',()=>{
         state.revision++;state.busy=false;
         if(remove.checked){input.value='';state.file=null;input.setCustomValidity('');}
-        status.textContent=remove.checked?'저장하면 이 사진이 삭제됩니다.':'';render();busy();
+        retry.hidden=true;status.textContent=remove.checked?'저장하면 이 사진이 삭제됩니다.':'';render();busy();
       });
       root.addEventListener('pagehide',()=>{if(state.url)URL.revokeObjectURL(state.url);});
     });

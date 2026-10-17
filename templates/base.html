@@ -20,14 +20,14 @@
   <link rel="stylesheet" href="/static/members.css?v=20261011-wrap" />
   <link rel="stylesheet" href="/static/images.css?v=20261014-upload" />
   {% block head %}{% endblock %}
-  <link rel="stylesheet" href="/static/community.css?v=20261017-basic-info">
+  <link rel="stylesheet" href="/static/community.css?v=20261017-upgrade">
   <link rel="stylesheet" href="/static/brand.css?v=20261012-brand">
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% include '_site_header.html' %}{% endif %}
   {% block body %}{% endblock %}
   <script src="/static/site-nav.js?v=20261008-home"></script>
-  <script src="/static/image-uploads.js?v=20261014-upload" defer></script>
+  <script src="/static/image-uploads.js?v=20261017-upgrade" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

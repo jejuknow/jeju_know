@@ -65,17 +65,20 @@ def optimize_upload(stream, filename, content_type):
 
 
 def _optimize_image(raw, filename, content_type):
-    expected = FORMATS.get(Path(filename).suffix.lower())
+    expected = None
     dimensions = None
     try:
-        if not expected or content_type.lower() not in MIME_TYPES[expected] | {"", "application/octet-stream"}:
+        # Mobile pickers can transcode HEIC to JPEG without updating name/MIME.
+        # Decode only our format allowlist; names and MIME are hints, never proof.
+        if content_type and not (content_type.lower().startswith("image/") or content_type.lower() == "application/octet-stream"):
             raise ImageError("지원하지 않는 이미지 형식입니다. JPG, PNG, WebP, HEIC 사진을 선택해주세요.")
-        if not raw or len(raw) > MAX_FILE_BYTES:
+        if not raw:
+            raise ImageError("사진 파일이 비어 있거나 손상되어 있습니다.")
+        if len(raw) > MAX_FILE_BYTES:
             raise ImageError("파일이 너무 큽니다. 사진은 한 장당 32MB까지 처리할 수 있어요.")
         with Image.open(io.BytesIO(raw), formats=list(MIME_TYPES)) as check:
             dimensions = check.size
-            if check.format != expected:
-                raise ImageError("파일 형식과 실제 이미지 형식이 일치하지 않습니다.")
+            expected = check.format
             if check.width * check.height > MAX_PIXELS:
                 raise ImageError("사진 크기가 처리 가능한 범위를 넘었습니다. 5,000만 화소 이하의 사진을 선택해주세요.")
             if expected != "HEIF" and getattr(check, "is_animated", False):
@@ -100,7 +103,14 @@ def _optimize_image(raw, filename, content_type):
         logger.warning("Image processing failed format=%s bytes=%d dimensions=%s error=%s reason=%s", expected, len(raw), dimensions, type(error).__name__, str(error) if isinstance(error, ImageError) else "decoder failure", exc_info=not isinstance(error, ImageError))
         if isinstance(error, ImageError):
             raise
-        raise ImageError("사진을 처리하지 못했습니다. 파일이 손상되었거나 지원하지 않는 사진입니다. 다른 사진을 선택해주세요.") from error
+        if isinstance(error, UnidentifiedImageError):
+            known_header = raw.startswith((b'\xff\xd8', b'\x89PNG', b'RIFF')) or (len(raw) >= 12 and raw[4:8] == b'ftyp')
+            message = "사진 파일이 손상되어 있습니다." if known_header else "지원되지 않는 이미지입니다. JPG, PNG, WebP, HEIC 사진을 선택해주세요."
+        elif isinstance(error, MemoryError):
+            message = "사진을 처리하지 못했습니다. 잠시 후 다시 시도해주세요."
+        else:
+            message = "사진 파일이 손상되어 있어 처리하지 못했습니다."
+        raise ImageError(message) from error
 
 
 class ImageStore:
