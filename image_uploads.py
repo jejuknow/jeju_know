@@ -178,7 +178,7 @@ class ImageStore:
 
     async def prepare(self, form, kind, *, slots=None):
         plan = ImagePlan(self, kind)
-        count = slots if slots is not None else (5 if kind == "places" else 1)
+        count = slots if slots is not None else (4 if kind == "places" else 1)
         uploads = [(key, value) for key, value in form.multi_items() if isinstance(value, UploadFile) and value.filename]
         valid_names = {f"image_{slot}" for slot in range(count)}
         if len(uploads) > count or len({key for key, _ in uploads}) != len(uploads) or any(key not in valid_names for key, _ in uploads):

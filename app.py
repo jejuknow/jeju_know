@@ -35,6 +35,8 @@ from admin_settings import read_settings, catalog
 from admin_ui_migrations import backup_before_admin_ui, migrate_admin_ui
 from basic_place_info_migrations import backup_before_basic_place_info, migrate_basic_place_info
 from submission_migrations import backup_before_submission, migrate_submission
+from admin_place_cleanup_migrations import backup_before_admin_place_cleanup, migrate_admin_place_cleanup
+from submission_fields import normalize_controls, controls, TIME_OPTIONS, WEEKDAYS, CONTROL_FIELDS
 from starlette.concurrency import run_in_threadpool
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -190,6 +192,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        cleanup_backup_path = backup_before_admin_place_cleanup(app.state.database)
         submission_backup_path = backup_before_submission(app.state.database)
         basic_info_backup_path = backup_before_basic_place_info(app.state.database)
         admin_backup_path = backup_before_admin_ui(app.state.database)
@@ -300,6 +303,7 @@ def create_app(test_config=None):
         migrate_admin_ui(app.state.database, admin_backup_path)
         migrate_basic_place_info(app.state.database, basic_info_backup_path)
         migrate_submission(app.state.database, submission_backup_path)
+        migrate_admin_place_cleanup(app.state.database, cleanup_backup_path)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -449,9 +453,17 @@ def create_app(test_config=None):
 
     async def parse_place_form(request: Request, existing=None):
         form = await request.form(max_files=5, max_fields=100, max_part_size=FORM_BYTES)
+        control_error = None
+        try:
+            form = normalize_controls(form)
+        except ValueError as exc:
+            control_error = str(exc)
         slug = unique_slug(form.get("slug"), existing["id"] if existing else None)
         return form, {
             **parse_details(form, existing),
+            "_control_error": control_error,
+            "_focus_submitted": "cafe_focus_present" in form or "cafe_focus" in form,
+            **{key: form.getlist(key) if key == "closed_weekdays" else form.get(key, "") for key in CONTROL_FIELDS if key in form or (key in ("hours_same", "hours_unknown") and form.get("hours_present") == "1")},
             "slug": slug,
             "name": str(form.get("name", "")).strip(),
             "region": str(form.get("region", "")).strip(),
@@ -519,6 +531,8 @@ def create_app(test_config=None):
         return [dict(row) for row in rows]
 
     def validate_place(data, existing=None):
+        if data.get("_control_error"):
+            return data["_control_error"]
         try:
             validate_details(data)
             data["opened_year"], data["opened_month"] = opening(data["opened_year"], data["opened_month"])
@@ -539,10 +553,12 @@ def create_app(test_config=None):
         if not category or category["type"] != "place" or (not category["is_active"] and (not existing or existing["category_id"] != category["id"])):
             return "활성 카테고리를 선택해 주세요. 기존 장소의 비활성 분류는 유지할 수 있습니다."
         data["category_id"], data["category"] = category["id"], category["name"]
+        data["emoji"] = {"food": "🍚", "cafe": "☕", "attraction": "📍"}.get(category["slug"], "📍")
         conn = connect_db()
         try:
             error = validate_terms(conn, data, existing)
-            validate_focus(conn, data, existing)
+            if data.get("_focus_submitted"):
+                validate_focus(conn, data, existing)
             region_values = {i['value'] for i in catalog(conn, 'region')}
             companion_values = {i['value'] for i in catalog(conn, 'companion')}
             if existing:
@@ -588,6 +604,9 @@ def create_app(test_config=None):
             "status_options": STATUS_OPTIONS,
             "coffee_options": COFFEE_OPTIONS,
             "waiting_options": WAITING_OPTIONS,
+            "submission_controls": controls,
+            "admin_time_options": TIME_OPTIONS,
+            "admin_weekdays": WEEKDAYS,
         }
 
     def admin_guard(request: Request):

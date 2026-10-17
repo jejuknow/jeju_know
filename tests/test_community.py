@@ -17,6 +17,7 @@ from app import create_app
 from auth_security import hash_password
 from community_migrations import VERSION, backup_before_community_migration
 from community_places import duplicates
+from legacy_images import add_fifth
 
 
 class CommunityTest(unittest.TestCase):
@@ -244,15 +245,15 @@ class CommunityTest(unittest.TestCase):
             self.assertEqual(self.create(**data).status_code,400)
 
     def test_18_new_uses_same_place_id_in_find_map_detail(self):
-        p=self.place(from_new='1',opened_year=str(self.now.year),latitude='33.45',longitude='126.56')
+        p=self.place(from_new='1',opened_year=str(self.now.year),opened_month=self.now.month,latitude='33.45',longitude='126.56')
         self.assertEqual([r['id'] for r in self.api('?new=current')],[p['id']])
         self.assertEqual([r['id'] for r in self.api('?category=cafe')],[p['id']])
         self.assertTrue(self.api()[0]['has_coordinates'])
         self.assertEqual(len(self.rows('SELECT * FROM places')),1)
 
-    def test_19_new_current_year_not_hardcoded(self):
-        p=self.place(opened_year=str(self.now.year))
-        with patch('place_taxonomy.today',return_value=date(self.now.year+1,1,1)):
+    def test_19_new_calendar_month_not_hardcoded(self):
+        p=self.place(opened_year=str(self.now.year),opened_month=self.now.month)
+        with patch('place_taxonomy.today',return_value=date(self.now.year+1,self.now.month,1)):
             self.assertEqual(self.api('?new=current'),[])
         self.assertEqual(len(self.api('?new=current')),1)
 
@@ -349,10 +350,11 @@ class CommunityTest(unittest.TestCase):
         output=io.BytesIO();Image.new('RGB',(40,50),'blue').save(output,'PNG')
         files=[(f'image_{n}',(f'{n}.png',output.getvalue(),'image/png')) for n in range(5)]
         for name,address in [('사진 원본','주소1'),('사진 유지','주소2')]:
-            # Admin uploads retain five slots; these also model existing five-photo records.
+            # Seed the fifth image as legacy data, outside the new upload route.
             p=self.place(name=name,address=address)
-            r=self.admin.post(f"/admin/places/{p['id']}/edit",data={'csrf_token':self.csrf(self.admin,'/admin'),**self.form(name=name,address=address),'published':'1'},files=files,follow_redirects=False)
+            r=self.admin.post(f"/admin/places/{p['id']}/edit",data={'csrf_token':self.csrf(self.admin,'/admin'),**self.form(name=name,address=address),'published':'1'},files=files[:4],follow_redirects=False)
             self.assertEqual(r.status_code,303,r.text)
+            add_fifth(self.app.state.image_store,self.database,p['id'])
         source,target=self.rows('SELECT * FROM places ORDER BY id')
         image_paths=[r['file_path'] for r in self.rows('SELECT * FROM images')]
         self.post(self.admin,f"/admin/places/{source['id']}/merge",target_id=target['id'],confirm_merge='1')
@@ -408,11 +410,11 @@ class CommunityTest(unittest.TestCase):
         for table,rows in before.items(): self.assertEqual(self.rows(f'SELECT * FROM {table}'),rows)
 
     def test_38_new_food_registration_and_shared_filters(self):
-        p=self.place(category_id=self.category['food'],from_new='1',opened_year=str(self.now.year),opened_month='1')
+        p=self.place(category_id=self.category['food'],from_new='1',opened_year=str(self.now.year),opened_month=str(self.now.month))
         self.assertEqual([r['id'] for r in self.api('?new=current&category=food')],[p['id']])
         self.assertEqual(self.api('?new=current&category=cafe'),[])
         self.assertEqual(self.api('?category=attraction'),[])
-        self.assertEqual(self.api('?new=current')[0]['opened_month'],1)
+        self.assertEqual(self.api('?new=current')[0]['opened_month'],self.now.month)
 
     def test_39_merge_chain_preserves_all_shared_slugs(self):
         places=[self.place(name=f'장소 {n}',address=f'주소 {n}',duplicate_ack='1') for n in range(3)]
@@ -455,7 +457,7 @@ class CommunityTest(unittest.TestCase):
 
     def test_39_one_map_record_discovered_by_find_map_and_new(self):
         term=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
-        r=self.post(self.member,'/map/register',**self.form(category_id=self.category['food'],opened_year=str(self.now.year),from_new='1',details_enabled='1',term_ids=[str(term)],latitude='33.45',longitude='126.4'))
+        r=self.post(self.member,'/map/register',**self.form(category_id=self.category['food'],opened_year=str(self.now.year),opened_month=self.now.month,from_new='1',details_enabled='1',term_ids=[str(term)],latitude='33.45',longitude='126.4'))
         self.assertEqual(r.status_code,303,r.text)
         self.assertEqual(len(self.rows('SELECT id FROM places')),1)
         p=self.rows('SELECT * FROM places')[0]
@@ -517,7 +519,8 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(r.status_code,400)
         r=self.post(self.member,'/map/register',**self.form(from_new='1',opened_year=str(self.now.year)))
         self.assertEqual(r.status_code,303)
-        result=self.api('?new=current')[0]
+        self.assertEqual(self.api('?new=current'),[])  # Unknown opening month is never auto-NEW.
+        result=self.api()[0]
         self.assertIsNone(result['latitude']);self.assertIsNone(result['longitude'])
 
 
@@ -526,7 +529,7 @@ class CommunityMigrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             db=str(Path(folder)/'old.db')
             # Build exactly the previous commit's schema through its existing migration functions.
-            with patch.dict(os.environ,{'JEJUNO_SKIP_SEED':'1'}),patch('app.migrate_community'),patch('app.backup_before_community_migration'),patch('app.migrate_admin_ui'):
+            with patch.dict(os.environ,{'JEJUNO_SKIP_SEED':'1'}),patch('app.migrate_community'),patch('app.backup_before_community_migration'),patch('app.migrate_admin_ui'),patch('app.migrate_admin_place_cleanup'):
                 create_app({'TESTING':True,'DATABASE':db,'SECRET_KEY':'migration-test'})
             with closing(sqlite3.connect(db)) as conn,conn:
                 conn.execute("INSERT INTO places(slug,name,category,region,is_pick,companions,checked_at) VALUES ('old','기존 장소','카페','애월',1,'[\"부모님\"]','2020-01-01')")

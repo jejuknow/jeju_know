@@ -80,13 +80,13 @@ class BasicPlaceInfoTest(unittest.TestCase):
     def test_admin_edit_and_member_image_upload_preserve_links_and_discovery(self):
         buffer = io.BytesIO()
         Image.new('RGB', (80, 60), 'blue').save(buffer, format='PNG')
-        response = self.member.post('/map/register', data={**self.form(opened_year=self.now.year, business_hours='매일 10:00 ~ 18:00', phone='01012345678', latitude='33.45', longitude='126.57'),
+        response = self.member.post('/map/register', data={**self.form(opened_year=self.now.year,opened_month=self.now.month, business_hours='매일 10:00 ~ 18:00', phone='01012345678', latitude='33.45', longitude='126.57'),
             'csrf_token': self.csrf(self.member)}, files={'image_0': ('cover.png', buffer.getvalue(), 'image/png')}, follow_redirects=False)
         self.assertEqual(response.status_code, 303, response.text[:500])
         p = self.rows('SELECT * FROM places')[0]
         images = self.rows('SELECT * FROM images')
         self.assertEqual(len(images), 1)
-        response = self.post(self.admin, f"/admin/places/{p['id']}/edit", **self.form(slug=p['slug'], published='1', phone='064-987-6543', business_hours='화요일 휴무\n11시부터', opened_year=self.now.year, latitude='33.45', longitude='126.57'))
+        response = self.post(self.admin, f"/admin/places/{p['id']}/edit", **self.form(slug=p['slug'], published='1', phone='064-987-6543', business_hours='화요일 휴무\n11시부터', opened_year=self.now.year,opened_month=self.now.month, latitude='33.45', longitude='126.57'))
         self.assertEqual(response.status_code, 303)
         self.assertEqual(self.rows('SELECT * FROM images'), images)
         page = self.visitor.get('/place/' + p['slug']).text

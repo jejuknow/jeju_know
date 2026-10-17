@@ -11,7 +11,7 @@ from place_details import BASIC_INFO_LIMITS, validate_detail_value
 FACT_LIMITS = {"name": 120, "region": 40, "address": 300, "one_line": 600,
                "map_url": 2000, "website_url": 2000, **BASIC_INFO_LIMITS}
 FACT_FIELDS = (*FACT_LIMITS, "category_id", "opened_year", "opened_month", "latitude", "longitude", "representative_price", "tamnaneunjeon_status")
-VERIFICATION_LABELS = {"unverified": "미확인", "community_confirmed": "정보 확인됨", "jejuno_verified": "JEJU_KNOW 확인"}
+VERIFICATION_LABELS = {"unverified": "미확인", "jejuno_verified": "JEJU_KNOW 확인"}
 SUGGESTION_FIELDS = {"name": "장소명", "address": "주소", "coordinates": "지도 위치",
                      "signature_menu": "대표메뉴", "representative_price": "가격", "tamnaneunjeon_status": "탐나는전 가능 여부",
                      "business_hours": "영업시간", "phone": "전화번호", "closed_days": "휴무일", "closed": "폐업/휴업",
@@ -115,7 +115,7 @@ def decorate_facts(conn, place):
     place["is_pick"] = bool(period)
     place["pick_note"] = period["pick_note"] if period else ""
     place["pick_order"] = period["sort_order"] if period else 0
-    place["status_label"] = ("사용자 등록 · " if place["source_type"] == "user" else "JEJU_KNOW 등록 · ") + VERIFICATION_LABELS[place["verification_status"]]
+    place["status_label"] = ("사용자 등록 · " if place["source_type"] == "user" else "JEJU_KNOW 등록 · ") + VERIFICATION_LABELS.get(place["verification_status"], "미확인")
     place["opening_label"] = (f'{place["opened_year"]}년' + (f' {place["opened_month"]}월' if place["opened_month"] else "") + " 오픈") if place["opened_year"] else ""
     return place
 

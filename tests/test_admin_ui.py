@@ -95,11 +95,11 @@ class AdminUITest(unittest.TestCase):
         self.assertNotIn('제안 이름',self.admin.get('/admin/suggestions').text)
 
     def test_new_year_and_monthly_pick_use_shared_places(self):
-        a=self.place(name='올해 장소',opened_year=self.now.year)
+        a=self.place(name='올해 장소',opened_year=self.now.year,opened_month=self.now.month)
         b=self.place(name='작년 장소',opened_year=self.now.year-1,duplicate_ack='1')
         self.assertIn('올해 장소',self.admin.get('/admin/new').text)
         self.assertNotIn('작년 장소',self.admin.get('/admin/new').text)
-        self.assertIn('작년 장소',self.admin.get(f'/admin/new?year={self.now.year-1}').text)
+        self.assertNotIn('작년 장소',self.admin.get(f'/admin/new?year={self.now.year-1}').text)
         self.post(self.admin,'/admin/picks',place_id=a['id'],year=self.now.year,month=self.now.month,sort_order=2,pick_note='이달 설명',is_active='1')
         self.assertIn('이달 설명',self.admin.get('/admin/picks').text)
         self.post(self.admin,'/admin/picks',place_id=a['id'],year=self.now.year,month=self.now.month,sort_order=2,pick_note='보존 기록')

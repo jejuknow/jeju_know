@@ -54,7 +54,7 @@ test('authorship, missing status and community confirmation never imply editoria
  }
  assert.equal(placeStatus({source_type:'user'}).label,'사용자 등록 · 미확인');
  assert.equal(placeStatus({source_type:'admin'}).label,'JEJU_KNOW 등록 · 미확인');
- assert.equal(placeStatus({source_type:'user',verification_status:'community_confirmed'}).label,'사용자 등록 · 정보 확인됨');
+ assert.equal(placeStatus({source_type:'user',verification_status:'community_confirmed'}).label,'사용자 등록 · 미확인');
 });
 
 test('marker and card share status, with accessible text and a distinct symbol for each status',()=>{

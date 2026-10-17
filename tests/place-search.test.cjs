@@ -47,12 +47,12 @@ test('orientation URL round trips separately from the ten cafe features',()=>{
  assert.deepEqual(filters.fromParams(filters.params(state)),state);
  filters.select(state,'category','food');assert.deepEqual(state.focus,[]);assert.deepEqual(state.terms,[]);
 });
-test('popup uses linked restaurant terms, explicit cafe focus and original companions',()=>{
+test('popup uses linked restaurant terms, shared cafe taxonomy and original companions',()=>{
  const taxonomy={cafe_focus:[{value:'taste',label:'맛 중심'},{value:'space',label:'공간 중심'},{value:'experience',label:'이색 경험'}]};
  const base={region:'서귀포시',companions:['연인','친구','부모님','아이']};
  const cafe=filters.discoveryAttributes({...base,category:'카페',category_slug:'cafe',cafe_focus:['taste','space'],classification_terms:[{type:'cafe_feature',name:'좋은 뷰'}]},taxonomy);
- assert.equal(cafe.region,'서귀포시내');assert.equal(cafe.what,'카페 · 맛 중심 · 공간 중심');assert.equal(cafe.companions,'연인 · 친구 · 부모님');assert.equal(cafe.moreCompanions,1);
+ assert.equal(cafe.region,'서귀포시내');assert.equal(cafe.what,'카페 · 좋은 뷰');assert.equal(cafe.companions,'연인 · 친구 · 부모님');assert.equal(cafe.moreCompanions,1);
  assert.equal(filters.discoveryAttributes({category:'카페',category_slug:'cafe'},taxonomy).what,'카페');
- assert.equal(filters.discoveryAttributes({category:'카페',category_slug:'cafe',cafe_focus:['experience']},taxonomy).what,'카페 · 이색 경험');
+ assert.equal(filters.discoveryAttributes({category:'카페',category_slug:'cafe',classification_terms:[{type:'cafe_feature',name:'이색 경험'}]},taxonomy).what,'카페 · 이색 경험');
  assert.equal(filters.discoveryAttributes({...base,category:'맛집',category_slug:'food',classification_terms:[{type:'restaurant_subcategory',name:'베트남식'}]},taxonomy).what,'맛집 · 베트남식');
 });

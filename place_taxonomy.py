@@ -2,6 +2,7 @@
 from taxonomy_migrations import json_list, legacy_term_ids
 from community_migrations import today
 from admin_settings import catalog
+from new_visibility import new_clause
 
 CORE_ORDER = {"food": 0, "cafe": 1, "attraction": 2}
 
@@ -63,8 +64,9 @@ def public_search(conn, category="", q="", region="", companion="", detail="", c
         clauses.append("EXISTS(SELECT 1 FROM place_pick_periods k WHERE k.place_id=p.id AND k.year=? AND k.month=? AND k.is_active=1)")
         params.extend([now.year,now.month])
     if new:
-        clauses.append("c.slug IN ('cafe','food') AND c.is_active=1 AND p.new_override!='hide' AND (p.new_override='show' OR p.opened_year=?)")
-        params.append(now.year)
+        clause, values = new_clause(now)
+        clauses.append(clause)
+        params.extend(values)
     if category:
         clauses.append("c.slug=? AND c.type='place' AND c.is_active=1")
         params.append(category)

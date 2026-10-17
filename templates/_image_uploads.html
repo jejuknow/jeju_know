@@ -1,5 +1,5 @@
 {% macro image_uploads(content, kind, legacy=true, slots=none, compact=false) %}
-{% set count = slots if slots is not none else (5 if kind == 'places' else 1) %}
+{% set count = slots if slots is not none else (4 if kind == 'places' else 1) %}
 <section class="form-card image-editor {{ 'compact-image-editor' if compact else '' }}" data-image-editor>
   <h2>{{ '장소 사진' if kind == 'places' else '대표 포스터' }}</h2>
   <p class="form-help">{{ ('대표사진 1장과 추가사진 최대 ' ~ (count - 1) ~ '장을 올릴 수 있어요.') if kind == 'places' else '행사나 소식을 소개하는 포스터 1장을 올려주세요.' }}</p>

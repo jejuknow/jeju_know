@@ -123,7 +123,7 @@ class TaxonomyTest(unittest.TestCase):
         self.assertEqual(slugs(category='food',focus='taste'),set())
         self.assertEqual(slugs(category='cafe',focus='bogus'),set())
         self.assertEqual(slugs(category='cafe'),{'focus-a','focus-b','focus-empty'})
-        self.assertIn('카페 성향',self.client.get('/place/focus-a').text)
+        self.assertNotIn('<h2>카페 성향</h2>',self.client.get('/place/focus-a').text)
         self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='cafe_feature']),10)
 
     def test_cafe_focus_validation_legacy_edit_clear_and_category_switch(self):

@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from admin_settings import catalog, catalog_usage, read_settings, write_setting, DEFAULTS
 from auth_security import current_user, safe_external_url
 from community_migrations import today
+from new_visibility import new_clause
 from community_places import SUGGESTION_FIELDS
 from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal, snapshot
 SUGGESTION_LABELS = {**SUGGESTION_FIELDS, DETAIL_FIELD: DETAIL_LABEL}
@@ -64,11 +65,12 @@ def page_rows(conn, request, select, source, where, args, order):
 
 def counters(conn):
     now = today()
+    new_sql, new_args = new_clause(now)
     scalar = lambda sql, args=(): conn.execute(sql, args).fetchone()[0]
     return dict(total=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE),
                 unverified=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE + " AND source_type='user' AND verification_status='unverified'"),
                 suggestions=scalar("SELECT count(*) FROM place_correction_suggestions WHERE status='pending'"),
-                new=scalar("SELECT count(*) FROM places p JOIN categories c ON c.id=p.category_id WHERE " + ACTIVE + " AND c.slug IN ('cafe','food') AND c.is_active=1 AND p.new_override!='hide' AND (p.new_override='show' OR p.opened_year=?)", (now.year,)),
+                new=scalar("SELECT count(*) FROM places p JOIN categories c ON c.id=p.category_id WHERE " + ACTIVE + " AND " + new_sql, new_args),
                 picks=scalar("SELECT count(*) FROM place_pick_periods k JOIN places p ON p.id=k.place_id WHERE " + ACTIVE + " AND k.year=? AND k.month=? AND k.is_active=1", (now.year, now.month)))
 
 
@@ -108,7 +110,7 @@ def admin_context(request, conn):
         detail = "ISSUE 등록" if path.endswith("/new") else "ISSUE 수정"
     return {"admin_account": account, "admin_counts": counters(conn), "admin_active": active,
             "admin_section": section, "admin_title": detail or title, "admin_parent_title": title,
-            "admin_is_detail": bool(detail), "classification_kinds": KINDS}
+            "admin_is_detail": bool(detail), "classification_kinds": {k: v for k, v in KINDS.items() if k != "cafe_focus"}}
 
 
 class AdminUI:
@@ -144,7 +146,7 @@ class AdminUI:
             expression = {"name": "p.name", "address": "p.address", "id": "CAST(p.id AS TEXT)"}.get(field, "p.name || ' ' || p.address || ' ' || p.region")
             where.append("instr(lower(" + expression + "),lower(?))>0")
             args.append(q)
-        for param, column, allowed in [("source", "source_type", ("user", "jejuno")), ("verification", "verification_status", ("unverified", "community_confirmed", "jejuno_verified")), ("published", "published", ("0", "1"))]:
+        for param, column, allowed in [("source", "source_type", ("user", "jejuno")), ("verification", "verification_status", ("unverified", "jejuno_verified")), ("published", "published", ("0", "1"))]:
             if f.get(param) in allowed:
                 where.append("p." + column + "=?")
                 args.append(f[param])
@@ -160,8 +162,12 @@ class AdminUI:
             elif status == "hidden": where.append("p.published=0")
         year = integer(f.get("year"), today().year, 1900, today().year)
         if mode == "new":
-            where.extend(["c.slug IN ('cafe','food')", "c.is_active=1", "p.new_override!='hide'", "(p.opened_year=? OR (p.new_override='show' AND ?=?))"])
-            args.extend([year, year, today().year])
+            new_sql, new_args = new_clause()
+            where.append(new_sql)
+            args.extend(new_args)
+            if f.get("year"):
+                where.append("p.opened_year=?")
+                args.append(year)
         with closing(self.db()) as conn:
             select = "p.*,u.nickname,(SELECT count(*) FROM place_correction_suggestions s WHERE s.place_id=p.id AND s.status='pending') AS pending_count"
             rows, page = page_rows(conn, request, select, "FROM places p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN users u ON u.id=p.submitted_by_user_id", " AND ".join(where), args, "p.updated_at DESC,p.id DESC")

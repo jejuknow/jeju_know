@@ -11,7 +11,7 @@
     if(place.is_pick===true||place.is_pick===1)return {key:'pick',symbol:'★',label:'JEJU_KNOW PICK'};
     if(place.verification_status==='jejuno_verified')return {key:'verified',symbol:'✓',label:'JEJU_KNOW 확인'};
     const source=place.source_type==='user'?'사용자 등록':'JEJU_KNOW 등록';
-    const verification=place.verification_status==='community_confirmed'?'정보 확인됨':'미확인';
+    const verification='미확인';
     return {key:'unverified',symbol:'○',label:`${source} · ${verification}`};
   }
   function makeStatusBadge(place,doc) {

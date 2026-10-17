@@ -114,5 +114,6 @@ def decorate_details(conn, place):
         place[field + "_items"] = [line.strip() for line in (place.get(field) or "").splitlines() if line.strip()]
     place["classification_terms"] = [dict(r) for r in conn.execute("SELECT c.id,c.name,c.slug,c.type FROM categories c JOIN place_category_links l ON l.category_id=c.id WHERE l.place_id=? AND c.parent_id=? ORDER BY c.sort_order,c.id", (place["id"], place.get("category_id")))]
     terms = [r["name"] for r in place["classification_terms"]]
-    place["detail_features"] = list(dict.fromkeys([*terms, *place.get("features_public", [])]))
+    # Cafe presentation uses the same managed terms as FIND/MAP. Legacy tags stay stored.
+    place["detail_features"] = terms if place["category_slug"] == "cafe" else list(dict.fromkeys([*terms, *place.get("features_public", [])]))
     return place

@@ -17,7 +17,7 @@
 {% include "_submission_basic.html" %}
 <label>오픈 연도{{ ' *' if new_only else ' (선택)' }}<input type="number" name="opened_year" min="1900" max="{{ current_year }}" {% if new_only %}required{% endif %} value="{{ p.get('opened_year') or '' }}" placeholder="예: {{ current_year }}"></label>
 <label>오픈 월 (선택)<select name="opened_month"><option value="">월 미확인</option>{% for n in range(1,13) %}<option value="{{ n }}" {% if p.get('opened_month')|string==n|string %}selected{% endif %}>{{ n }}월</option>{% endfor %}</select></label>
-</div><p class="form-help">모르는 정보는 미확인으로 남습니다. NEW에는 현재 연도에 오픈한 카페·맛집이 표시됩니다.</p>
+</div><p class="form-help">모르는 정보는 미확인으로 남습니다. NEW에는 오픈 연월이 확인된 카페·맛집이 오픈 월부터 6개 달 동안 자동 표시됩니다. 오픈 월을 모르면 자동 노출되지 않습니다.</p>
 <label>한줄 소개 (선택)<textarea name="one_line" rows="3" maxlength="600">{{ p.get('one_line','') }}</textarea></label>
 <label>홈페이지·Instagram (선택)<input type="url" name="website_url" maxlength="2000" value="{{ p.get('website_url','') }}"></label>
 <p id="locationFeedback" class="form-help location-feedback" role="status" aria-live="polite">{{ '위치 확인됨 · 지도에서 확인하거나 수정할 수 있어요.' if p.get('latitude') is not none and p.get('longitude') is not none else '주소를 입력하면 지도 위치를 자동으로 찾습니다.' }}</p>
@@ -29,4 +29,4 @@
 <p class="form-help" data-submit-status role="status" aria-live="polite"></p><div class="form-actions"><a class="secondary-btn" href="/account/places">내 장소</a><button class="primary-inline" type="submit">{{ '수정사항 저장' if p.get('id') else '장소 등록하기' }}</button></div>
 </form></main>{% endblock %}
 
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/member-place.js?v=20261017-upgrade"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/admin-location.js?v=20261014-upload"></script><script src="/static/member-place.js?v=20261017-admin-cleanup"></script>{% endblock %}

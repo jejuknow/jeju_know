@@ -18,7 +18,7 @@
         <nav class="hero-board" aria-label="빠른 탐색">
           {% if site_settings.home_new %}<a href="/new" class="hero-board-card blue">
             <span class="hero-board-icon" aria-hidden="true">🆕</span>
-            <strong>제주 신상</strong><p>새로 생긴 카페와 맛집</p><small>{{ current_year }} NEW →</small>
+            <strong>제주 신상</strong><p>새로 생긴 카페와 맛집</p><small>최근 6개월 NEW →</small>
           </a>{% endif %}
           {% if site_settings.home_issue %}<a href="{{ url_for('news_list') }}" class="hero-board-card green">
             <span class="hero-board-icon" aria-hidden="true">📣</span>
@@ -83,4 +83,4 @@
 </main>
 <footer><div class="wrap footer-inner">{{ brand_logo(variant='footer-brand') }}<p>{{ site_settings.site_description }} · <a href="{{ url_for('admin_dashboard') }}">관리자</a>{% if site_settings.instagram_url %} · <a href="{{ site_settings.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}</p></div></footer>
 {% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261015-admin"></script><script src="/static/home-cards.js?v=20261012-map-flow"></script><script src="/static/app.js?v=20261015-admin"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261017-admin-cleanup"></script><script src="/static/home-cards.js?v=20261012-map-flow"></script><script src="/static/app.js?v=20261017-admin-cleanup"></script>{% endblock %}

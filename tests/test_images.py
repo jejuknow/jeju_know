@@ -14,6 +14,7 @@ from app import create_app
 from auth_security import hash_password
 from image_migrations import VERSION, backup_before_image_migration
 from image_uploads import MAX_FILE_BYTES, ImagePlan
+from legacy_images import add_fifth
 
 
 def picture(fmt='PNG', size=(120, 180), color='navy', exif=None):
@@ -98,9 +99,10 @@ class ImageUploadTest(unittest.TestCase):
         self.assertIn('https://example.com/legacy.jpg',self.visitor.get('/news/'+post['slug']).text)
 
     def test_place_five_images_gallery_primary_pick_and_restart(self):
-        files = [(f'image_{n}',(f'photo{n}.png',picture(color='green'),'image/png')) for n in range(5)]
+        files = [(f'image_{n}',(f'photo{n}.png',picture(color='green'),'image/png')) for n in range(4)]
         self.assertEqual(self.save_place(files=files).status_code,303)
         place = self.rows('SELECT * FROM places')[0]
+        add_fifth(self.store, self.database, place['id'])
         images = self.rows('SELECT * FROM images ORDER BY sort_order')
         self.assertEqual([r['sort_order'] for r in images],list(range(5)))
         result = self.visitor.get('/api/places').json()[0]
@@ -258,7 +260,7 @@ class ImageUploadTest(unittest.TestCase):
         self.save_place(files=[self.file()],image_url='https://example.com/old.png')
         place=self.rows('SELECT * FROM places')[0]
         html=self.admin.get(f"/admin/places/{place['id']}/edit").text
-        self.assertEqual(html.count('type="file"'),5)
+        self.assertEqual(html.count('type="file"'),4)
         self.assertIn('enctype="multipart/form-data"',html)
         self.assertIn('name="image_url" maxlength="2048" value="https://example.com/old.png"',html)
         self.assertEqual(self.client.get('/issues/new').text.count('type="file"'),1)

@@ -10,6 +10,7 @@ import test_community
 from auth_security import hash_password
 from image_uploads import optimize_image, ImageError
 from image_limits import MAX_FILE_BYTES, MAX_PIXELS, FORM_BYTES
+from legacy_images import add_fifth
 
 
 def photo(fmt='JPEG', size=(800,600), exif=None):
@@ -71,7 +72,7 @@ class MemberMobileUploadTest(unittest.TestCase):
 
     def test_four_images_coordinates_find_new_map_and_restart(self):
         files=[(f'image_{n}',('phone.heic',photo('HEIF'),'image/heic')) for n in range(4)]
-        response=self.submit(files,latitude='33.4507',longitude='126.5707',opened_year=str(self.now.year))
+        response=self.submit(files,latitude='33.4507',longitude='126.5707',opened_year=str(self.now.year),opened_month=self.now.month)
         self.assertEqual(response.status_code,303,response.text)
         p=self.rows('SELECT * FROM places')[0]
         self.assertEqual((p['latitude'],p['longitude']),(33.4507,126.5707))
@@ -92,8 +93,9 @@ class MemberMobileUploadTest(unittest.TestCase):
         self.assertEqual(self.submit(files).status_code,400)
         self.assertEqual(self.rows('SELECT * FROM places'),[])
         p=self.place(map_url='https://map.kakao.com/example')
-        response=self.admin.post(f"/admin/places/{p['id']}/edit",data={**self.form(), 'csrf_token':self.csrf(self.admin,'/admin'),'published':'1','map_url':p['map_url']},files=files,follow_redirects=False)
+        response=self.admin.post(f"/admin/places/{p['id']}/edit",data={**self.form(), 'csrf_token':self.csrf(self.admin,'/admin'),'published':'1','map_url':p['map_url']},files=files[:4],follow_redirects=False)
         self.assertEqual(response.status_code,303)
+        add_fifth(self.app.state.image_store, self.database, p['id'])
         before=self.rows('SELECT * FROM images ORDER BY sort_order')
         html=self.member.get(f"/places/{p['id']}/edit").text
         self.assertEqual(html.count('type="file"'),4)

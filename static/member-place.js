@@ -1,7 +1,7 @@
-/* The member form uses the same DB taxonomy as FIND, MAP and administration. */
+/* Shared visit controls; member-only optional classifications keep their own toggle. */
 (function () {
   'use strict';
-  const category=document.getElementById('memberPlaceCategory');
+  const category=document.querySelector('#memberPlaceCategory, .place-form select[name="category_id"]');
   if(!category)return;
   const form=category.form,details=form.elements.details_enabled;
   function show(group,visible){
@@ -9,6 +9,7 @@
     group.querySelectorAll('input,select,textarea').forEach(input=>{input.disabled=!visible;});
   }
   function update(){
+    if(details){
     const expanded=details.checked;
     document.getElementById('submissionDetails').hidden=!expanded;
     details.setAttribute('aria-expanded',String(expanded));
@@ -18,6 +19,7 @@
       group.hidden=!active||!group.querySelector('input');
       group.querySelectorAll('input').forEach(input=>{input.disabled=!active||!expanded;});
     });
+    }
     const slug=category.selectedOptions[0]?.dataset.slug;
     document.querySelectorAll('[data-menu-field]').forEach(group=>show(group,['cafe','food'].includes(slug)));
   }
@@ -39,6 +41,6 @@
     const digits=price.value.trim().replace(/[,원\s]/g,'');
     if(/^\d{1,8}$/.test(digits))price.value=Number(digits).toLocaleString('ko-KR');
   });
-  details.addEventListener('change',update);
+  details?.addEventListener('change',update);
   category.addEventListener('change',update);update();hours();closed();
 })();

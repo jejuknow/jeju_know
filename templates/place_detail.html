@@ -16,7 +16,6 @@
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
       {% if place.website_url %}<p><a href="{{ place.website_url }}" target="_blank" rel="noopener noreferrer">홈페이지·Instagram →</a></p>{% endif %}
       <p class="detail-lead">{{ place.one_line }}</p>
-      {% if place.cafe_focus_labels %}<section class="detail-section"><h2>카페 성향</h2><div class="tag-row">{% for item in place.cafe_focus_labels %}<span class="tag">{{ item }}</span>{% endfor %}</div></section>{% endif %}
       <section class="detail-section"><h2>한눈에 보기</h2><dl class="place-glance">
         {% for field,label in [('business_hours','🕒 영업시간'),('closed_days','📅 휴무일'),('phone','☎ 전화'),('tamnaneunjeon_status','탐나는전'),('reservation_status','📞 예약'),('waiting_status','👥 웨이팅'),('parking_status','🚗 주차')] %}<div><dt>{{ label }}</dt><dd{% if field == 'business_hours' %} class="place-hours"{% endif %}>{% if field == 'phone' and place.phone_href %}<a href="{{ place.phone_href }}">{{ place.phone }}</a>{% else %}{{ place.get(field) or '미확인' }}{% endif %}{% if field == 'business_hours' and place.last_order %}<small>라스트오더 {{ place.last_order }}</small>{% endif %}</dd></div>{% endfor %}
       {% if place.category_slug in ('cafe','food') %}<div><dt>🍽 대표메뉴</dt><dd class="place-paragraph">{{ place.signature_menu or '미확인' }}</dd></div><div><dt>💳 가격</dt><dd>{{ place.price_label }}</dd></div>{% endif %}
