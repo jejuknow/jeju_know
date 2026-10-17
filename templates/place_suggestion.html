@@ -6,4 +6,4 @@
 <label id="suggestionStatus" hidden>변경된 이용 상태<select name="new_value" disabled>{% for value in status_options %}<option value="{{ value }}">{{ value }}</option>{% endfor %}</select></label>
 <p class="form-help" id="suggestionHelp">변경된 내용을 입력해주세요.</p>
 <label>확인 근거·이유<textarea name="reason" required minlength="5" maxlength="2000" rows="4" placeholder="공식 안내, 현장 안내 또는 변경 정보를 알게 된 경위를 적어주세요."></textarea></label><div class="form-actions"><a class="secondary-btn" href="/place/{{ place.slug }}">장소로 돌아가기</a><button class="primary-inline" type="submit">수정 제안 보내기</button></div></form></main>{% endblock %}
-{% block scripts %}<script src="/static/place-suggestion.js?v=20261013-details"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-suggestion.js?v=20261017-basic-info"></script>{% endblock %}

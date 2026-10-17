@@ -34,7 +34,7 @@ class PlaceDetailsTest(unittest.TestCase):
         return self.rows('SELECT * FROM places ORDER BY id DESC')[0]
 
     def test_admin_create_edit_and_public_detail(self):
-        facts = dict(business_hours='10:00 ~ 18:00', closed_days='매주 화요일', last_order='17:30',
+        facts = dict(phone='064-123-4567',business_hours='10:00 ~ 18:00', closed_days='매주 화요일', last_order='17:30',
                      signature_menu='필터커피\n천연발효빵', recommended_menu='시즌 필터커피\n오늘의 빵',
                      coffee_taste='밸런스형', dessert_note='직접 만든 빵', food_taste_note='',
                      reservation_status='제한', waiting_status='주말·성수기 있음', parking_status='가능',
@@ -94,7 +94,7 @@ class PlaceDetailsTest(unittest.TestCase):
         self.assertNotIn('<script>alert(1)</script>',page)
 
     def test_member_cannot_write_admin_details(self):
-        for field in ('reason','is_pick','verification_status','checked_at','business_hours'):
+        for field in ('reason','is_pick','verification_status','checked_at','signature_menu'):
             self.assertEqual(self.create(**{field:'forged'}).status_code,403)
         self.assertFalse(self.rows('SELECT id FROM places'))
 

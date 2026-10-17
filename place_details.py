@@ -1,12 +1,18 @@
 """Optional visit facts, kept separate from editorial recommendations and filters."""
 from datetime import date
+import re
+import unicodedata
 
 TEXT_LIMITS = {
     "business_hours": 200, "closed_days": 200, "last_order": 100,
     "signature_menu": 1000, "recommended_menu": 1000,
     "dessert_note": 300, "food_taste_note": 300,
 }
+# Keep the historical detail migration's field list stable.
+CONTACT_TEXT_LIMITS = {"phone": 80}
+BASIC_INFO_LIMITS = {"business_hours": TEXT_LIMITS["business_hours"], **CONTACT_TEXT_LIMITS}
 FIELD_LABELS = {
+    "phone": "전화번호",
     "business_hours": "영업시간", "closed_days": "휴무일", "last_order": "라스트오더",
     "signature_menu": "대표 메뉴", "recommended_menu": "추천 메뉴",
     "dessert_note": "디저트 특징", "food_taste_note": "음식/맛 특징",
@@ -16,18 +22,36 @@ USE_OPTIONS = ("미확인", "가능", "불가", "제한")
 WAITING_OPTIONS = ("미확인", "없음", "있음", "주말·성수기 있음")
 COFFEE_OPTIONS = ("미확인", "산미 있음", "산미 적음", "고소한 편", "밸런스형", "기타")
 CHOICE_OPTIONS = {"reservation_status": USE_OPTIONS, "waiting_status": WAITING_OPTIONS, "coffee_taste": COFFEE_OPTIONS}
-DETAIL_FIELDS = (*TEXT_LIMITS, *CHOICE_OPTIONS)
+DETAIL_FIELDS = (*TEXT_LIMITS, *CONTACT_TEXT_LIMITS, *CHOICE_OPTIONS)
+
+
+def normalize_phone(value):
+    return " ".join(str(value or "").split())
+
+
+def phone_link(value):
+    # Loose input is retained as text; only ordinary numbers become dial links.
+    number = unicodedata.normalize("NFKC", normalize_phone(value))
+    if not re.fullmatch(r"\+?[0-9][0-9\s().-]*", number):
+        return ""
+    digits = re.sub(r"[^0-9+]", "", number)
+    return "tel:" + digits if len(digits.lstrip("+")) >= 3 else ""
 
 
 def parse_details(form, existing=None):
     previous = dict(existing or {})
-    return {field: str(form.get(field, previous.get(field) or ("미확인" if field in CHOICE_OPTIONS else ""))).strip()
+    data = {field: str(form.get(field, previous.get(field) or ("미확인" if field in CHOICE_OPTIONS else ""))).strip()
             for field in DETAIL_FIELDS}
+    data["phone"] = normalize_phone(data["phone"])
+    return data
 
 
 def validate_detail_value(field, value):
-    if field in TEXT_LIMITS and len(value) > TEXT_LIMITS[field]:
-        raise ValueError(f"{FIELD_LABELS[field]}은 {TEXT_LIMITS[field]:,}자 이내로 입력해주세요.")
+    limits = {**TEXT_LIMITS, **CONTACT_TEXT_LIMITS}
+    if field == "phone":
+        value = normalize_phone(value)
+    if field in limits and len(value) > limits[field]:
+        raise ValueError(f"{FIELD_LABELS[field]}은 {limits[field]:,}자 이내로 입력해주세요.")
     if field in CHOICE_OPTIONS and value not in CHOICE_OPTIONS[field]:
         raise ValueError(f"{FIELD_LABELS[field]} 선택값을 확인해주세요.")
     if field == "parking_status" and value not in USE_OPTIONS:
@@ -39,7 +63,7 @@ def validate_details(data):
     for field in DETAIL_FIELDS:
         if field in CHOICE_OPTIONS and not data[field]:
             data[field] = "미확인"
-        validate_detail_value(field, data[field])
+        data[field] = validate_detail_value(field, data[field])
     checked = data["checked_at"]
     if checked:
         try:
@@ -58,6 +82,7 @@ def save_details(conn, place_id, data):
 
 
 def decorate_details(conn, place):
+    place["phone_href"] = phone_link(place.get("phone"))
     category = conn.execute("SELECT slug FROM categories WHERE id=?", (place.get("category_id"),)).fetchone()
     place["category_slug"] = category[0] if category else ""
     for field in (*CHOICE_OPTIONS, "parking_status", "pet_status", "child_status", "accessible_status"):

@@ -18,3 +18,5 @@
 .place-form [hidden]{display:none}.place-form .place-section-body.check-grid{display:flex}
 @media(max-width:900px){.detail-shell{grid-template-columns:minmax(0,1fr)}.detail-media .detail-visual{aspect-ratio:4/3}.detail-media .place-gallery{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}}
 @media(max-width:640px){.place-admin-section{padding:20px}.place-facts>div{grid-template-columns:76px minmax(0,1fr);gap:8px}.place-glance,.place-menu-grid{grid-template-columns:minmax(0,1fr)}.detail-media .place-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.place-glance dd,.place-menu-grid ul{font-size:14px;line-height:1.65}}
+
+.place-glance .place-hours{white-space:pre-line}

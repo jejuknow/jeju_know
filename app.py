@@ -33,6 +33,7 @@ from community_routes import register_community_routes
 from admin_ui import AdminUI, admin_context, admin_return
 from admin_settings import read_settings, catalog
 from admin_ui_migrations import backup_before_admin_ui, migrate_admin_ui
+from basic_place_info_migrations import backup_before_basic_place_info, migrate_basic_place_info
 from starlette.concurrency import run_in_threadpool
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -188,6 +189,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        basic_info_backup_path = backup_before_basic_place_info(app.state.database)
         admin_backup_path = backup_before_admin_ui(app.state.database)
         focus_backup_path = backup_before_cafe_focus(app.state.database)
         detail_backup_path = backup_before_place_detail_migration(app.state.database)
@@ -294,6 +296,7 @@ def create_app(test_config=None):
         migrate_place_details(app.state.database, detail_backup_path)
         migrate_cafe_focus(app.state.database, focus_backup_path)
         migrate_admin_ui(app.state.database, admin_backup_path)
+        migrate_basic_place_info(app.state.database, basic_info_backup_path)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
