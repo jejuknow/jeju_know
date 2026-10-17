@@ -4,6 +4,17 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 const {dimensions,boundedSize}=require('../static/image-uploads.js');
 
+test('photo picker diagnostics are opt-in, local, and contain only name/type/size',()=>{
+ const logs=[];
+ const context={module:{exports:{}},URLSearchParams,location:{search:''},console:{debug:(...args)=>logs.push(args)}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../static/image-uploads.js'),'utf8'),context);
+ const file={name:'IMG_1234.JPG',type:'image/jpeg',size:2192514,privateMetadata:'never log'};
+ context.module.exports.debugPhoto(file);assert.equal(logs.length,0);
+ context.location.search='?photo_debug=1';context.module.exports.debugPhoto(file);
+ assert.equal(logs.length,1);
+ assert.deepEqual(JSON.parse(JSON.stringify(logs[0][1])),{name:file.name,type:file.type,size:file.size});
+});
+
 test('phone image headers and portrait bounds',()=>{
  const png=Buffer.alloc(24);png.writeUInt32BE(0x89504e47);png.writeUInt32BE(6048,16);png.writeUInt32BE(8064,20);
  assert.deepEqual(dimensions(png),{width:6048,height:8064});

@@ -2,6 +2,13 @@
 (function (root) {
   'use strict';
   const MAX_BYTES=32*1024*1024, MAX_PIXELS=50000000, EDGE=1920;
+  function debugPhoto(file) {
+    // Explicit, local-only diagnostics for Safari's picker/transcoding behavior.
+    // No EXIF, account/session data, or image contents are logged or transmitted.
+    if(new URLSearchParams(root.location?.search||'').get('photo_debug')==='1') {
+      root.console?.debug('[JEJU_KNOW photo selection]',{name:file.name,type:file.type,size:file.size});
+    }
+  }
   function dimensions(bytes) {
     const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
     if(bytes.length>=24&&view.getUint32(0)===0x89504e47) return {width:view.getUint32(16),height:view.getUint32(20)};
@@ -42,7 +49,7 @@
     } catch (_) { return file; }
     finally { bitmap?.close(); }
   }
-  if(typeof module==='object'&&module.exports)module.exports={dimensions,boundedSize,optimizePhoto};
+  if(typeof module==='object'&&module.exports)module.exports={dimensions,boundedSize,optimizePhoto,debugPhoto};
   if(typeof document==='undefined')return;
   let queue=Promise.resolve();
   document.querySelectorAll('form').forEach(form=>{
@@ -87,6 +94,7 @@
         const revision=++state.revision,file=input.files[0];state.file=null;state.busy=false;
         input.setCustomValidity('');status.textContent='';retry.hidden=true;
         if(!file){render();busy();return;}
+        debugPhoto(file);
         if(file.size>MAX_BYTES){
           status.textContent='파일이 너무 큽니다. 사진은 한 장당 32MB까지 처리할 수 있어요.';
           input.setCustomValidity(status.textContent);render();busy();return;

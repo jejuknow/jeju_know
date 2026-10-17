@@ -11,6 +11,7 @@ from unittest.mock import patch
 from PIL import Image
 import test_community
 from test_mobile_uploads import photo
+from test_still_photos import encoded_photo
 from auth_security import hash_password
 from app import create_app
 from image_uploads import optimize_image, ImageError
@@ -158,6 +159,25 @@ class SubmissionUpgradeTest(unittest.TestCase):
         with patch('community_routes.rate_limited',return_value=True):
             self.assertEqual(self.member.post(endpoint,data={'csrf_token':self.csrf(self.member)},files={'photo':('x.jpg',photo(),'image/jpeg')}).status_code,429)
         self.assertFalse(self.rows('SELECT * FROM images'))
+
+    def test_mpo_prepare_and_save_while_real_animations_remain_blocked(self):
+        endpoint='/api/place-photos/prepare'
+        raw=encoded_photo('MPO',multiple=True)
+        result=self.member.post(endpoint,data={'csrf_token':self.csrf(self.member)},files={'photo':('IMG_1234.JPG',raw,'image/jpeg')})
+        self.assertEqual(result.status_code,200)
+        with Image.open(io.BytesIO(result.content)) as image:
+            self.assertEqual(image.format,'WEBP')
+            self.assertEqual(image.n_frames,1)
+        # Direct uploads (without browser JS) must use the same primary-image policy.
+        saved=self.member.post('/map/register',data={**self.form(),'csrf_token':self.csrf(self.member)},files={'image_0':('IMG_1234.JPG',raw,'image/jpeg')},follow_redirects=False)
+        self.assertEqual(saved.status_code,303,saved.text[:200])
+        before=self.rows('SELECT * FROM images')
+        self.assertEqual(len(before),1)
+        for fmt in ('PNG','WEBP','GIF'):
+            rejected=self.member.post(endpoint,data={'csrf_token':self.csrf(self.member)},files={'photo':('photo.jpg',encoded_photo(fmt,multiple=True,duration=100),'image/jpeg')})
+            self.assertEqual(rejected.status_code,400)
+            self.assertIn('애니메이션',rejected.json()['error'])
+        self.assertEqual(before,self.rows('SELECT * FROM images'))
 
 
 class SubmissionMigrationTest(unittest.TestCase):

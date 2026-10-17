@@ -22,6 +22,8 @@ FORMATS = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".webp": "WEBP",
            ".heic": "HEIF", ".heif": "HEIF"}
 MIME_TYPES = {"JPEG": {"image/jpeg", "image/jpg"}, "PNG": {"image/png"}, "WEBP": {"image/webp"},
               "HEIF": {"image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"}}
+# GIF is inspected only to return a precise rejection, never accepted for storage.
+INSPECT_FORMATS = [*MIME_TYPES, "GIF"]
 # Keep libheif/Pillow security limits. Ignore depth/auxiliary images and decode serially.
 register_heif_opener(decode_threads=1, depth_images=False, aux_images=False)
 KINDS = {"places": "place_id", "issues": "issue_id"}
@@ -67,6 +69,13 @@ def optimize_upload(stream, filename, content_type):
 def _optimize_image(raw, filename, content_type):
     expected = None
     dimensions = None
+    frames = None
+    selected_frame = None
+    # Keep arbitrary filenames out of server logs; full picker metadata is available
+    # only in the browser's opt-in photo_debug console (never sent as extra telemetry).
+    suffix = Path(filename or "").suffix.lower()
+    suffix = suffix if suffix in FORMATS or suffix in {".mpo", ".gif"} else "other"
+    mime = re.sub(r"[^a-zA-Z0-9.+_/-]", "", (content_type or "")[:80])
     try:
         # Mobile pickers can transcode HEIC to JPEG without updating name/MIME.
         # Decode only our format allowlist; names and MIME are hints, never proof.
@@ -76,13 +85,21 @@ def _optimize_image(raw, filename, content_type):
             raise ImageError("사진 파일이 비어 있거나 손상되어 있습니다.")
         if len(raw) > MAX_FILE_BYTES:
             raise ImageError("파일이 너무 큽니다. 사진은 한 장당 32MB까지 처리할 수 있어요.")
-        with Image.open(io.BytesIO(raw), formats=list(MIME_TYPES)) as check:
+        with Image.open(io.BytesIO(raw), formats=INSPECT_FORMATS) as check:
             dimensions = check.size
             expected = check.format
+            frames = getattr(check, "n_frames", 1)
+            selected_frame = check.tell()
             if check.width * check.height > MAX_PIXELS:
                 raise ImageError("사진 크기가 처리 가능한 범위를 넘었습니다. 5,000만 화소 이하의 사진을 선택해주세요.")
-            if expected != "HEIF" and getattr(check, "is_animated", False):
-                raise ImageError("움직이는 이미지는 지원하지 않습니다. 정지 이미지로 선택해주세요.")
+            # MPO is a JPEG still-image container (e.g. a phone photo plus an
+            # auxiliary image); Pillow labels it is_animated merely for n_frames > 1.
+            # HEIF similarly contains a primary still plus optional auxiliary images.
+            # Preserve the decoder-selected primary; only timed formats are rejected.
+            if expected in {"PNG", "WEBP", "GIF"} and frames > 1:
+                raise ImageError("여러 프레임의 애니메이션 이미지는 지원하지 않습니다. 정지 사진을 선택해주세요.")
+            if expected not in {*MIME_TYPES, "MPO"}:
+                raise ImageError("지원하지 않는 이미지 형식입니다. JPG, PNG, WebP, HEIC·HEIF 사진을 선택해주세요.")
             check.verify()
         with Image.open(io.BytesIO(raw), formats=list(MIME_TYPES)) as source:
             # JPEG decoder scaling / compatible HEIF thumbnails reduce peak memory.
@@ -96,16 +113,18 @@ def _optimize_image(raw, filename, content_type):
                     clean.paste(pixels)
                     result = io.BytesIO()
                     clean.save(result, "WEBP", quality=86, method=4, exif=b"", icc_profile=None)
-                    logger.info("Image optimized format=%s bytes=%d dimensions=%s output_bytes=%d output=%sx%s", expected, len(raw), dimensions, result.tell(), clean.width, clean.height)
+                    logger.info("Image optimized format=%s frames=%s selected_frame=%s input_suffix=%s input_mime=%s bytes=%d dimensions=%s output_bytes=%d output=%sx%s", expected, frames, selected_frame, suffix, mime, len(raw), dimensions, result.tell(), clean.width, clean.height)
                     return result.getvalue(), clean.width, clean.height
-    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, RuntimeError, MemoryError, Image.DecompressionBombError) as error:
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, RuntimeError, EOFError, MemoryError, Image.DecompressionBombError) as error:
         # Never log filenames, EXIF, GPS, credentials or the request body.
-        logger.warning("Image processing failed format=%s bytes=%d dimensions=%s error=%s reason=%s", expected, len(raw), dimensions, type(error).__name__, str(error) if isinstance(error, ImageError) else "decoder failure", exc_info=not isinstance(error, ImageError))
+        logger.warning("Image processing failed format=%s frames=%s selected_frame=%s input_suffix=%s input_mime=%s bytes=%d dimensions=%s error=%s reason=%s", expected, frames, selected_frame, suffix, mime, len(raw), dimensions, type(error).__name__, str(error) if isinstance(error, ImageError) else "decoder failure", exc_info=not isinstance(error, ImageError))
         if isinstance(error, ImageError):
             raise
         if isinstance(error, UnidentifiedImageError):
             known_header = raw.startswith((b'\xff\xd8', b'\x89PNG', b'RIFF')) or (len(raw) >= 12 and raw[4:8] == b'ftyp')
             message = "사진 파일이 손상되어 있습니다." if known_header else "지원되지 않는 이미지입니다. JPG, PNG, WebP, HEIC 사진을 선택해주세요."
+        elif isinstance(error, Image.DecompressionBombError):
+            message = "사진 크기가 처리 가능한 범위를 넘었습니다. 5,000만 화소 이하의 사진을 선택해주세요."
         elif isinstance(error, MemoryError):
             message = "사진을 처리하지 못했습니다. 잠시 후 다시 시도해주세요."
         else:
