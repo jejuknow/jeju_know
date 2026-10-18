@@ -10,6 +10,9 @@
     document.getElementById('categoryEmoji').textContent=({food:'🍚',cafe:'☕',attraction:'📍'})[slug]||'📍';
     document.querySelectorAll('[data-place-categories]').forEach(group=>{
       group.hidden=!group.dataset.placeCategories.split(' ').includes(slug);
+      if(group.hasAttribute('data-legacy-tags')){
+        group.querySelectorAll('input').forEach(input=>{input.disabled=group.hidden;});
+      }
       // Keep optional facts enabled: category switches must not erase saved input.
     });
   }

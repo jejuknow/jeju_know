@@ -475,7 +475,9 @@ def create_app(test_config=None):
             "image_url": str(form.get("image_url", existing["image_url"] if existing else "")).strip(),
             "is_pick": 1 if form.get("is_pick") == "1" else 0,
             "companions": form.getlist("companions"),
-            "features": form.getlist("features"),
+            # Disabled/omitted legacy controls must not clear existing JSON tags.
+            # The presence marker still allows an explicit clear in the visible editor.
+            "features": form.getlist("features") if "features" in form or form.get("legacy_features_present") == "1" else parse_json_list(existing["features"] if existing else None),
             "term_ids": form.getlist("term_ids") if form.get("taxonomy_present") == "1" else None,
             "cafe_focus": parse_focus(form, existing),
             "parking_status": str(form.get("parking_status", "미확인")),
@@ -553,6 +555,10 @@ def create_app(test_config=None):
         if not category or category["type"] != "place" or (not category["is_active"] and (not existing or existing["category_id"] != category["id"])):
             return "활성 카테고리를 선택해 주세요. 기존 장소의 비활성 분류는 유지할 수 있습니다."
         data["category_id"], data["category"] = category["id"], category["name"]
+        if category["slug"] == "food" and existing:
+            # Food hides this editor, including after a category switch. Preserve
+            # the saved tags even if a stale browser submits cafe-only edits.
+            data["features"] = parse_json_list(existing["features"])
         data["emoji"] = {"food": "🍚", "cafe": "☕", "attraction": "📍"}.get(category["slug"], "📍")
         conn = connect_db()
         try:

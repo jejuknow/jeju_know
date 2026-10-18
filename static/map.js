@@ -12,7 +12,7 @@
     if(place.verification_status==='jejuno_verified')return {key:'verified',symbol:'✓',label:'JEJU_KNOW 확인'};
     const source=place.source_type==='user'?'사용자 등록':'JEJU_KNOW 등록';
     const verification='미확인';
-    return {key:'unverified',symbol:'○',label:`${source} · ${verification}`};
+    return {key:'unverified',symbol:'●',label:`${source} · ${verification}`};
   }
   function makeStatusBadge(place,doc) {
     const status=placeStatus(place),badge=doc.createElement('span');
@@ -20,10 +20,11 @@
     badge.textContent=`${status.symbol} ${status.label}`;
     return badge;
   }
-  function makeStatusPin(place,index,select,doc) {
+  function makeStatusPin(place,select,doc) {
     const status=placeStatus(place),pin=doc.createElement('button');
     pin.className=`map-pin map-status--${status.key}`;pin.type='button';
-    pin.textContent=`${status.symbol} ${index}`;
+    const shape=doc.createElement('span');shape.className='map-pin-shape';
+    shape.textContent=status.symbol;shape.setAttribute('aria-hidden','true');pin.append(shape);
     pin.setAttribute('aria-label',`${place.name} 지도 마커 · ${status.label}`);
     pin.setAttribute('title',status.label);pin.setAttribute('aria-pressed','false');
     pin.addEventListener('click',select);return pin;
@@ -48,8 +49,8 @@
         pins.forEach(pin => pin.overlay.setMap(null));
         pins.clear();
         visible = places.filter(hasCoordinates);
-        visible.forEach((place, index) => {
-          const node = makePin(place,index+1,() => onSelect(place.id,true));
+        visible.forEach(place => {
+          const node = makePin(place,() => onSelect(place.id,true));
           const overlay = new maps.CustomOverlay({map,position:new maps.LatLng(place.latitude,place.longitude),content:node,yAnchor:1,zIndex:1,clickable:true});
           pins.set(place.id,{node,overlay});
         });
@@ -233,7 +234,7 @@
   sheetToggle.addEventListener('click',()=>setListExpanded(!workspace.classList.contains('is-list-expanded')));
   renderDetails();search(false);
   root.JejunoKakao.load(workspace.dataset.kakaoKey).then(maps=>{
-    view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,index,select)=>makeStatusPin(place,index,select,document));
+    view=createMapView(maps,document.getElementById('kakaoMap'),selectPlace,(place,select)=>makeStatusPin(place,select,document));
     view.render(state.places);fitButton.disabled=!state.places.some(hasCoordinates);updateNotice();
     new ResizeObserver(()=>view.resize()).observe(document.getElementById('kakaoMap'));
     if(state.selected!==null) view.select(state.selected);

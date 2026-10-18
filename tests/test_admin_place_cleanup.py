@@ -32,6 +32,40 @@ class AdminPlaceCleanupTest(unittest.TestCase):
     def save(self, place, **data):
         return self.post(self.admin, f"/admin/places/{place['id']}/edit", **self.form(published='1', **data))
 
+    def test_hidden_food_legacy_tags_preserved_with_subtypes(self):
+        p = self.place(category_id=self.category['food'])
+        tags = ['뷰', '감성', '이전 사용자 정의 태그']
+        self.execute('UPDATE places SET features=? WHERE id=?', (json.dumps(tags), p['id']))
+        term = self.rows("SELECT id FROM categories WHERE slug='food-korean'")[0]['id']
+        self.execute('INSERT INTO place_category_links VALUES (?,?)', (p['id'], term))
+        for extra in ({}, {'legacy_features_present':'1', 'features':['다른 태그']}):
+            response = self.save(p, category_id=self.category['food'], taxonomy_present='1', term_ids=[str(term)], **extra)
+            self.assertEqual(response.status_code,303)
+            self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),tags)
+            self.assertEqual(self.rows('SELECT category_id FROM place_category_links'),[{'category_id':term}])
+        # A failed save must also leave the original tags intact.
+        self.assertEqual(self.save(p, category_id=self.category['food'], name='').status_code,400)
+        self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),tags)
+
+    def test_cafe_attraction_explicit_tag_edit_clear_and_omitted_preservation(self):
+        p = self.place()
+        for slug in ['cafe','attraction']:
+            self.assertEqual(self.save(p,category_id=self.category[slug],legacy_features_present='1',features=['사진','뷰']).status_code,303)
+            self.assertEqual(self.save(p,category_id=self.category[slug]).status_code,303)
+            self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),['사진','뷰'])
+            self.assertEqual(self.save(p,category_id=self.category[slug],legacy_features_present='1').status_code,303)
+            self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),[])
+
+    def test_switch_to_food_preserves_saved_legacy_tags_not_hidden_draft(self):
+        p = self.place()
+        self.execute('UPDATE places SET features=? WHERE id=?',(json.dumps(['감성','뷰']),p['id']))
+        self.assertEqual(self.save(p,category_id=self.category['food'],legacy_features_present='1',features=['삭제하면 안 됨']).status_code,303)
+        self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),['감성','뷰'])
+        self.assertEqual(self.save(p,category_id=self.category['cafe']).status_code,303)
+        html = self.admin.get(f"/admin/places/{p['id']}/edit").text
+        self.assertIn('data-legacy-tags data-place-categories="cafe attraction"',html)
+        self.assertIn('value="감성" checked',html)
+
     def test_category_emoji_server_authority_and_legacy_focus_preserved(self):
         p = self.place()
         self.execute('UPDATE places SET cafe_focus=?', (json.dumps(['space']),))

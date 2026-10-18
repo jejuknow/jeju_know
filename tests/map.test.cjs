@@ -10,7 +10,7 @@ function fixture(){
   CustomOverlay:class{constructor(options){Object.assign(this,options);calls.overlays.push(this);}setMap(map){this.map=map;}setZIndex(value){this.zIndex=value;}}
  };
  const selected=[];
- const view=createMapView(sdk,{},(id,fromMarker)=>selected.push([id,fromMarker]),(place,index,click)=>({place,index,click,attributes:{},setAttribute(key,value){this.attributes[key]=value;}}));
+ const view=createMapView(sdk,{},(id,fromMarker)=>selected.push([id,fromMarker]),(place,click)=>({place,click,attributes:{},setAttribute(key,value){this.attributes[key]=value;}}));
  return {calls,view,selected};
 }
 const cafe={id:1,latitude:33.4,longitude:126.3};
@@ -58,18 +58,21 @@ test('authorship, missing status and community confirmation never imply editoria
 });
 
 test('marker and card share status, with accessible text and a distinct symbol for each status',()=>{
- const doc={createElement:tag=>({tag,attributes:{},events:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(k,v){this.events[k]=v;}})};
+ const doc={createElement:tag=>({tag,children:[],append(child){this.children.push(child);},attributes:{},events:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(k,v){this.events[k]=v;}})};
  for(const data of [{source_type:'user'},{verification_status:'jejuno_verified'},{is_pick:true,verification_status:'jejuno_verified'}]){
   const place={name:'<img onerror=alert(1)>',...data},status=placeStatus(place);
   let clicks=0;
-  const pin=makeStatusPin(place,2,()=>clicks++,doc),badge=makeStatusBadge(place,doc);
+  const pin=makeStatusPin(place,()=>clicks++,doc),badge=makeStatusBadge(place,doc);
   assert.ok(pin.className.includes(`map-status--${status.key}`));
   assert.ok(badge.className.includes(`map-status--${status.key}`));
-  assert.equal(pin.textContent,`${status.symbol} 2`);
+  assert.equal(pin.children[0].textContent,status.symbol);
+  assert.equal(pin.children[0].attributes['aria-hidden'],'true');
+  assert.doesNotMatch(pin.children[0].textContent,/\d/);
   assert.equal(badge.textContent,`${status.symbol} ${status.label}`);
   assert.ok(pin.attributes['aria-label'].includes(status.label));
   assert.equal(pin.innerHTML,undefined);
   assert.equal(pin.attributes['aria-pressed'],'false');
+  const originalClass=pin.className;pin.setAttribute('aria-pressed','true');assert.equal(pin.className,originalClass);
   pin.events.click();assert.equal(clicks,1);
  }
 });
