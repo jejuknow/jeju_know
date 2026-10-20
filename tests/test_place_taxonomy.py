@@ -30,7 +30,7 @@ class TaxonomyTest(unittest.TestCase):
     def test_existing_ten_names_core_order_and_shared_pages(self):
         seed = json.loads(SEED_PATH.read_text(encoding='utf-8'))
         self.assertEqual([t['name'] for t in self.config()['terms'] if t['type']=='cafe_feature'], [t['label'] for t in seed['cafe_feature']])
-        self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='restaurant_subcategory']),13)
+        self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='restaurant_subcategory' and not t['is_legacy']]),61)
         self.setup_admin_and_login()
         self.post('/admin/categories/new',name='직접 분류',slug='custom',sort_order='0',is_active='1')
         self.assertEqual([t['slug'] for t in self.config()['categories']][:3],['food','cafe','attraction'])

@@ -89,6 +89,7 @@
   const taxonomy=JSON.parse(document.getElementById('mapCategoriesData').textContent);
   const categories=taxonomy.categories, filters=root.PlaceSearch;
   const detailNav=document.getElementById('mapDetails');
+  const cuisineNav=document.getElementById('mapCuisines');
   const parameters=new URLSearchParams(location.search);
   const state={...filters.fromParams(parameters),places:[],selected:null};
   let view=null, pending=null, sequence=0, debounce;
@@ -111,7 +112,10 @@
   }
   function categoryName() { return filters.labels(state,taxonomy).join(' · ')||'전체'; }
   function renderDetails(){
-    const terms=filters.termsFor(taxonomy,state.category);detailNav.hidden=!terms.length;
+    const cuisine=filters.selectedCuisine(taxonomy,state);
+    cuisineNav.hidden=state.category!=='food';
+    filters.chips(cuisineNav,[{value:'',label:'전체 음식'},...filters.cuisinesFor(taxonomy).map(t=>({value:t.slug,label:t.name}))],cuisine,'map-category');
+    const terms=filters.termsFor(taxonomy,state.category,cuisine);detailNav.hidden=!terms.length;
     if(!terms.length){detailNav.replaceChildren();return;}
     filters.chips(detailNav,[{value:'',label:'전체'},...terms.map(t=>({value:t.slug,label:t.name}))],state.terms,'map-category');
   }
@@ -168,6 +172,10 @@
       row.append(element('dt','',label),description);discovery.append(row);
     }
     content.append(discovery);
+    if(place.category_slug==='food'&&place.signature_menu){
+      const menu=element('p','map-signature-menu','대표메뉴 · '+place.signature_menu.trim().split('\n').filter(Boolean).join(' · '));
+      content.append(menu);
+    }
     if(!hasCoordinates(place)) content.append(element('p','map-location-missing','지도 위치 미등록'));
     const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
     const correction=element('a','detail-link','정보 바로잡기');correction.href=`/places/${encodeURIComponent(place.id)}/suggest`;
@@ -225,7 +233,14 @@
     } finally { if(request===sequence)list.setAttribute('aria-busy','false'); }
   }
   categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category],[data-pick]');if(!button)return;if(button.dataset.pick)state.pick=state.pick?'':'current';else filters.select(state,'category',button.dataset.category||'');renderDetails();state.q=query.value.trim();search();});
-  detailNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,'terms',button.dataset.value);renderDetails();search();});
+  cuisineNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,'cuisine',button.dataset.value);renderDetails();search();});
+  detailNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;
+    if(state.category==='food'){
+      state.cuisine=filters.selectedCuisine(taxonomy,state);
+      const allowed=filters.termsFor(taxonomy,'food',state.cuisine).map(t=>t.slug);
+      state.terms=state.terms.filter(t=>allowed.includes(t));
+    }
+    filters.select(state,'terms',button.dataset.value);renderDetails();search();});
   document.getElementById('mapSearch').addEventListener('submit',event=>{event.preventDefault();state.q=query.value.trim();search();});
   query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search('replace');},250);});
   document.getElementById('mapReset').addEventListener('click',()=>{Object.assign(state,filters.defaultState());query.value='';renderDetails();search();});

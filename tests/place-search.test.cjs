@@ -30,7 +30,7 @@ test('DB names drive detail choices and preserve IDs through renaming',()=>{
 });
 
 test('FIND MAP and registration links retain every active filter and NEW context',()=>{
-  const state={focus:[],category:'food',region:'애월',companions:['부모님','아이'],terms:['food-western'],q:'바다 & 숲',condition:'rain',pick:'current',new:'current'};
+  const state={cuisine:'',focus:[],category:'food',region:'애월',companions:['부모님','아이'],terms:['food-western'],q:'바다 & 숲',condition:'rain',pick:'current',new:'current'};
   for(const path of ['/find','/map']){
     const url=new URL(filters.href(path,state),'https://example.test');
     assert.equal(url.pathname,path);assert.deepEqual(filters.fromParams(url.searchParams),state);
@@ -55,4 +55,20 @@ test('popup uses linked restaurant terms, shared cafe taxonomy and original comp
  assert.equal(filters.discoveryAttributes({category:'카페',category_slug:'cafe'},taxonomy).what,'카페');
  assert.equal(filters.discoveryAttributes({category:'카페',category_slug:'cafe',classification_terms:[{type:'cafe_feature',name:'이색 경험'}]},taxonomy).what,'카페 · 이색 경험');
  assert.equal(filters.discoveryAttributes({...base,category:'맛집',category_slug:'food',classification_terms:[{type:'restaurant_subcategory',name:'베트남식'}]},taxonomy).what,'맛집 · 베트남식');
+});
+
+const foodTree={categories:[{id:1,slug:'food',name:'맛집'}],terms:[{id:2,parent_id:1,slug:'food-korean',name:'한식'},{id:3,parent_id:1,slug:'food-japanese',name:'일식'},{id:4,parent_id:2,slug:'food-noodles',name:'국수·면'},{id:5,parent_id:3,slug:'food-ramen',name:'라멘'},{id:6,parent_id:1,slug:'food-asian',name:'기타 아시아',is_legacy:1}]};
+test('restaurant choices are hierarchical, legacy URLs infer parent and filters round trip',()=>{
+ assert.deepEqual(filters.cuisinesFor(foodTree).map(t=>t.name),['한식','일식']);
+ assert.deepEqual(filters.termsFor(foodTree,'food'),[]);
+ assert.deepEqual(filters.termsFor(foodTree,'food','food-korean').map(t=>t.name),['국수·면']);
+ const state=filters.fromParams(new URLSearchParams('category=food&detail=food-ramen'));
+ assert.equal(filters.selectedCuisine(foodTree,state),'food-japanese');
+ assert.equal(state.cuisine,''); // Compatibility display never silently changes an old query.
+ filters.select(state,'cuisine','food-korean');assert.deepEqual(state.terms,[]);
+ filters.select(state,'terms','food-noodles');
+ assert.deepEqual(filters.fromParams(filters.params(state)),state);
+ assert.deepEqual(filters.labels(state,foodTree),['맛집','한식','국수·면']);
+ assert.equal(new URL(filters.registrationHref(state),'https://example.test').searchParams.get('cuisine'),'food-korean');
+ filters.select(state,'category','cafe');assert.equal(state.cuisine,'');assert.deepEqual(state.terms,[]);
 });

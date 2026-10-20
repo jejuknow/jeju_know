@@ -48,7 +48,7 @@ def json_list(value):
 
 def legacy_term_ids(conn, category_id, features):
     tags = {normalize(v) for v in features}
-    return [row[0] for row in conn.execute("SELECT id,name,legacy_aliases FROM categories WHERE parent_id=?", (category_id,))
+    return [row[0] for row in conn.execute("WITH RECURSIVE tree AS (SELECT id,name,legacy_aliases FROM categories WHERE parent_id=? UNION ALL SELECT c.id,c.name,c.legacy_aliases FROM categories c JOIN tree p ON c.parent_id=p.id) SELECT * FROM tree", (category_id,))
             if tags.intersection(normalize(v) for v in [row[1], *json_list(row[2])])]
 
 

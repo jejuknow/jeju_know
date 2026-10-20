@@ -37,7 +37,7 @@ class AdminPlaceCleanupTest(unittest.TestCase):
         tags = ['뷰', '감성', '이전 사용자 정의 태그']
         self.execute('UPDATE places SET features=? WHERE id=?', (json.dumps(tags), p['id']))
         term = self.rows("SELECT id FROM categories WHERE slug='food-korean'")[0]['id']
-        self.execute('INSERT INTO place_category_links VALUES (?,?)', (p['id'], term))
+        self.execute('INSERT OR IGNORE INTO place_category_links VALUES (?,?)', (p['id'], term))
         for extra in ({}, {'legacy_features_present':'1', 'features':['다른 태그']}):
             response = self.save(p, category_id=self.category['food'], taxonomy_present='1', term_ids=[str(term)], **extra)
             self.assertEqual(response.status_code,303)

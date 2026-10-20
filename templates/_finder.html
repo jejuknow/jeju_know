@@ -6,6 +6,7 @@
         <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">2</span>무엇을 찾나요?</legend><div class="chips" data-filter="category" id="categoryChips"></div></fieldset>
         <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">3</span>누구와 가나요?</legend><p class="filter-help">함께 가는 사람을 모두 골라주세요.</p><div class="chips" data-filter="companions" id="companionChips"></div></fieldset>
         <fieldset class="filter-group category-details" id="categoryDetails" hidden><legend class="filter-label" id="categoryDetailTitle"></legend>
+          <div id="foodCuisineGroup" hidden><p class="filter-help">대분류만 선택해도 검색할 수 있어요.</p><div class="chips" data-filter="cuisine" id="foodCuisineChips"></div></div>
           <details id="categoryFeatureDetails" class="finder-detail-more" open><summary id="categoryFeatureSummary">카페 특징 더보기</summary><div class="filter-help-row"><p class="filter-help">선택사항 · 여러 개를 고를 수 있어요. 다시 누르면 해제돼요.</p><span class="filter-count" id="categoryDetailCount"></span></div><div class="chips" data-filter="terms" id="categoryDetailChips"></div></details>
         </fieldset>
         <button class="primary-btn" id="findBtn" type="button" disabled>이 조건으로 장소 보기 →</button>

@@ -112,8 +112,12 @@ def decorate_details(conn, place):
         place[field] = place.get(field) or "미확인"
     for field in ("signature_menu", "recommended_menu"):
         place[field + "_items"] = [line.strip() for line in (place.get(field) or "").splitlines() if line.strip()]
-    place["classification_terms"] = [dict(r) for r in conn.execute("SELECT c.id,c.name,c.slug,c.type FROM categories c JOIN place_category_links l ON l.category_id=c.id WHERE l.place_id=? AND c.parent_id=? ORDER BY c.sort_order,c.id", (place["id"], place.get("category_id")))]
+    from restaurant_taxonomy import classification_terms, form_selection
+    place["classification_terms"] = classification_terms(conn, place['id'], place.get('category_id'))
+    if place['category_slug'] == 'food':
+        place.update(form_selection(conn, place['id'], place.get('category_id')))
     terms = [r["name"] for r in place["classification_terms"]]
     # Cafe presentation uses the same managed terms as FIND/MAP. Legacy tags stay stored.
-    place["detail_features"] = terms if place["category_slug"] == "cafe" else list(dict.fromkeys([*terms, *place.get("features_public", [])]))
+    place["restaurant_label"] = ' · '.join(terms) if place['category_slug'] == 'food' else ''
+    place["detail_features"] = terms if place["category_slug"] == "cafe" else list(dict.fromkeys(place.get("features_public", [])))
     return place

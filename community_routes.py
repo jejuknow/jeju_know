@@ -17,7 +17,8 @@ from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABEL
                               duplicates, editable, facts, merge_places, opening)
 from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
 from image_limits import MEMBER_PLACE_SLOTS
-from place_taxonomy import linked_ids
+from place_taxonomy import linked_ids, save_links
+from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, branch_terms
 from admin_settings import catalog
 from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
 from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, USAGE_LABELS,
@@ -134,7 +135,14 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                     "region": query.get("region", "") if query.get("region") in {i['value'] for i in catalog(conn,'region')} else "", "term_ids": []}
             if category:
                 slugs = query.get("detail", "").split(",")
-                data["term_ids"] = [r["id"] for r in conn.execute("SELECT id,slug FROM categories WHERE parent_id=? AND type!='place' AND is_active=1", (category["id"],)) if r["slug"] in slugs]
+                terms = branch_terms(conn, category['id'], active=True)
+                data["term_ids"] = [r['id'] for r in terms if r['slug'] in slugs and not r['is_legacy']]
+                if category['slug'] == 'food':
+                    main = next((r for r in terms if r['slug'] == query.get('cuisine') and r['parent_id'] == category['id'] and not r['is_legacy']), None)
+                    chosen = [r for r in terms if r['id'] in data['term_ids']]
+                    if not main and len(chosen) == 1:
+                        main = chosen[0] if chosen[0]['parent_id'] == category['id'] else next((r for r in terms if r['id'] == chosen[0]['parent_id']), None)
+                    data.update(restaurant_main_id=str(main['id']) if main else '', restaurant_subtype_id=str(chosen[0]['id']) if main and len(chosen)==1 and chosen[0]['parent_id']==main['id'] else '', term_ids=[])
         return place_form(request, data, new_only=new_only)
 
     @app.get("/places/{place_id}/edit")
@@ -157,7 +165,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if form is None:
             return bad_csrf()
         # Only basic facts and explicitly namespaced pending details are accepted.
-        allowed = set(FACT_FIELDS) | CONTROL_FIELDS | INPUT_FIELDS | {"csrf_token", "from_new", "duplicate_ack"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
+        allowed = set(FACT_FIELDS) | CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | {"csrf_token", "from_new", "duplicate_ack"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
         if any(k not in allowed for k in form):
             return HTMLResponse("허용하지 않는 입력 항목입니다. 기본 정보·사진과 선택형 세부 정보만 제출해주세요.", status_code=403)
         if limited(request, "community-place"):
@@ -173,13 +181,14 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 allowed_regions = [i['value'] for i in catalog(conn, 'region')]
                 if existing and existing['region'] not in allowed_regions: allowed_regions.append(existing['region'])
                 data = facts(normalized, conn, allowed_regions, new_only=new_only, existing=existing)
+                restaurant_ids = parse_selection(conn, form, data['category_id'], existing, required=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
-                data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS})
+                data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS})
                 data.update(term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isdigit() and len(str(v)) <= 10],
                             detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"))
             except ValueError as exc:
                 values = {k: str(form.get(k, "")) for k in FACT_FIELDS}
-                values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS})
+                values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS})
                 values.update(detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"))
                 values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
@@ -198,6 +207,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 plan.discard()
                 return HTMLResponse("정보 확인 상태가 변경되었습니다. 수정 제안을 이용해주세요.", status_code=403)
             try:
+                restaurant_ids = parse_selection(conn, form, data['category_id'], fresh, required=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
             except ValueError as exc:
                 plan.discard()
@@ -210,7 +220,9 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 slug = "place-" + secrets.token_hex(12)
                 fields = (*FACT_FIELDS, "category")
                 place_id = conn.execute("INSERT INTO places (" + ",".join(fields) + ",slug,submitted_by_user_id,source_type,verification_status,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user','unverified',1)", (*[data[k] for k in fields],slug,user_id)).lastrowid
-            # Existing approved classifications and cafe_focus are retained, never cleared by this form.
+            # Food hierarchy is a basic fact; other optional traits still use review.
+            if restaurant_ids is not None:
+                save_links(conn, place_id, restaurant_ids)
             queue_proposal(conn, get_place(conn, place_id), user_id, proposal)
             plan.apply(conn, place_id)
         flash(request, "장소를 저장했습니다. 사용자 등록 · 미확인으로 표시됩니다." + (" 세부 정보는 관리자 확인을 기다리고 있습니다." if proposal else ""))

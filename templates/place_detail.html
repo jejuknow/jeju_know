@@ -10,7 +10,7 @@
       {% if gallery %}<section aria-label="추가사진" class="place-gallery">{% for image in gallery %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ loop.index }}" loading="lazy"></a><figcaption>추가사진 {{ loop.index }}</figcaption></figure>{% endfor %}</section>{% endif %}
     </div>
     <div class="detail-content">
-      <div class="meta-row"><span class="badge primary">{{ region_labels.get(place.region,place.region) }}</span><span class="badge">{{ place.category }}</span>{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
+      <div class="meta-row"><span class="badge primary">{{ region_labels.get(place.region,place.region) }}</span><span class="badge">{{ place.category }}{{ " · "~place.restaurant_label if place.restaurant_label else "" }}</span>{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       <h1 class="detail-title">{{ place.name }}</h1>
       <p class="place-provenance">{{ place.status_label }}</p>
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}

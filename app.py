@@ -20,6 +20,8 @@ from place_details import parse_details, validate_details, save_details, decorat
 from user_migrations import backup_before_user_migration, migrate_users
 from home_migrations import backup_before_home_migration, migrate_home
 from taxonomy_migrations import backup_before_taxonomy_migration, migrate_taxonomy, TYPES
+from restaurant_migrations import backup_before_restaurants, migrate_restaurants
+from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, validate_parent, usage_count
 from image_migrations import backup_before_image_migration, migrate_images
 from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedFormRoute
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
@@ -192,6 +194,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        restaurant_backup = backup_before_restaurants(app.state.database)
         cleanup_backup_path = backup_before_admin_place_cleanup(app.state.database)
         submission_backup_path = backup_before_submission(app.state.database)
         basic_info_backup_path = backup_before_basic_place_info(app.state.database)
@@ -304,6 +307,7 @@ def create_app(test_config=None):
         migrate_basic_place_info(app.state.database, basic_info_backup_path)
         migrate_submission(app.state.database, submission_backup_path)
         migrate_admin_place_cleanup(app.state.database, cleanup_backup_path)
+        migrate_restaurants(app.state.database, restaurant_backup)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -460,6 +464,7 @@ def create_app(test_config=None):
             control_error = str(exc)
         slug = unique_slug(form.get("slug"), existing["id"] if existing else None)
         return form, {
+            **{key: str(form.get(key, '')) for key in RESTAURANT_FIELDS},
             **parse_details(form, existing),
             "_control_error": control_error,
             "_focus_submitted": "cafe_focus_present" in form or "cafe_focus" in form,
@@ -550,7 +555,7 @@ def create_app(test_config=None):
         if data["category_id"]:
             category = conn.execute("SELECT * FROM categories WHERE id=?", (data["category_id"],)).fetchone()
         else:  # Preserve the existing category-name POST contract.
-            category = conn.execute("SELECT * FROM categories WHERE name=?", (data["category"],)).fetchone()
+            category = conn.execute("SELECT * FROM categories WHERE name=? AND type='place'", (data["category"],)).fetchone()
         conn.close()
         if not category or category["type"] != "place" or (not category["is_active"] and (not existing or existing["category_id"] != category["id"])):
             return "활성 카테고리를 선택해 주세요. 기존 장소의 비활성 분류는 유지할 수 있습니다."
@@ -562,6 +567,9 @@ def create_app(test_config=None):
         data["emoji"] = {"food": "🍚", "cafe": "☕", "attraction": "📍"}.get(category["slug"], "📍")
         conn = connect_db()
         try:
+            restaurant_ids = parse_selection(conn, data, data['category_id'], existing)
+            if restaurant_ids is not None:
+                data['term_ids'] = restaurant_ids
             error = validate_terms(conn, data, existing)
             if data.get("_focus_submitted"):
                 validate_focus(conn, data, existing)
@@ -649,10 +657,10 @@ def create_app(test_config=None):
         return templates.TemplateResponse(request=request, name="place_detail.html", context={"place": row_to_place(row)})
 
     @app.get("/api/places")
-    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = "", focus: str = ""):
+    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = "", focus: str = "", cuisine: str = ""):
         conn = connect_db()
         try:
-            rows = public_search(conn, category, q, region, companion, detail, condition, pick, new, focus)
+            rows = public_search(conn, category, q, region, companion, detail, condition, pick, new, focus, cuisine)
             places = [row_to_place(row) for row in rows]
             if pick == "current":
                 places.sort(key=lambda p: (p["pick_order"],p["id"]))
@@ -993,31 +1001,30 @@ def create_app(test_config=None):
         try:
             with conn:
                 conn.execute("BEGIN IMMEDIATE")
-                parent_id = None
-                if category_id is None and kind != "place":
-                    parent_slug = {"restaurant_subcategory": "food", "cafe_feature": "cafe"}.get(kind)
-                    parent = conn.execute("SELECT id FROM categories WHERE slug=? AND type='place'", (parent_slug,)).fetchone()
-                    if not parent:
-                        flash(request, "상위 카테고리를 확인해 주세요.", "error")
-                        return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
-                    parent_id = parent[0]
+                original = conn.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone() if category_id else None
+                if category_id and not original:
+                    return HTMLResponse("카테고리를 찾을 수 없습니다.", status_code=404)
+                if original:
+                    kind = original['type']
                 if kind not in TYPES:
                     return HTMLResponse("분류 유형을 확인해 주세요.", status_code=400)
+                parent_id = validate_parent(conn, kind, form.get('parent_id'), original)
                 if category_id is None:
                     conn.execute("INSERT INTO categories(name,slug,sort_order,is_active,type,parent_id) VALUES (?,?,?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1"), kind, parent_id))
                 else:
-                    original = conn.execute("SELECT * FROM categories WHERE id=?", (category_id,)).fetchone()
-                    if not original:
-                        return HTMLResponse("카테고리를 찾을 수 없습니다.", status_code=404)
                     # The stable slug survives renaming so shared map URLs continue to work.
-                    conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), category_id))
+                    conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), parent_id, category_id))
+                    if original['is_legacy'] and form.get('adopt_legacy') == '1':
+                        conn.execute('UPDATE categories SET is_legacy=0 WHERE id=?', (category_id,))
                     if original["type"] != "place" and original["name"] != name:
                         aliases = list(dict.fromkeys([*parse_json_list(original["legacy_aliases"]), original["name"]]))
                         conn.execute("UPDATE categories SET legacy_aliases=? WHERE id=?", (json.dumps(aliases, ensure_ascii=False), category_id))
                     conn.execute("UPDATE places SET category=? WHERE category_id=?", (name, category_id))
             flash(request, "카테고리를 저장했습니다. 방문자 화면에 바로 반영됩니다.")
         except sqlite3.IntegrityError:
-            flash(request, "이미 사용 중인 카테고리 이름 또는 슬러그입니다.", "error")
+            flash(request, "같은 상위 분류에서 사용 중인 이름 또는 중복 슬러그입니다.", "error")
+        except ValueError as exc:
+            flash(request, str(exc), "error")
         finally:
             conn.close()
         return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
@@ -1042,7 +1049,7 @@ def create_app(test_config=None):
         try:
             with conn:
                 conn.execute("BEGIN IMMEDIATE")
-                count = conn.execute("SELECT (SELECT COUNT(*) FROM places WHERE category_id=?) + (SELECT COUNT(*) FROM place_category_links WHERE category_id=?)", (category_id, category_id)).fetchone()[0]
+                count = usage_count(conn, category_id)
                 children = conn.execute("SELECT COUNT(*) FROM categories WHERE parent_id=?", (category_id,)).fetchone()[0]
                 if count:
                     flash(request, f"현재 {count}개 장소에서 사용 중인 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")

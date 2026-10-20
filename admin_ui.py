@@ -243,18 +243,28 @@ class AdminUI:
         return self.render(request, "picks.html", periods=rows, places=places, pagination=page, selected_year=year, selected_month=month)
 
     def categories(self, request, kind=None):
+        from restaurant_taxonomy import usage_count
         if response := self.guard(request): return response
         kind = kind or request.query_params.get("type", "place")
         if kind not in KINDS: return HTMLResponse("분류를 찾을 수 없습니다.", status_code=404)
         with closing(self.db()) as conn:
+            all_categories = [dict(r) for r in conn.execute('SELECT * FROM categories ORDER BY sort_order,id')]
+            food = next((r for r in all_categories if r['slug']=='food'), None)
+            restaurant_parents = ([food] + [r for r in all_categories if r['parent_id']==food['id'] and not r['is_legacy']]) if food else []
             if kind in TYPES:
                 items = [dict(r) for r in conn.execute("SELECT c.*,(SELECT count(*) FROM places p WHERE p.category_id=c.id)+(SELECT count(*) FROM place_category_links l WHERE l.category_id=c.id) AS place_count,(SELECT count(*) FROM categories child WHERE child.parent_id=c.id) AS child_count FROM categories c WHERE c.type=? ORDER BY c.sort_order,c.id", (kind,))]
+                by_id = {r['id']:r for r in all_categories}
+                for item in items:
+                    item['place_count'] = usage_count(conn,item['id'])
+                    item['parent_name'] = by_id.get(item['parent_id'],{}).get('name','')
+                if kind == 'restaurant_subcategory':
+                    items.sort(key=lambda r: (r['is_legacy'], by_id[r['parent_id']]['sort_order'] if r['parent_id']!=food['id'] else r['sort_order'], r['parent_id'] if r['parent_id']!=food['id'] else r['id'], 0 if r['parent_id']==food['id'] else 1, r['sort_order'], r['id']))
             else:
                 items = [{**i, "name": i["label"], "place_count": catalog_usage(conn, kind, i["value"]), "child_count": 0} for i in catalog(conn, kind, True)]
         q = request.query_params.get("q", "").strip()[:200]
         if q: items = [i for i in items if q.casefold() in i["name"].casefold()]
         page = paginate(request, len(items))
-        return self.render(request, "classifications.html", kind=kind, kind_label=KINDS[kind], items=items[page["offset"]:page["offset"]+page["size"]], pagination=page, is_catalog=kind not in TYPES)
+        return self.render(request, "classifications.html", kind=kind, kind_label=KINDS[kind], items=items[page["offset"]:page["offset"]+page["size"]], pagination=page, is_catalog=kind not in TYPES, restaurant_parents=restaurant_parents, food_id=food['id'] if food else None)
 
     def best(self, request):
         if response := self.guard(request): return response

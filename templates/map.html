@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}제주 지도 | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261018-pins">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261020-restaurants">{% endblock %}
 {% block body_class %}map-body{% endblock %}
 {% block body %}
 <main class="map-workspace" id="mapWorkspace" data-kakao-key="{{ kakao_map_key }}">
@@ -11,7 +11,7 @@
     <div class="map-filter-summary"><p id="mapActiveFilters"></p><button id="mapReset" type="button" class="text-btn">초기화</button></div>
   </section>
   <div class="map-explore-panel">
-    <div class="map-filter-panel"><nav class="map-categories" aria-label="장소 카테고리"><button type="button" class="map-category is-selected" data-category="" aria-pressed="true">전체</button>{% for category in categories %}<button type="button" class="map-category" data-category="{{ category.slug }}" aria-pressed="false">{{ category.name }}</button>{% endfor %}<button type="button" class="map-category" data-pick="current" aria-pressed="false">JEJU_KNOW PICK</button></nav><nav id="mapDetails" class="map-details" aria-label="세부 분류" hidden></nav></div>
+    <div class="map-filter-panel"><nav class="map-categories" aria-label="장소 카테고리"><button type="button" class="map-category is-selected" data-category="" aria-pressed="true">전체</button>{% for category in categories %}<button type="button" class="map-category" data-category="{{ category.slug }}" aria-pressed="false">{{ category.name }}</button>{% endfor %}<button type="button" class="map-category" data-pick="current" aria-pressed="false">JEJU_KNOW PICK</button></nav><nav id="mapCuisines" class="map-details" aria-label="맛집 대분류" hidden></nav><nav id="mapDetails" class="map-details" aria-label="세부 분류" hidden></nav></div>
     <section class="map-canvas-panel" aria-label="제주 장소 지도">
       <div id="kakaoMap" aria-label="장소 위치 지도"></div>
       <div class="map-canvas-actions"><button id="mapFit" class="map-fit" type="button" disabled>장소 전체 범위</button><a id="mapRegisterLink" class="primary-inline" href="/map/register">+ 장소 알려주기</a>
@@ -25,4 +25,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261017-admin-cleanup"></script><script src="/static/map.js?v=20261018-pins"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261020-restaurants"></script><script src="/static/map.js?v=20261020-restaurants"></script>{% endblock %}

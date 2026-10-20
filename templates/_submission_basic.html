@@ -12,6 +12,6 @@
   <label data-closed-custom>휴무 안내<textarea name="closed_days" rows="2" maxlength="200">{{ p.get('closed_days') or '' }}</textarea></label>
 </fieldset>
 <label>전화번호 (선택)<input type="tel" inputmode="tel" name="phone" maxlength="80" value="{{ p.get('phone') or '' }}" placeholder="예: 0647992122"></label>
-<label data-menu-field>대표메뉴 (선택)<textarea name="signature_menu" maxlength="1000" rows="2" placeholder="예: 아메리카노">{{ p.get('signature_menu') or '' }}</textarea></label>
+{% if not defer_signature_menu %}<label data-menu-field>대표메뉴 (선택)<textarea name="signature_menu" maxlength="1000" rows="2" placeholder="예: 아메리카노">{{ p.get('signature_menu') or '' }}</textarea></label>{% endif %}
 <label data-menu-field>가격 (선택)<input name="representative_price" inputmode="numeric" maxlength="12" value="{{ p.get('representative_price') if p.get('representative_price') is not none else '' }}" placeholder="예: 5500"><small>대표메뉴 가격 · 원</small></label>
 <label>탐나는전 결제 (선택)<select name="tamnaneunjeon_status">{% for value in ['미확인','가능','불가'] %}<option value="{{ value }}" {% if (p.get('tamnaneunjeon_status') or '미확인') == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>

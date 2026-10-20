@@ -9,11 +9,15 @@ function buildFilters(){
   search.chips($('regionChips'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:taxonomy.region_labels?.[v]||search.regionLabel(v)}))],state.region);
   search.chips($('categoryChips'),[{value:'',label:'전체'},...taxonomy.categories.map(v=>({value:v.slug,label:v.name}))],state.category);
   search.chips($('companionChips'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:taxonomy.companion_labels?.[v]||v}))],state.companions);
-  const terms=search.termsFor(taxonomy,state.category);
-  $('categoryDetails').hidden=!terms.length;
+  const cuisine=search.selectedCuisine(taxonomy,state),terms=search.termsFor(taxonomy,state.category,cuisine);
+  $('categoryDetails').hidden=state.category!=='food'&&!terms.length;
+  $('foodCuisineGroup').hidden=state.category!=='food';
+  search.chips($('foodCuisineChips'),[{value:'',label:'전체'},...search.cuisinesFor(taxonomy).map(v=>({value:v.slug,label:v.name}))],cuisine);
   const more=$('categoryFeatureDetails');
+  more.hidden=!terms.length;
   if(more.dataset.category!==state.category){more.open=true;more.dataset.category=state.category;}
-  $('categoryFeatureSummary').hidden=true;
+  $('categoryFeatureSummary').hidden=state.category!=='food';
+  $('categoryFeatureSummary').textContent=state.category==='food'?'세부유형 (선택)':'카페 특징 더보기';
   $('categoryDetailTitle').textContent=state.category==='food'?'어떤 음식을 찾나요?':'어떤 카페가 좋아요?';
   $('categoryDetailCount').textContent=state.terms.length?`${state.terms.length}개 선택`:'';
   search.chips($('categoryDetailChips'),terms.map(v=>({value:v.slug,label:v.name})),state.terms);
@@ -41,6 +45,11 @@ async function renderResults(scroll=false,updateUrl=true){
 }
 document.querySelector('.compact-finder').addEventListener('click',event=>{
   const button=event.target.closest('.chip');if(!button||!taxonomy)return;
+  if(state.category==='food'&&button.closest('[data-filter]').dataset.filter==='terms'){
+    state.cuisine=search.selectedCuisine(taxonomy,state);
+    const allowed=search.termsFor(taxonomy,'food',state.cuisine).map(t=>t.slug);
+    state.terms=state.terms.filter(t=>allowed.includes(t));
+  }
   search.select(state,button.closest('[data-filter]').dataset.filter,button.dataset.value);buildFilters();
 });
 // Keep keywords received from MAP/shared URLs; FIND only edits the three filter groups.

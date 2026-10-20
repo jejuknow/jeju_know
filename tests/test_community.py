@@ -67,7 +67,11 @@ class CommunityTest(unittest.TestCase):
         return client.post(path,data={'csrf_token':self.csrf(client,'/admin' if client is self.admin else '/account'),**data},follow_redirects=False)
 
     def form(self,**changes):
-        return {'name':'테스트 커피','region':'애월','category_id':str(self.category['cafe']),'address':'제주 테스트로 123',**changes}
+        data = {'name':'테스트 커피','region':'애월','category_id':str(self.category['cafe']),'address':'제주 테스트로 123',**changes}
+        if str(data['category_id']) == str(self.category['food']):
+            data.setdefault('restaurant_taxonomy_present','1')
+            data.setdefault('restaurant_main_id',str(self.rows("SELECT id FROM categories WHERE slug='food-korean'")[0]['id']))
+        return data
 
     def create(self,client=None,**data):
         return self.post(client or self.member,'/places/new',**self.form(**data))
@@ -447,7 +451,7 @@ class CommunityTest(unittest.TestCase):
         self.assertRegex(html,r'name="opened_year"[^>]+required')
         self.assertIn('id="placeLocationMap"',html)
         term=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
-        self.assertRegex(html,rf'name="term_ids" value="{term}" checked')
+        self.assertIn(f'value="{term}" selected',html)
         legacy=self.member.get('/places/new?from=new',follow_redirects=False)
         self.assertEqual(legacy.headers['location'],'/map/register?from=new')
         self.assertEqual(self.visitor.get('/map?register=1&source=new',follow_redirects=False).headers['location'],'/map/register?register=1&source=new')
@@ -457,13 +461,11 @@ class CommunityTest(unittest.TestCase):
 
     def test_39_one_map_record_discovered_by_find_map_and_new(self):
         term=self.rows("SELECT id FROM categories WHERE slug='food-western'")[0]['id']
-        r=self.post(self.member,'/map/register',**self.form(category_id=self.category['food'],opened_year=str(self.now.year),opened_month=self.now.month,from_new='1',details_enabled='1',term_ids=[str(term)],latitude='33.45',longitude='126.4'))
+        r=self.post(self.member,'/map/register',**self.form(category_id=self.category['food'],restaurant_main_id=str(term),opened_year=str(self.now.year),opened_month=self.now.month,from_new='1',latitude='33.45',longitude='126.4'))
         self.assertEqual(r.status_code,303,r.text)
         self.assertEqual(len(self.rows('SELECT id FROM places')),1)
         p=self.rows('SELECT * FROM places')[0]
         self.assertEqual(r.headers['location'],'/place/'+p['slug'])
-        sid=self.rows('SELECT id FROM place_correction_suggestions')[0]['id']
-        self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='accept').status_code,303)
         for query in ('?category=food&region=애월&detail=food-western','?new=current&category=food'):
             results=self.api(query)
             self.assertEqual([item['id'] for item in results],[p['id']])
