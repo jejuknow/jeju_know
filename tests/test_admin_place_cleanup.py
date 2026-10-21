@@ -165,11 +165,11 @@ class AdminPlaceCleanupTest(unittest.TestCase):
             self.assertEqual(updated[key],before[key],key)
         links=self.rows('SELECT * FROM place_category_links')
         self.assertEqual(len(links),2)
-        for slug in ['cafe-taste','cafe-unique']:
-            self.assertEqual(self.api('?category=cafe&detail='+slug)[0]['id'],p['id'])
+        self.assertEqual(self.api('?category=cafe&detail=cafe-taste'),[])
+        self.assertEqual(self.api('?category=cafe&detail=cafe-unique')[0]['id'],p['id'])
         self.assertEqual(self.api('?category=cafe&detail=cafe-space'),[])
         terms=self.api()[0]['classification_terms']
-        self.assertEqual({t['slug'] for t in terms},{'cafe-taste','cafe-unique'})
+        self.assertEqual({t['slug'] for t in terms},{'cafe-unique'})
         detail=self.visitor.get('/place/'+p['slug']).text
         self.assertNotIn('<h2>카페 성향</h2>',detail)
         self.assertIn('이색 경험',detail)

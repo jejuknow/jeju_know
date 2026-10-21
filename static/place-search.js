@@ -59,7 +59,7 @@
   }
   function discoveryAttributes(place,taxonomy){
     const details=place.category_slug==='food'?(place.classification_terms||[]).filter(t=>t.type==='restaurant_subcategory').map(t=>t.name):
-      place.category_slug==='cafe'?(place.classification_terms||[]).filter(t=>t.type==='cafe_feature').map(t=>t.name):[];
+      place.category_slug==='cafe'?(place.classification_terms||[]).filter(t=>t.type==='cafe_feature'&&!t.is_legacy&&t.is_active!==0).slice(0,3).map(t=>t.name):[];
     const companions=Array.isArray(place.companions)?place.companions:[];
     return {region:taxonomy.region_labels?.[place.region]||regionLabel(place.region)||'미확인',what:[place.category,...details].filter(Boolean).join(' · '),
       companions:companions.slice(0,3).map(v=>taxonomy.companion_labels?.[v]||v).join(' · ')||'미확인',moreCompanions:Math.max(0,companions.length-3)};

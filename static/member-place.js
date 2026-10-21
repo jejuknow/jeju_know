@@ -19,6 +19,8 @@
       group.hidden=!active||!group.querySelector('input');
       group.querySelectorAll('input').forEach(input=>{input.disabled=!active||!expanded;});
     });
+    const termSection=document.querySelector('[data-submission-terms]');
+    if(termSection)termSection.hidden=!document.querySelector('#memberPlaceTerms fieldset:not([hidden])');
     }
     const slug=category.selectedOptions[0]?.dataset.slug;
     document.querySelectorAll('[data-menu-field]').forEach(group=>show(group,['cafe','food'].includes(slug)));

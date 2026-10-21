@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app import create_app
+from cafe_feature_migrations import FEATURES
 from fastapi.testclient import TestClient
 from taxonomy_migrations import VERSION, SEED_PATH, backup_before_taxonomy_migration, migrate_taxonomy
 import test_map_categories as legacy
@@ -29,7 +30,7 @@ class TaxonomyTest(unittest.TestCase):
 
     def test_existing_ten_names_core_order_and_shared_pages(self):
         seed = json.loads(SEED_PATH.read_text(encoding='utf-8'))
-        self.assertEqual([t['name'] for t in self.config()['terms'] if t['type']=='cafe_feature'], [t['label'] for t in seed['cafe_feature']])
+        self.assertEqual([t['name'] for t in self.config()['terms'] if t['type']=='cafe_feature'], [name for _,name in FEATURES])
         self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='restaurant_subcategory' and not t['is_legacy']]),61)
         self.setup_admin_and_login()
         self.post('/admin/categories/new',name='직접 분류',slug='custom',sort_order='0',is_active='1')
@@ -83,7 +84,7 @@ class TaxonomyTest(unittest.TestCase):
 
     def test_cafe_legacy_mapping_toggle_clear_and_category_switch(self):
         self.setup_admin_and_login()
-        place=self.place(features=['감성 추천','오션뷰','원래 태그'],companions=['혼자'])
+        place=self.place(features=['감성 추천','오션뷰','원래 태그'],companions=['혼자'],taxonomy_present='1',term_ids=[str(self.term('cafe-mood')['id']),str(self.term('cafe-view')['id'])])
         self.assertEqual(len(self.client.get('/api/places?category=cafe&detail=cafe-mood').json()),1)
         self.assertEqual(len(self.client.get('/api/places?category=cafe&detail=cafe-view').json()),1)
         payload=dict(name=place['name'],slug=place['slug'],region='애월',category_id=self.category('cafe')['id'],published='1',taxonomy_present='1',features=['감성 추천','오션뷰','원래 태그'])
@@ -116,15 +117,15 @@ class TaxonomyTest(unittest.TestCase):
         self.assertEqual(a['cafe_focus_labels'],['맛 중심','공간 중심'])
         self.assertEqual(a['classification_terms'][0]['name'],mood['name'])
         def slugs(**params):return {p['slug'] for p in self.client.get('/api/places',params=params).json()}
-        self.assertEqual(slugs(category='cafe',focus='taste'),{'focus-a'})
-        self.assertEqual(slugs(category='cafe',focus='space',detail='cafe-mood',companion='연인,친구'),{'focus-a'})
-        self.assertEqual(slugs(category='cafe',focus='taste,experience'),{'focus-a','focus-b'})
+        self.assertEqual(slugs(category='cafe',focus='taste'),set())
+        self.assertEqual(slugs(category='cafe',focus='space',detail='cafe-mood',companion='연인,친구'),set())
+        self.assertEqual(slugs(category='cafe',focus='taste,experience'),set())
         self.assertEqual(slugs(category='cafe',focus='experience',detail='cafe-mood'),set())
         self.assertEqual(slugs(category='food',focus='taste'),set())
         self.assertEqual(slugs(category='cafe',focus='bogus'),set())
         self.assertEqual(slugs(category='cafe'),{'focus-a','focus-b','focus-empty'})
         self.assertNotIn('<h2>카페 성향</h2>',self.client.get('/place/focus-a').text)
-        self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='cafe_feature']),10)
+        self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='cafe_feature']),15)
 
     def test_cafe_focus_validation_legacy_edit_clear_and_category_switch(self):
         self.setup_admin_and_login()

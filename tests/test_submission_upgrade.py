@@ -120,7 +120,7 @@ class SubmissionUpgradeTest(unittest.TestCase):
         self.assertFalse(self.rows('SELECT * FROM place_correction_suggestions'))
         html=self.member.get(f"/places/{p['id']}/edit").text
         self.assertNotIn('이 카페는 어떤 곳인가요?',html)
-        self.assertIn('카페 세부 분류 (선택)',html)
+        self.assertIn('카페 특징 (선택)',html)
         self.assertIn('세부 정보도 알려줄게요',html)
         self.assertIn('accept="image/*"',html)
 

@@ -42,10 +42,17 @@ test('FIND MAP and registration links retain every active filter and NEW context
 });
 
 
-test('orientation URL round trips separately from the ten cafe features',()=>{
+test('legacy orientation URLs remain identifiable without becoming official features',()=>{
  const state={...filters.defaultState(),category:'cafe',focus:['taste','space'],terms:['cafe-mood']};
  assert.deepEqual(filters.fromParams(filters.params(state)),state);
  filters.select(state,'category','food');assert.deepEqual(state.focus,[]);assert.deepEqual(state.terms,[]);
+});
+
+test('cafe popup uses at most three active official features',()=>{
+ const terms=[{type:'cafe_feature',name:'맛 중심',is_legacy:1,is_active:0},
+  ...['커피 전문','디저트 전문','베이커리','좋은 뷰'].map(name=>({type:'cafe_feature',name,is_active:1,is_legacy:0}))];
+ assert.equal(filters.discoveryAttributes({category:'카페',category_slug:'cafe',classification_terms:terms},{}).what,
+  '카페 · 커피 전문 · 디저트 전문 · 베이커리');
 });
 test('popup uses linked restaurant terms, shared cafe taxonomy and original companions',()=>{
  const taxonomy={cafe_focus:[{value:'taste',label:'맛 중심'},{value:'space',label:'공간 중심'},{value:'experience',label:'이색 경험'}]};

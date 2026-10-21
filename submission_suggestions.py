@@ -29,6 +29,13 @@ def parse_proposal(form, conn, category_id):
     data = {"category_id": category_id, "features": [], "term_ids": form.getlist("term_ids")}
     if error := validate_terms(conn, data):
         raise ValueError(error)
+    cafe_terms = [dict(r) for r in conn.execute("SELECT id,member_policy FROM categories WHERE type='cafe_feature' AND parent_id=?", (category_id,))]
+    if cafe_terms:
+        restricted = {r["id"] for r in cafe_terms if r["member_policy"] == "admin"}
+        if set(data["term_ids"]) & restricted:
+            raise ValueError("인기 핫플은 관리자만 지정할 수 있어요.")
+        if len(data["term_ids"]) > 5:
+            raise ValueError("카페 특징은 최대 5개까지 선택할 수 있어요.")
     usage = {}
     for key, label in USAGE_LABELS.items():
         value = form.get("detail_" + key, "미확인")

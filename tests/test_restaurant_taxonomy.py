@@ -45,7 +45,7 @@ class RestaurantTest(unittest.TestCase):
         self.assertEqual([r['name'] for r in majors], [r[1] for r in TREE])
         for major, (_,_,children) in zip(majors,TREE):
             self.assertEqual([r['name'] for r in data['terms'] if r['parent_id']==major['id']], [r[1] for r in children])
-        self.assertEqual(len([r for r in data['terms'] if r['type']=='cafe_feature']),10)
+        self.assertEqual(len([r for r in data['terms'] if r['type']=='cafe_feature']),15)
         self.assertEqual(sum(len(r[2]) for r in TREE),53)
 
     def test_member_major_required_child_optional_and_validation(self):
@@ -149,7 +149,7 @@ class RestaurantMigrationTest(unittest.TestCase):
     def test_backup_mapping_preservation_ambiguity_and_idempotence(self):
         with tempfile.TemporaryDirectory() as folder:
             database=str(Path(folder)/'jejuno.db')
-            with patch('app.migrate_restaurants'):
+            with patch('app.migrate_restaurants'), patch('app.migrate_cafe_features'):
                 create_app({'TESTING':True,'DATABASE':database,'SECRET_KEY':'test','SKIP_SEED':True})
             with closing(sqlite3.connect(database)) as conn,conn:
                 food=conn.execute("SELECT id FROM categories WHERE slug='food'").fetchone()[0]

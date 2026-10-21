@@ -27,6 +27,7 @@ from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedF
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
 from cafe_focus import parse_focus, validate_focus, save_focus, decorate_focus
 from cafe_focus_migrations import backup_before_cafe_focus, migrate_cafe_focus
+from cafe_feature_migrations import backup_before_cafe_features, migrate_cafe_features
 from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
 from member_routes import register_member_routes, validate_news
 from community_migrations import backup_before_community_migration, migrate_community, today as community_today
@@ -200,6 +201,7 @@ def create_app(test_config=None):
         basic_info_backup_path = backup_before_basic_place_info(app.state.database)
         admin_backup_path = backup_before_admin_ui(app.state.database)
         focus_backup_path = backup_before_cafe_focus(app.state.database)
+        cafe_feature_backup = backup_before_cafe_features(app.state.database)
         detail_backup_path = backup_before_place_detail_migration(app.state.database)
         community_backup_path = backup_before_community_migration(app.state.database)
         image_backup_path = backup_before_image_migration(app.state.database)
@@ -308,6 +310,7 @@ def create_app(test_config=None):
         migrate_submission(app.state.database, submission_backup_path)
         migrate_admin_place_cleanup(app.state.database, cleanup_backup_path)
         migrate_restaurants(app.state.database, restaurant_backup)
+        migrate_cafe_features(app.state.database, cafe_feature_backup)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)

@@ -18,7 +18,7 @@ FIELD_LABELS = {
     "representative_price": "가격", "tamnaneunjeon_status": "탐나는전",
     "business_hours": "영업시간", "closed_days": "휴무일", "last_order": "라스트오더",
     "signature_menu": "대표 메뉴", "recommended_menu": "추천 메뉴",
-    "dessert_note": "디저트 특징", "food_taste_note": "음식/맛 특징",
+    "dessert_note": "디저트·베이커리 특징", "food_taste_note": "음식/맛 특징",
     "reservation_status": "예약", "waiting_status": "웨이팅", "coffee_taste": "커피 맛 특징",
 }
 USE_OPTIONS = ("미확인", "가능", "불가", "제한")
@@ -114,10 +114,16 @@ def decorate_details(conn, place):
         place[field + "_items"] = [line.strip() for line in (place.get(field) or "").splitlines() if line.strip()]
     from restaurant_taxonomy import classification_terms, form_selection
     place["classification_terms"] = classification_terms(conn, place['id'], place.get('category_id'))
+    if place['category_slug'] == 'cafe':
+        place["classification_terms"] = [r for r in place["classification_terms"] if r["is_active"] and not r["is_legacy"]]
     if place['category_slug'] == 'food':
         place.update(form_selection(conn, place['id'], place.get('category_id')))
     terms = [r["name"] for r in place["classification_terms"]]
     # Cafe presentation uses the same managed terms as FIND/MAP. Legacy tags stay stored.
     place["restaurant_label"] = ' · '.join(terms) if place['category_slug'] == 'food' else ''
     place["detail_features"] = terms if place["category_slug"] == "cafe" else list(dict.fromkeys(place.get("features_public", [])))
+    if place["category_slug"] == "cafe":
+        # Shared PICK cards also use official features; raw legacy tags remain stored.
+        usage = [label for field, label in (("parking_status", "주차"), ("accessible_status", "무장애")) if place.get(field) == "가능"]
+        place["features_public"] = list(dict.fromkeys(terms + usage))
     return place

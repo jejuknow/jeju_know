@@ -124,7 +124,7 @@ class BasicPlaceInfoTest(unittest.TestCase):
             self.assertEqual(self.rows('SELECT * FROM places')[0], before)
 
     def test_focus_does_not_duplicate_feature_taxonomy(self):
-        term = self.rows("SELECT id FROM categories WHERE name='맛 중심' AND type='cafe_feature'")[0]['id']
+        term = self.rows("SELECT id FROM categories WHERE name='커피 전문' AND type='cafe_feature'")[0]['id']
         p = self.place()
         self.execute('UPDATE places SET cafe_focus=?', (json.dumps(['taste','space']),))
         response = self.post(self.member, f"/places/{p['id']}/edit", **self.form(details_enabled='1', term_ids=[str(term)]))

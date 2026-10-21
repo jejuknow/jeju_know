@@ -111,7 +111,9 @@ class AdminUITest(unittest.TestCase):
         self.assertEqual(self.post(self.admin,route,action='new',value='garden',name='정원 중심',sort_order=4,is_active='1').status_code,303)
         p=self.place()
         self.assertEqual(self.post(self.admin,f"/admin/places/{p['id']}/edit",**self.form(published='1',cafe_focus_present='1',cafe_focus=['garden'])).status_code,303)
-        self.assertEqual(self.api('?category=cafe&focus=garden')[0]['id'],p['id'])
+        # Legacy focus values remain editable/preserved, but no longer drive public filters.
+        self.assertEqual(self.api('?category=cafe&focus=garden'),[])
+        self.assertEqual(self.api()[0]['cafe_focus_labels'],['정원 중심'])
         self.assertEqual(self.post(self.admin,route,action='delete',value='garden').status_code,409)
         self.post(self.admin,route,action='edit',value='garden',name='정원 있는 카페',sort_order=4)
         self.assertEqual(self.api()[0]['cafe_focus_labels'],['정원 있는 카페'])

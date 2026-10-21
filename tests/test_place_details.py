@@ -41,7 +41,8 @@ class PlaceDetailsTest(unittest.TestCase):
                      note='골목 안쪽에 있습니다.\n야외 좌석은 날씨 영향을 받습니다.',
                      reason='직접 확인한 추천 이유', companions=['부모님','아이'], features=['로컬'],
                      checked_at='2020-03-04', info_source='공식 Instagram / 현장 확인')
-        p = self.admin_place(**facts)
+        local = self.rows("SELECT id FROM categories WHERE slug='cafe-local'")[0]['id']
+        p = self.admin_place(taxonomy_present='1',term_ids=[str(local)],**facts)
         for field in DETAIL_FIELDS:
             self.assertEqual(p[field], facts[field])
         edit = self.admin.get(f"/admin/places/{p['id']}/edit")
