@@ -19,6 +19,7 @@
       group.hidden=!active||!group.querySelector('input');
       group.querySelectorAll('input').forEach(input=>{input.disabled=!active||!expanded;});
     });
+    document.querySelectorAll('[data-cafe-visit-times]').forEach(group=>show(group,expanded&&group.dataset.categoryId===category.value));
     const termSection=document.querySelector('[data-submission-terms]');
     if(termSection)termSection.hidden=!document.querySelector('#memberPlaceTerms fieldset:not([hidden])');
     }

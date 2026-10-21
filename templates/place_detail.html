@@ -24,6 +24,7 @@
       {% if place.signature_menu_items or place.recommended_menu_items %}<section class="detail-section"><h2>대표 / 추천 메뉴</h2><div class="place-menu-grid">
         {% for field,label in [('signature_menu_items','대표 메뉴'),('recommended_menu_items','추천 메뉴')] %}{% if place[field] %}<div><h3>{{ label }}</h3><ul>{% for item in place[field] %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}{% endfor %}
       </div></section>{% endif %}
+      {% if place.category_slug == 'cafe' and place.cafe_visit_times %}<section class="detail-section"><h2>추천 시간대</h2><div class="chips">{% for value in place.cafe_visit_times %}<span class="tag">{{ value }}</span>{% endfor %}</div></section>{% endif %}
       {% if place.category_slug == 'cafe' and (place.coffee_taste != '미확인' or place.dessert_note) %}<section class="detail-section"><h2>커피와 디저트·베이커리</h2>{% if place.coffee_taste != '미확인' %}<p><strong>커피 맛</strong> {{ place.coffee_taste }}</p>{% endif %}{% if place.dessert_note %}<p class="place-paragraph">{{ place.dessert_note }}</p>{% endif %}</section>{% endif %}
       {% if place.category_slug == 'food' and place.food_taste_note %}<section class="detail-section"><h2>음식/맛 특징</h2><p class="place-paragraph">{{ place.food_taste_note }}</p></section>{% endif %}
       {% endif %}

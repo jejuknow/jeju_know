@@ -174,7 +174,12 @@ class AdminUI:
             categories = conn.execute("SELECT name,slug FROM categories WHERE type='place' ORDER BY sort_order,id").fetchall()
             regions = catalog(conn, "region", True)
             years = sorted({today().year, *[r[0] for r in conn.execute("SELECT DISTINCT opened_year FROM places WHERE opened_year IS NOT NULL")]}, reverse=True)
-        items = [{**self.place(row), "nickname": row["nickname"], "pending_count": row["pending_count"]} for row in rows]
+            pending = {}
+            if mode == "community" and rows:
+                ids = [row["id"] for row in rows]
+                for row in conn.execute("SELECT id,place_id,new_value FROM place_correction_suggestions WHERE status='pending' AND field=? AND place_id IN (" + ",".join("?" for _ in ids) + ") ORDER BY id", (DETAIL_FIELD, *ids)):
+                    pending.setdefault(row["place_id"], []).append({"id": row["id"], "summary": display_proposal(conn, row["new_value"])})
+        items = [{**self.place(row), "nickname": row["nickname"], "pending_count": row["pending_count"], "detail_proposals": pending.get(row["id"], [])} for row in rows]
         return self.render(request, "places.html", places=items, pagination=page, mode=mode, categories=categories, regions=regions, years=years, selected_year=year)
 
     def suggestions(self, request):

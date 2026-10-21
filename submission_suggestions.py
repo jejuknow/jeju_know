@@ -2,7 +2,9 @@
 import json
 
 from admin_settings import catalog
-from place_details import USE_OPTIONS, WAITING_OPTIONS
+from place_details import USE_OPTIONS, WAITING_OPTIONS, FIELD_LABELS, validate_detail_value
+from cafe_features import DETAIL_KEYS
+from cafe_visit_times import validate_times
 from place_taxonomy import linked_ids, save_links, validate_terms
 
 DETAIL_FIELD = "submission_details"
@@ -54,6 +56,8 @@ def snapshot(conn, place, proposal):
         data["companions"] = sorted(json.loads(place["companions"] or "[]"))
     if proposal["term_ids"]:
         data["term_ids"] = sorted(linked_ids(conn, place["id"]))
+    if proposal.get("cafe_details"):
+        data["cafe_details"] = {key: json.loads(place[key] or "[]") if key == "cafe_visit_times" else place[key] for key in proposal["cafe_details"]}
     return dumps(data)
 
 
@@ -84,6 +88,16 @@ def approve_proposal(conn, place, suggestion):
     for key, value in proposal["usage"].items():
         if key not in USAGE_LABELS or value not in (WAITING_OPTIONS if key == "waiting_status" else USE_OPTIONS):
             raise ValueError("이용 정보 선택값을 확인해주세요.")
+    details = proposal.get("cafe_details", {})
+    if details and conn.execute("SELECT slug FROM categories WHERE id=?", (place["category_id"],)).fetchone()[0] != "cafe":
+        raise ValueError("카페 정보는 카페에서만 반영할 수 있어요.")
+    for key, value in details.items():
+        if key == "cafe_visit_times":
+            validate_times(value)
+        elif key not in DETAIL_KEYS or not isinstance(value, str):
+            raise ValueError("카페 제안 항목을 확인해주세요.")
+        else:
+            validate_detail_value(key, value)
     # Validate the complete batch before the first canonical write.
     for key, value in proposal["usage"].items():
         conn.execute(f"UPDATE places SET {key}=? WHERE id=?", (value, place["id"]))
@@ -92,6 +106,8 @@ def approve_proposal(conn, place, suggestion):
         conn.execute("UPDATE places SET companions=? WHERE id=?", (dumps(combined), place["id"]))
     if proposal["term_ids"]:
         save_links(conn, place["id"], sorted(set(linked_ids(conn, place["id"])) | set(proposal["term_ids"])))
+    for key, value in details.items():
+        conn.execute(f"UPDATE places SET {key}=? WHERE id=?", (dumps(value) if key == "cafe_visit_times" else value, place["id"]))
     conn.execute("UPDATE places SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (place["id"],))
 
 
@@ -102,7 +118,8 @@ def display_proposal(conn, value):
     if data.get("companions"):
         lines.append("잘 맞는 동행: " + " / ".join(labels.get(c, c) for c in data["companions"]))
     if data.get("term_ids"):
-        labels = {r["id"]: r["name"] for r in conn.execute("SELECT id,name FROM categories")}
-        lines.append("장소 특징: " + " / ".join(labels.get(i, "이전 분류") for i in data["term_ids"]))
+        labels = {r["id"]: r["name"] for r in conn.execute("SELECT id,name FROM categories ORDER BY sort_order,id")}
+        lines.append("장소 특징: " + " / ".join([name for i,name in labels.items() if i in data["term_ids"]] + ["이전 분류" for i in data["term_ids"] if i not in labels]))
     lines.extend(USAGE_LABELS.get(k, k) + ": " + v for k,v in data.get("usage", {}).items())
+    lines.extend(("추천 시간대" if k == "cafe_visit_times" else FIELD_LABELS.get(k, k)) + ": " + (" / ".join(v) if isinstance(v, list) else v) for k,v in data.get("cafe_details", {}).items())
     return "\n".join(lines) or "미확인"

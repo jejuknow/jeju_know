@@ -139,7 +139,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 terms = branch_terms(conn, category['id'], active=True)
                 data["term_ids"] = [r['id'] for r in terms if r['slug'] in slugs and not r['is_legacy']]
                 if category['slug'] == 'cafe':
-                    data['cafe_feature_ids'] = [str(r['id']) for r in terms if r['id'] in data['term_ids'] and r['member_policy'] == 'direct'][:5]
+                    data['cafe_feature_ids'] = [str(r['id']) for r in terms if r['id'] in data['term_ids'] and r['member_policy'] != 'admin'][:5]
                     data['term_ids'] = []
                 if category['slug'] == 'food':
                     main = next((r for r in terms if r['slug'] == query.get('cuisine') and r['parent_id'] == category['id'] and not r['is_legacy']), None)
@@ -160,7 +160,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         if not editable(place, current_user(request)["id"]):
             return HTMLResponse("본인이 등록한 미확인 장소만 수정할 수 있습니다. 확인된 장소는 수정 제안을 이용해주세요.", status_code=403)
-        return place_form(request, {**row_to_place(place), "term_ids": [], "approved_term_ids": term_ids, "cafe_feature_ids": [str(v) for v in term_ids]})
+        return place_form(request, {**row_to_place(place), "term_ids": [], "approved_term_ids": term_ids, "cafe_feature_ids": []})
 
     async def save_submission(request, place_id=None):
         if response := member_guard(request):
@@ -187,16 +187,16 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 data = facts(normalized, conn, allowed_regions, new_only=new_only, existing=existing)
                 restaurant_ids = parse_selection(conn, form, data['category_id'], existing, required=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
-                cafe_ids, cafe_proposal = parse_member_features(conn, form, data["category_id"], existing)
+                _, cafe_proposal = parse_member_features(conn, form, data["category_id"], existing)
                 proposal = combine_proposals(proposal, cafe_proposal)
                 data.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
-                data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS})
+                data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
                 data.update(term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isdigit() and len(str(v)) <= 10],
-                            detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"))
+                            detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
             except ValueError as exc:
                 values = {k: str(form.get(k, "")) for k in FACT_FIELDS}
-                values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS})
-                values.update(detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"))
+                values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
+                values.update(detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
                 values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
                 values.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
@@ -217,7 +217,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             try:
                 restaurant_ids = parse_selection(conn, form, data['category_id'], fresh, required=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
-                cafe_ids, cafe_proposal = parse_member_features(conn, form, data["category_id"], fresh)
+                _, cafe_proposal = parse_member_features(conn, form, data["category_id"], fresh)
                 proposal = combine_proposals(proposal, cafe_proposal)
             except ValueError as exc:
                 plan.discard()
@@ -230,11 +230,9 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 slug = "place-" + secrets.token_hex(12)
                 fields = (*FACT_FIELDS, "category")
                 place_id = conn.execute("INSERT INTO places (" + ",".join(fields) + ",slug,submitted_by_user_id,source_type,verification_status,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user','unverified',1)", (*[data[k] for k in fields],slug,user_id)).lastrowid
-            # Food classification and permitted cafe features save directly; proposals use review.
+            # Food classification saves directly; cafe classification always uses review.
             if restaurant_ids is not None:
                 save_links(conn, place_id, restaurant_ids)
-            if cafe_ids is not None:
-                save_links(conn, place_id, cafe_ids)
             queue_proposal(conn, get_place(conn, place_id), user_id, proposal)
             plan.apply(conn, place_id)
         flash(request, "장소를 저장했습니다. 사용자 등록 · 미확인으로 표시됩니다." + (" 세부 정보는 관리자 확인을 기다리고 있습니다." if proposal else ""))
@@ -402,7 +400,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                         conn.execute("DELETE FROM place_category_links WHERE place_id=?", (place["id"],))
             conn.execute("UPDATE place_correction_suggestions SET status=?,reviewed_at=CURRENT_TIMESTAMP,reviewed_by=?,review_note=? WHERE id=?", ("accepted" if action == "accept" else "rejected",actor(request),note,suggestion_id))
         flash(request, "제안을 반영했습니다." if action == "accept" else "제안을 거절했습니다.")
-        return redirect("/admin/suggestions")
+        return redirect("/admin/community" if form.get("next") == "/admin/community" else "/admin/suggestions")
 
     @app.get("/admin/places/{place_id}/merge")
     async def merge_get(request: Request, place_id: int, target_id: int = 0):

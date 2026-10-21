@@ -8,7 +8,7 @@
     const count = () => choices.filter(input => input.checked).length;
     const sync = () => {
       group.hidden = category.value !== group.dataset.parentId;
-      group.querySelectorAll('input').forEach(input => { input.disabled = group.hidden; });
+      group.querySelectorAll('input,select,textarea').forEach(input => { input.disabled = group.hidden; });
       feedback.textContent = `${count()}/5 선택`;
     };
     group.addEventListener('change', event => {

@@ -1,17 +1,19 @@
 {% for c in taxonomy.categories if c.slug == 'cafe' %}
 <section class="form-card" data-member-cafe-features data-parent-id="{{ c.id }}" {% if p.get('category_id')|string != c.id|string %}hidden{% endif %}>
-<h2>카페 특징 (선택)</h2>
+<h2>카테고리별 정보</h2><h3>카페 특징 (선택)</h3>
+{% if p.get('classification_terms') %}<p class="form-help">승인된 특징: {{ p.classification_terms|map(attribute='name')|join(' · ') }}</p>{% endif %}
 <input type="hidden" name="cafe_features_present" value="1">
 <p class="form-help">이 카페를 가장 잘 설명하는 특징을 골라주세요. 최대 5개</p>
 <p class="form-help" data-cafe-feature-feedback role="status" aria-live="polite">0/5 선택</p>
 <div class="chips">
-{% for term in taxonomy.terms if term.parent_id == c.id and term.is_active and not term.is_legacy and term.member_policy == 'direct' %}
+{% for term in taxonomy.terms if term.parent_id == c.id and term.is_active and not term.is_legacy and term.member_policy != 'admin' %}
 <label class="member-term"><input type="checkbox" name="cafe_feature_ids" value="{{ term.id }}" {% if term.id|string in p.get('cafe_feature_ids',[]) %}checked{% endif %}>{{ term.name }}</label>
 {% endfor %}
 </div>
 <p class="form-help">케이크·푸딩 등은 디저트 전문, 빵·페이스트리 등은 베이커리로 골라주세요. 둘 다 선택할 수 있어요.</p>
-{% for term in taxonomy.terms if term.parent_id == c.id and term.is_active and not term.is_legacy and term.member_policy == 'review' %}
-<label class="member-term"><input type="checkbox" name="cafe_value_suggestion" value="1" {% if p.get('cafe_value_suggestion') == '1' %}checked{% endif %}>{{ term.name }} 제안 (관리자 확인 후 반영)</label>
-{% endfor %}
+<p class="form-help">선택한 특징과 아래 메뉴 정보는 관리자 승인 후 반영됩니다. 가성비도 제안할 수 있어요. 이미 승인된 특징은 유지됩니다.</p>
+<div class="form-grid two"><label class="span-2">추천메뉴 (선택)<textarea name="detail_recommended_menu" maxlength="1000" rows="2" placeholder="한 줄에 메뉴 이름 하나씩">{{ p.get('detail_recommended_menu','') }}</textarea></label>
+<label>커피 맛 특징<select name="detail_coffee_taste">{% for item in coffee_options %}<option value="{{ item }}" {% if (p.get('detail_coffee_taste') or '미확인') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+<label>디저트·베이커리 특징<textarea name="detail_dessert_note" maxlength="300" rows="3">{{ p.get('detail_dessert_note','') }}</textarea></label></div>
 </section>
 {% endfor %}

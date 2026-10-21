@@ -47,14 +47,21 @@ class AdminPlaceCleanupTest(unittest.TestCase):
         self.assertEqual(self.save(p, category_id=self.category['food'], name='').status_code,400)
         self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),tags)
 
-    def test_cafe_attraction_explicit_tag_edit_clear_and_omitted_preservation(self):
+    def test_attraction_explicit_tag_edit_clear_and_omitted_preservation(self):
         p = self.place()
-        for slug in ['cafe','attraction']:
+        for slug in ['attraction']:
             self.assertEqual(self.save(p,category_id=self.category[slug],legacy_features_present='1',features=['사진','뷰']).status_code,303)
             self.assertEqual(self.save(p,category_id=self.category[slug]).status_code,303)
             self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),['사진','뷰'])
             self.assertEqual(self.save(p,category_id=self.category[slug],legacy_features_present='1').status_code,303)
             self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),[])
+
+    def test_cafe_hidden_legacy_tags_preserved_even_with_stale_inputs(self):
+        p = self.place()
+        self.execute('UPDATE places SET features=? WHERE id=?', (json.dumps(['사진','뷰']), p['id']))
+        for extra in ({}, {'legacy_features_present':'1'}, {'legacy_features_present':'1','features':['힐링']}):
+            self.assertEqual(self.save(p, **extra).status_code,303)
+            self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),['사진','뷰'])
 
     def test_switch_to_food_preserves_saved_legacy_tags_not_hidden_draft(self):
         p = self.place()
@@ -63,7 +70,7 @@ class AdminPlaceCleanupTest(unittest.TestCase):
         self.assertEqual(json.loads(self.rows('SELECT features FROM places')[0]['features']),['감성','뷰'])
         self.assertEqual(self.save(p,category_id=self.category['cafe']).status_code,303)
         html = self.admin.get(f"/admin/places/{p['id']}/edit").text
-        self.assertIn('data-legacy-tags data-place-categories="cafe attraction"',html)
+        self.assertIn('data-legacy-tags data-place-categories="attraction"',html)
         self.assertIn('value="감성" checked',html)
 
     def test_category_emoji_server_authority_and_legacy_focus_preserved(self):

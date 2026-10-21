@@ -1,5 +1,6 @@
 """Optional visit facts, kept separate from editorial recommendations and filters."""
 from datetime import date
+import json
 import re
 import unicodedata
 
@@ -121,6 +122,7 @@ def decorate_details(conn, place):
     terms = [r["name"] for r in place["classification_terms"]]
     # Cafe presentation uses the same managed terms as FIND/MAP. Legacy tags stay stored.
     place["restaurant_label"] = ' · '.join(terms) if place['category_slug'] == 'food' else ''
+    place["cafe_visit_times"] = json.loads(place.get("cafe_visit_times") or "[]")
     place["detail_features"] = terms if place["category_slug"] == "cafe" else list(dict.fromkeys(place.get("features_public", [])))
     if place["category_slug"] == "cafe":
         # Shared PICK cards also use official features; raw legacy tags remain stored.

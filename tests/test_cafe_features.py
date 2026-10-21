@@ -41,10 +41,10 @@ class CafeFeaturesTest(unittest.TestCase):
         config = self.visitor.get("/api/place-taxonomy").json()
         terms = [r for r in config["terms"] if r["type"] == "cafe_feature"]
         self.assertEqual([r["name"] for r in terms], [name for _, name in FEATURES])
-        self.assertEqual(len([r for r in terms if r["member_policy"] == "direct"]), 13)
+        self.assertEqual(len([r for r in terms if r["member_policy"] == "review"]), 14)
         page = self.member.get("/map/register").text
-        self.assertEqual(page.count('name="cafe_feature_ids"'), 13)
-        self.assertIn("가성비 제안 (관리자 확인 후 반영)", page)
+        self.assertEqual(page.count('name="cafe_feature_ids"'), 14)
+        self.assertIn("가성비도 제안할 수 있어요", page)
         self.assertNotIn("인기 핫플", page)
         self.assertNotIn('name="cafe_focus"', page)
         admin = self.admin.get("/admin/places/new").text
@@ -55,13 +55,16 @@ class CafeFeaturesTest(unittest.TestCase):
 
     def test_member_choices_search_menu_and_no_inference(self):
         p = self.create_cafe(["bakery", "dessert", "coffee"], signature_menu="소금빵", latitude="33.4", longitude="126.5")
+        self.assertFalse(self.api("?category=cafe&detail=cafe-bakery"))
+        suggestion = self.rows("SELECT * FROM place_correction_suggestions")[0]
+        self.assertEqual(self.post(self.admin, f"/admin/suggestions/{suggestion['id']}/review", action="accept").status_code, 303)
         self.create_cafe([], name="메뉴만 있는 카페", address="다른 주소", signature_menu="빵")
         for slug in ("bakery", "dessert", "coffee"):
             result = self.api("?category=cafe&detail=cafe-" + slug)
             self.assertEqual([r["id"] for r in result], [p["id"]])
         self.assertEqual([r["id"] for r in self.api("?category=cafe&q=베이커리")], [p["id"]])
         self.assertEqual([r["id"] for r in self.api("?category=cafe&q=소금빵")], [p["id"]])
-        self.assertFalse(self.rows("SELECT * FROM place_correction_suggestions"))
+        self.assertEqual(self.rows("SELECT status FROM place_correction_suggestions")[0]["status"], "accepted")
         self.assertEqual(self.rows("SELECT count(*) AS n FROM categories WHERE type='cafe_feature' AND is_active=1")[0]["n"], 15)
         page = self.visitor.get("/place/" + p["slug"]).text
         for text in ("#베이커리", "#디저트 전문", "#커피 전문"):
@@ -71,7 +74,7 @@ class CafeFeaturesTest(unittest.TestCase):
         response = self.member.get('/map/register?category=cafe&detail=cafe-bakery,cafe-dessert,cafe-popular,cafe-value')
         selected = re.findall(r'name="cafe_feature_ids" value="(\d+)" checked', response.text)
         self.assertEqual(set(selected),
-                         {str(self.term(k)['id']) for k in ('bakery', 'dessert')})
+                         {str(self.term(k)['id']) for k in ('bakery', 'dessert', 'value')})
         self.assertNotIn('name="cafe_value_suggestion" value="1" checked', response.text)
 
     def test_maximum_and_forged_popular_or_review_blocked(self):
@@ -80,7 +83,6 @@ class CafeFeaturesTest(unittest.TestCase):
         for extras in (
             {"cafe_feature_ids": [str(self.term(k)["id"]) for k in keys + ["quiet"]]},
             {"cafe_feature_ids": [str(self.term("popular")["id"])]},
-            {"cafe_feature_ids": [str(self.term("value")["id"])]},
             {"cafe_feature_ids": [str(self.term("taste")["id"])]},
             {"cafe_feature_ids": [str(self.term(k)["id"]) for k in keys], "cafe_value_suggestion": "1"},
             {"details_enabled": "1", "term_ids": [str(self.term("popular")["id"])]},
@@ -92,7 +94,7 @@ class CafeFeaturesTest(unittest.TestCase):
     def test_value_requires_existing_admin_review_and_owner_checks(self):
         p = self.create_cafe(["bakery"], cafe_value_suggestion="1")
         self.assertFalse(self.api("?category=cafe&detail=cafe-value"))
-        self.assertEqual(len(self.api("?category=cafe&detail=cafe-bakery")), 1)
+        self.assertFalse(self.api("?category=cafe&detail=cafe-bakery"))
         suggestion = self.rows("SELECT * FROM place_correction_suggestions")[0]
         self.assertEqual(suggestion["status"], "pending")
         self.assertIn("가성비", self.admin.get("/admin/suggestions").text)
@@ -129,11 +131,13 @@ class CafeFeaturesTest(unittest.TestCase):
         response = self.post(self.member, f"/places/{p['id']}/edit", **self.form(cafe_features_present="1", cafe_feature_ids=[str(self.term("coffee")["id"])]))
         self.assertEqual(response.status_code, 303)
         linked = {r["category_id"] for r in self.rows("SELECT * FROM place_category_links")}
-        self.assertEqual(linked, {legacy, self.term("coffee")["id"], self.term("popular")["id"], self.term("value")["id"]})
+        self.assertEqual(linked, {legacy, *[self.term(k)["id"] for k in keys]})
         self.assertEqual(self.rows("SELECT cafe_focus FROM places")[0]["cafe_focus"], '["taste"]')
 
     def test_used_delete_and_inactive_feature_rejected(self):
         p = self.create_cafe(["bakery"])
+        suggestion = self.rows("SELECT * FROM place_correction_suggestions")[0]
+        self.post(self.admin, f"/admin/suggestions/{suggestion['id']}/review", action="accept")
         term = self.term("bakery")
         self.post(self.admin, f"/admin/categories/{term['id']}/delete")
         self.assertTrue(self.term("bakery"))
@@ -148,7 +152,7 @@ class CafeMigrationTest(unittest.TestCase):
     def test_backup_rename_stable_ids_preservation_and_idempotence(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"JEJUNO_SKIP_SEED": "1"}):
             path = Path(folder) / "old.db"
-            with patch("app.migrate_cafe_features"):
+            with patch("app.migrate_cafe_features"), patch("app.migrate_cafe_flow"):
                 create_app({"TESTING": True, "DATABASE": str(path), "SECRET_KEY": "test"})
             with closing(sqlite3.connect(path)) as conn, conn:
                 conn.execute("INSERT INTO categories(name,slug,type,parent_id,legacy_aliases) SELECT '디저트 좋은','old-dessert','cafe_feature',id,'[]' FROM categories WHERE slug='cafe'")

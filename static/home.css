@@ -92,3 +92,6 @@
 @keyframes filter-reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){#categoryDetailChips .chip{flex:1 0 calc(33.333% - 8px);min-width:88px;padding:10px 8px}.category-details{padding-top:18px}}
 @media(prefers-reduced-motion:reduce){.category-details{animation:none}}
+
+#selectedCafeFeatures[hidden]{display:none}
+#selectedCafeFeatures:not([hidden]){margin-bottom:12px}

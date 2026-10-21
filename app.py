@@ -27,6 +27,8 @@ from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedF
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
 from cafe_focus import parse_focus, validate_focus, save_focus, decorate_focus
 from cafe_focus_migrations import backup_before_cafe_focus, migrate_cafe_focus
+from cafe_flow_migrations import backup_before_cafe_flow, migrate_cafe_flow
+from cafe_visit_times import OPTIONS as CAFE_VISIT_TIMES, parse_times, validate_times, save_times
 from cafe_feature_migrations import backup_before_cafe_features, migrate_cafe_features
 from auth_security import ServerSessionMiddleware, current_user, hash_password, verify_password, safe_external_url, rate_limited, DUMMY_HASH
 from member_routes import register_member_routes, validate_news
@@ -195,6 +197,7 @@ def create_app(test_config=None):
         return conn
 
     def init_db():
+        cafe_flow_backup = backup_before_cafe_flow(app.state.database)
         restaurant_backup = backup_before_restaurants(app.state.database)
         cleanup_backup_path = backup_before_admin_place_cleanup(app.state.database)
         submission_backup_path = backup_before_submission(app.state.database)
@@ -311,6 +314,7 @@ def create_app(test_config=None):
         migrate_admin_place_cleanup(app.state.database, cleanup_backup_path)
         migrate_restaurants(app.state.database, restaurant_backup)
         migrate_cafe_features(app.state.database, cafe_feature_backup)
+        migrate_cafe_flow(app.state.database, cafe_flow_backup)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -469,6 +473,7 @@ def create_app(test_config=None):
         return form, {
             **{key: str(form.get(key, '')) for key in RESTAURANT_FIELDS},
             **parse_details(form, existing),
+            "cafe_visit_times": parse_times(form, existing),
             "_control_error": control_error,
             "_focus_submitted": "cafe_focus_present" in form or "cafe_focus" in form,
             **{key: form.getlist(key) if key == "closed_weekdays" else form.get(key, "") for key in CONTROL_FIELDS if key in form or (key in ("hours_same", "hours_unknown") and form.get("hours_present") == "1")},
@@ -545,6 +550,7 @@ def create_app(test_config=None):
             return data["_control_error"]
         try:
             validate_details(data)
+            data["cafe_visit_times"] = validate_times(data["cafe_visit_times"])
             data["opened_year"], data["opened_month"] = opening(data["opened_year"], data["opened_month"])
         except ValueError as exc:
             return str(exc)
@@ -563,9 +569,9 @@ def create_app(test_config=None):
         if not category or category["type"] != "place" or (not category["is_active"] and (not existing or existing["category_id"] != category["id"])):
             return "활성 카테고리를 선택해 주세요. 기존 장소의 비활성 분류는 유지할 수 있습니다."
         data["category_id"], data["category"] = category["id"], category["name"]
-        if category["slug"] == "food" and existing:
-            # Food hides this editor, including after a category switch. Preserve
-            # the saved tags even if a stale browser submits cafe-only edits.
+        if category["slug"] in ("food", "cafe") and existing:
+            # Cafe and food hide legacy tags. Preserve saved values even when
+            # a stale form submits changes to the retired editor.
             data["features"] = parse_json_list(existing["features"])
         data["emoji"] = {"food": "🍚", "cafe": "☕", "attraction": "📍"}.get(category["slug"], "📍")
         conn = connect_db()
@@ -620,6 +626,7 @@ def create_app(test_config=None):
             "features": FEATURES,
             "status_options": STATUS_OPTIONS,
             "coffee_options": COFFEE_OPTIONS,
+            "cafe_visit_time_options": CAFE_VISIT_TIMES,
             "waiting_options": WAITING_OPTIONS,
             "submission_controls": controls,
             "admin_time_options": TIME_OPTIONS,
@@ -1112,6 +1119,7 @@ def create_app(test_config=None):
             save_links(conn, cursor.lastrowid, data["term_ids"])
             save_focus(conn, cursor.lastrowid, data["cafe_focus"])
             save_details(conn, cursor.lastrowid, data)
+            save_times(conn, cursor.lastrowid, data)
             plan.apply(conn, cursor.lastrowid)
             save_admin_facts(conn, cursor.lastrowid, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
@@ -1179,6 +1187,7 @@ def create_app(test_config=None):
             save_links(conn, place_id, data["term_ids"])
             save_focus(conn, place_id, data["cafe_focus"])
             save_details(conn, place_id, data)
+            save_times(conn, place_id, data)
             plan.apply(conn, place_id)
             save_admin_facts(conn, place_id, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")

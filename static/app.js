@@ -15,10 +15,13 @@ function buildFilters(){
   search.chips($('foodCuisineChips'),[{value:'',label:'전체'},...search.cuisinesFor(taxonomy).map(v=>({value:v.slug,label:v.name}))],cuisine);
   const more=$('categoryFeatureDetails');
   more.hidden=!terms.length;
-  if(more.dataset.category!==state.category){more.open=true;more.dataset.category=state.category;}
-  $('categoryFeatureSummary').hidden=state.category!=='food';
+  if(more.dataset.category!==state.category){more.open=state.category!=='cafe'||!matchMedia('(max-width: 640px)').matches;more.dataset.category=state.category;}
+  $('categoryFeatureSummary').hidden=false;
   $('categoryFeatureSummary').textContent=state.category==='food'?'세부유형 (선택)':'카페 특징 더보기';
-  $('categoryDetailTitle').textContent=state.category==='food'?'어떤 음식을 찾나요?':'어떤 카페가 좋아요?';
+  $('categoryDetailTitle').textContent=state.category==='food'?'어떤 음식을 찾나요?':'어떤 카페를 찾나요?';
+  const selected=$('selectedCafeFeatures');
+  selected.hidden=state.category!=='cafe'||!state.terms.length;
+  search.chips(selected,terms.filter(v=>state.terms.includes(v.slug)).map(v=>({value:v.slug,label:v.name+' ×'})),state.terms);
   $('categoryDetailCount').textContent=state.terms.length?`${state.terms.length}개 선택`:'';
   search.chips($('categoryDetailChips'),terms.map(v=>({value:v.slug,label:v.name})),state.terms);
 }
