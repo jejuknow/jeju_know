@@ -86,7 +86,9 @@ def admin_context(request, conn):
     if not account:
         return {}
     path = request.url.path
-    if path.startswith("/admin/categories") or path.startswith("/admin/classifications/"):
+    if path.startswith('/admin/imports'):
+        section, title, active = '장소 관리', 'CSV 일괄 등록', 'imports'
+    elif path.startswith("/admin/categories") or path.startswith("/admin/classifications/"):
         section = "분류 관리"
         key = path.rsplit("/", 1)[-1] if "/classifications/" in path else request.query_params.get("type", "place")
         title, active = KINDS.get(key, "장소 카테고리"), "class-" + key

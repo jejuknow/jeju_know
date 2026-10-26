@@ -153,7 +153,10 @@ class ImageStore:
     def list(self, kind, owner_id):
         with closing(self.connect_db()) as conn:
             rows = conn.execute(f"SELECT * FROM images WHERE {KINDS[kind]}=? ORDER BY sort_order", (owner_id,)).fetchall()
-        return [{**dict(row), "url": "/uploads/" + row["file_path"], "is_primary": row["sort_order"] == 0} for row in rows]
+            refs = conn.execute('SELECT * FROM place_image_references WHERE place_id=? ORDER BY sort_order', (owner_id,)).fetchall() if kind == 'places' else []
+        photos = [{**dict(row), "url": "/uploads/" + row["file_path"], "is_primary": row["sort_order"] == 0} for row in rows]
+        photos.extend({**dict(row), 'is_primary': row['sort_order'] == 0} for row in refs)
+        return sorted(photos, key=lambda row: row['sort_order'])
 
     def decorate(self, item, kind):
         item["legacy_image_url"] = item.get("image_url", "")
@@ -162,8 +165,10 @@ class ImageStore:
             with closing(self.connect_db()) as conn:
                 merged = conn.execute("SELECT i.* FROM images i JOIN places p ON p.id=i.place_id WHERE p.merged_into_id=? ORDER BY p.id,i.sort_order", (item["id"],)).fetchall()
                 legacy = conn.execute("SELECT image_url FROM places WHERE merged_into_id=? AND image_url!='' ORDER BY id", (item["id"],)).fetchall()
+                references = conn.execute('SELECT r.* FROM place_image_references r JOIN places p ON p.id=r.place_id WHERE p.merged_into_id=? ORDER BY p.id,r.sort_order', (item['id'],)).fetchall()
             # Keep overflow photos and their original records when merging two five-photo places.
             item["merged_images"] = [{**dict(r), "url": "/uploads/" + r["file_path"], "sort_order": 5+n, "is_primary": False} for n,r in enumerate(merged)]
+            item['merged_images'].extend({**dict(r), 'is_primary': False} for r in references)
             for row in legacy:
                 if safe_external_url(row["image_url"]):
                     item["merged_images"].append({"url": row["image_url"], "is_primary": False})
@@ -267,10 +272,14 @@ class ImagePlan:
         column = KINDS[self.kind]
         conn.execute(f"INSERT OR IGNORE INTO image_file_gc SELECT file_path FROM images WHERE {column}=?", (owner_id,))
         conn.execute(f"DELETE FROM images WHERE {column}=?", (owner_id,))
+        if self.kind == 'places':
+            conn.execute('DELETE FROM place_image_references WHERE place_id=?', (owner_id,))
 
     def apply(self, conn, owner_id):
         column = KINDS[self.kind]
         for slot in self.remove | self.new.keys():
+            if self.kind == 'places':
+                conn.execute('DELETE FROM place_image_references WHERE place_id=? AND sort_order=?', (owner_id,slot))
             conn.execute(f"INSERT OR IGNORE INTO image_file_gc SELECT file_path FROM images WHERE {column}=? AND sort_order=?", (owner_id, slot))
             conn.execute(f"DELETE FROM images WHERE {column}=? AND sort_order=?", (owner_id, slot))
             if image := self.new.get(slot):

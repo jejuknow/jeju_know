@@ -45,10 +45,12 @@ function locationFixture(){
  const ids={addressLocate:button,locationFeedback:message,placeLocationMap:{},locationPicker:details,locationClear:clear};
  const selectors={'[name="address"]':address,'[name="latitude"]':lat,'[name="longitude"]':lng};
  const timers=new Map();let timerId=0;
- vm.runInNewContext(fs.readFileSync(require.resolve('../static/admin-location.js'),'utf8'),{
-  document:{getElementById:id=>ids[id],querySelector:s=>selectors[s]},window:{JejunoKakao:{load:async()=>sdk}},ResizeObserver:class{observe(){}},
-  setTimeout:f=>{timers.set(++timerId,f);return timerId;},clearTimeout:id=>timers.delete(id)});
- const tick=async()=>{await Promise.resolve();await Promise.resolve();await Promise.resolve();};
+ const context={document:{getElementById:id=>ids[id],querySelector:s=>selectors[s]},window:{},ResizeObserver:class{observe(){}},
+  setTimeout:f=>{timers.set(++timerId,f);return timerId;},clearTimeout:id=>timers.delete(id)};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../static/kakao-loader.js'),'utf8'),context);
+ context.window.JejunoKakao.load=async()=>sdk;
+ vm.runInNewContext(fs.readFileSync(require.resolve('../static/admin-location.js'),'utf8'),context);
+ const tick=async()=>{for(let i=0;i<10;i++)await Promise.resolve();};
  const start=async value=>{address.value=value;address.events.input();address.events.blur();await tick();};
  const finish=async(index,lat,lng)=>{calls[index].callback([{y:String(lat),x:String(lng)}],'OK');await tick();};
  return {address,lat,lng,button,message,details,clear,calls,events,sdk,tick,start,finish,get marker(){return marker;}};

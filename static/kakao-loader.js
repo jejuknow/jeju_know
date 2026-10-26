@@ -2,6 +2,17 @@
   'use strict';
   let pending;
   root.JejunoKakao = {
+    async geocode(key, address) {
+      const sdk = await this.load(key);
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('주소 검색이 지연되고 있습니다. 다시 시도해주세요.')), 8000);
+        new sdk.services.Geocoder().addressSearch(address, (data, status) => {
+          clearTimeout(timeout);
+          if (status === sdk.services.Status.OK && data.length === 1) resolve({lat:Number(data[0].y), lng:Number(data[0].x)});
+          else reject(new Error('주소로 정확한 위치를 찾지 못했습니다. 지도에서 직접 위치를 선택해주세요.'));
+        });
+      });
+    },
     load(key) {
       if (!key) return Promise.reject(new Error('지도를 준비 중입니다. 장소 목록과 상세보기는 이용할 수 있어요.'));
       if (pending) return pending;

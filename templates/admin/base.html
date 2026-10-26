@@ -13,7 +13,7 @@
     <a href="/admin" class="admin-nav-link" {% if admin_active=='dashboard' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}대시보드</a>
     <p class="admin-nav-caption">MANAGEMENT</p>
     {% for group, symbol, links in [
-      ('장소 관리','place',[('places','전체 장소','/admin/places'),('community','사용자 등록','/admin/community'),('suggestions','정보 바로잡기','/admin/suggestions'),('new','신상 장소','/admin/new'),('picks','JEJU_KNOW PICK','/admin/picks')]),
+      ('장소 관리','place',[('places','전체 장소','/admin/places'),('community','사용자 등록','/admin/community'),('suggestions','정보 바로잡기','/admin/suggestions'),('new','신상 장소','/admin/new'),('picks','JEJU_KNOW PICK','/admin/picks'),('imports','CSV 일괄 등록','/admin/imports')]),
       ('분류 관리','classification',[]),
       ('콘텐츠 관리','content',[('issues','ISSUE','/admin/issues'),('best','BEST','/admin/best')]),
       ('회원 관리','user',[('users','회원 목록','/admin/users')]),

@@ -1,0 +1,38 @@
+{% extends 'admin/base.html' %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/csv-import.css?v=1">{% endblock %}
+{% block admin_content %}
+<div class="csv-intro"><h2>{{ label ~ ' CSV 일괄등록' if kind else 'CSV 장소 일괄 등록' }}</h2><p>엑셀에서 장소 데이터를 작성한 뒤 <strong>CSV UTF-8</strong> 형식으로 저장하여 업로드해주세요.</p><p>카페와 맛집은 각각 업로드합니다. 미리보기에서 확인한 행만 기존 장소 DB에 저장합니다.</p></div>
+<nav class="csv-kinds" aria-label="CSV 종류 선택">
+  <a class="admin-panel csv-kind" href="/admin/imports/cafe" {% if kind=='cafe' %}aria-current="page"{% endif %}><strong>☕ 카페 CSV 등록</strong><span>카페 특징 · 커피 맛 특징</span></a>
+  <a class="admin-panel csv-kind" href="/admin/imports/restaurant" {% if kind=='restaurant' %}aria-current="page"{% endif %}><strong>🍚 맛집 CSV 등록</strong><span>맛집 대분류 · 세부유형</span></a>
+</nav>
+<div class="row-actions csv-downloads"><a class="secondary-btn" href="/admin/imports/cafe/template.csv">카페 CSV 템플릿 다운로드</a><a class="secondary-btn" href="/admin/imports/restaurant/template.csv">맛집 CSV 템플릿 다운로드</a><a class="secondary-btn" href="/admin/imports/template.xlsx">Excel 입력 양식 다운로드</a></div>
+{% if kind and not stage %}
+<form class="admin-panel csv-upload" method="post" action="/admin/imports/{{ kind }}/preview" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="csvFile"><strong>{{ label }} CSV 파일 선택</strong></label><input id="csvFile" name="csv_file" type="file" accept=".csv,text/csv" required>
+  <p>UTF-8 또는 UTF-8 BOM · 최대 5MB / 500행 · 저장 카테고리: <strong>{{ label }}</strong></p><button class="primary-inline" type="submit">업로드 내용 확인 →</button>
+</form>
+{% endif %}
+{% if result %}
+<section class="admin-panel csv-result" role="status"><h2>등록 완료</h2><p>신규 {{ result.created|length }}건 · 업데이트 {{ result.updated|length }}건 · 건너뜀 {{ result.skipped }}건</p><p>저장 직전 백업: <code>{{ result.backup }}</code></p><div class="row-actions">{% for id in result.created + result.updated %}<a class="mini-btn" href="/admin/places/{{ id }}/edit">장소 #{{ id }} 확인</a>{% endfor %}<a class="secondary-btn" href="/admin/places">전체 장소</a><a class="secondary-btn" href="/admin/imports/{{ kind }}">다른 파일 등록</a></div><p>새로고침하거나 같은 요청을 다시 보내도 중복 저장되지 않습니다.</p></section>
+{% elif stage %}
+<section class="admin-panel csv-preview"><div class="admin-panel-heading"><h2>미리보기 · 총 {{ stage.rows|length }}건</h2><a class="mini-btn" href="/admin/imports/{{ kind }}">다시 업로드</a></div>
+<div class="csv-summary">{% for state, count in counts.items() %}<span>{{ state }} <strong>{{ count }}</strong></span>{% endfor %}<a href="/admin/imports/{{ kind }}/preview/{{ stage.token }}/errors.csv">오류 CSV 다운로드</a></div>
+<p class="csv-help">경고·중복 후보는 기본적으로 건너뜁니다. 내용을 확인한 뒤 행별 작업을 선택해주세요. 빈 셀은 기존 값을 유지하며, 공개 여부가 비어 있는 신규 장소는 비공개입니다. 미리보기는 1시간 동안 유효합니다.</p>
+<form id="csvGeocode" method="post" action="/admin/imports/{{ kind }}/preview/{{ stage.token }}/coordinates" data-kakao-key="{{ kakao_map_key }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="button" class="secondary-btn" id="csvGeocodeButton">좌표 없는 주소 위치 찾기</button><span id="csvGeocodeStatus" role="status">검색 실패 시 좌표 없이 등록할 수 있습니다.</span></form>
+<form method="post" action="/admin/imports/{{ kind }}/preview/{{ stage.token }}/commit" id="csvCommit"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<div class="csv-table-wrap" tabindex="0" aria-label="CSV 미리보기 표 가로 스크롤"><table class="csv-table"><thead><tr><th>행</th><th>장소 / 지역 / 주소</th><th>{{ '카페 특징 / 커피 맛' if kind=='cafe' else '맛집 대분류 / 세부유형' }}</th><th>공개 / PICK / NEW</th><th>상태 / 확인 사항</th><th>작업</th></tr></thead><tbody>
+{% for row in stage.rows %}<tr {% if row.needs_coordinates and not row.errors %}data-geocode-line="{{ row.line }}" data-address="{{ row.address }}"{% endif %}>
+<td>{{ row.line }}</td><td><strong>{{ row.raw['장소명'] or '(기존 이름 유지)' }}</strong><div>{{ row.raw['지역'] or '(기존 지역 유지)' }}</div><div>{{ row.raw['주소'] or '(기존 주소 유지)' }}</div><details><summary>입력값 전체 보기</summary><dl>{% for key,value in row.raw.items() if value %}<dt>{{ key }}</dt><dd>{{ value }}</dd>{% endfor %}</dl></details></td>
+<td>{{ (row.raw['카페_특징'] ~ ' / ' ~ row.raw['커피맛_특징']) if kind=='cafe' else (row.raw['맛집_대분류'] ~ ' / ' ~ row.raw['맛집_세부유형']) }}</td>
+<td>{{ row.raw['공개여부'] or '신규 비공개 / 수정 유지' }}<br>PICK {{ row.raw['JEJU_KNOW_PICK'] or '신규 아니오 / 수정 유지' }} {{ row.raw['PICK_연도'] }} {{ row.raw['PICK_월'] }}<br>NEW {{ row.raw['NEW_노출'] or '신규 자동 / 수정 유지' }}</td>
+<td><strong class="csv-state">{{ row.status }}</strong><ul>{% for message in row.errors + row.warnings %}<li>{{ message }}</li>{% endfor %}{% if row.same_file %}<li>같은 파일 {{ row.same_file }}행과 이름·주소가 같습니다.</li>{% endif %}{% for p in row.duplicates %}<li>기존 #{{ p.id }} {{ p.name }} · {{ p.address }}{% if not p.can_update %} (다른 카테고리: 업데이트 불가){% endif %}</li>{% endfor %}</ul></td>
+<td><label class="csv-visually-hidden" for="action{{ row.line }}">{{ row.line }}행 작업</label><select id="action{{ row.line }}" name="action_{{ row.line }}" {% if row.errors %}disabled{% endif %}><option value="skip" {% if row.default_action=='skip' %}selected{% endif %}>건너뛰기</option><option value="create" {% if row.default_action=='create' %}selected{% endif %}>신규로 등록</option>{% if row.duplicates|selectattr('can_update')|list %}<option value="update">기존 장소 업데이트</option>{% endif %}</select>
+{% if row.duplicates|selectattr('can_update')|list %}<label for="target{{ row.line }}">업데이트 대상</label><select id="target{{ row.line }}" name="target_{{ row.line }}"><option value="">대상 선택</option>{% for p in row.duplicates if p.can_update %}<option value="{{ p.id }}">#{{ p.id }} {{ p.name }}</option>{% endfor %}</select>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+<div class="csv-confirm"><label><input name="confirm" type="checkbox" value="1" required> 선택한 행의 작업·공개 여부·경고를 확인했습니다.</label><button class="primary-inline" type="submit">선택한 데이터 저장 →</button><p>저장 직전 DB 백업을 생성합니다. 저장 중 오류가 발생하면 이번 작업 전체를 취소합니다.</p></div></form></section>
+<script src="/static/kakao-loader.js?v=csv1" defer></script><script src="/static/csv-import.js?v=1" defer></script>
+{% endif %}
+<details class="admin-panel csv-guide" {% if not stage %}open{% endif %}><summary>입력 규칙과 현재 선택 목록</summary><ul><li>장소명·지역·주소는 신규 등록 필수 항목입니다. 수정할 때 빈 셀은 기존 값을 유지합니다.</li><li>기존 장소를 수정하려면 place_id를 입력하고 미리보기에서 업데이트를 직접 선택해주세요.</li><li>동행·카페 특징·휴무 요일은 <code>|</code>로 구분합니다. Excel 드롭다운은 단일 선택만 지원하므로 복수값은 직접 입력해주세요.</li><li>영업시간은 HH:MM 형식으로 시작·종료를 함께 입력합니다. 휴무일: 월|화 또는 연중무휴 / 미확인.</li><li>위도·경도가 없으면 미리보기에서 주소 위치 찾기를 실행할 수 있습니다.</li><li>꿀팁은 기존 방문 전 알아둘 점에 저장합니다. 비고는 관리자 전용으로 보관합니다.</li><li>사진은 기존 /uploads/ 경로나 http/https URL만 참조합니다. 외부 사진 다운로드 및 기존 사진 교체·삭제는 하지 않습니다.</li><li>오류 CSV를 수정하여 다시 업로드할 때 마지막 오류사유 열을 제거해주세요.</li></ul>
+<div class="csv-choice-grid">{% for title,values in choices.items() %}{% if not kind or kind=='cafe' and title not in ['맛집_대분류','맛집_세부유형','맛집 분류 관계'] or kind=='restaurant' and title not in ['카페_특징','커피맛_특징'] %}<div><h3>{{ title }}</h3><p>{{ values|join(' · ') }}</p></div>{% endif %}{% endfor %}</div></details>
+{% endblock %}

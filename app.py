@@ -315,6 +315,8 @@ def create_app(test_config=None):
         migrate_restaurants(app.state.database, restaurant_backup)
         migrate_cafe_features(app.state.database, cafe_feature_backup)
         migrate_cafe_flow(app.state.database, cafe_flow_backup)
+        from csv_import_migrations import migrate as migrate_csv_import
+        migrate_csv_import(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -676,7 +678,7 @@ def create_app(test_config=None):
                 places.sort(key=lambda p: (p["pick_order"],p["id"]))
             # Private submitter IDs and internal moderator identities are never public API fields.
             for place in places:
-                for key in ("submitted_by_user_id","verified_by","deleted_at","merged_into_id"):
+                for key in ("submitted_by_user_id","verified_by","deleted_at","merged_into_id","admin_import_note"):
                     place.pop(key, None)
             return JSONResponse(places, headers={"Cache-Control": "no-store"})
         finally:
@@ -1245,6 +1247,8 @@ def create_app(test_config=None):
     register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
                               row_to_place, form_options, REGIONS, secret_key, image_store)
     app.state.admin_ui = AdminUI(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place, row_to_news, NEWS_CATEGORIES, NEWS_CATEGORY_ALIASES)
+    from csv_import_routes import register_csv_routes
+    register_csv_routes(app, templates, connect_db, admin_guard, require_csrf, flash)
     app.state.admin_ui.register()
     return app
 

@@ -53,18 +53,10 @@
     searchedAddress=knownAddress=normalize(value);
     pending=(async()=>{try{
       const sdk=await window.JejunoKakao.load(button.dataset.kakaoKey);
-      const results=await new Promise((resolve,reject)=>{
-        const timeout=setTimeout(()=>reject(new Error('주소 검색이 지연되고 있습니다. 다시 찾거나 지도에서 직접 위치를 선택해주세요.')),8000);
-        new sdk.services.Geocoder().addressSearch(value,(data,status)=>{
-          clearTimeout(timeout);
-          if(status===sdk.services.Status.OK&&data.length)resolve(data);
-          else reject(new Error('주소로 정확한 위치를 찾지 못했습니다. 아래 지도에서 직접 위치를 선택해주세요.'));
-        });
-      });
+      const result=await window.JejunoKakao.geocode(button.dataset.kakaoKey,value);
       if(current!==revision)return;
-      if(results.length!==1)throw new Error('주소로 정확한 위치를 찾지 못했습니다. 아래 지도에서 직접 위치를 선택해주세요.');
       if(!automatic||details?.open)await ensurePicker();if(current!==revision)return;
-      const position=new sdk.LatLng(Number(results[0].y),Number(results[0].x));
+      const position=new sdk.LatLng(result.lat,result.lng);
       showPosition(position);if(map){map.setCenter(position);map.setLevel(4);}
       message.textContent='위치 확인됨 · 지도 위치를 찾았습니다.';
     }catch(error){if(current===revision){message.textContent=error.message;if(automatic&&details)details.open=true;}}
