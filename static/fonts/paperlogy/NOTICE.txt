@@ -1,0 +1,21 @@
+Paperlogy - self-hosted webfont assets for JEJU_KNOW
+
+Copyright 2024 The PAPERLOGY Authors
+License: SIL Open Font License 1.1 (see OFL.txt in this directory)
+Official project: https://freesentation.blog/paperlogyfont
+Official distribution: https://github.com/Freesentation/paperlogy
+Source revision: 8ef35f53b318c7ca914c52b1b382b9a8bad07a61
+Downloaded: 2026-10-27
+
+The six WOFF2 files were copied unmodified from the official repository's
+woff2/ directory. Only weights used by the UI policy (400-900) are included;
+the browser loads individual faces on demand. There is no external font CDN
+dependency and no font download feature in the product.
+
+The existing 800/900 emphasis is retained. Intermediate CSS weights 750,
+850 and 950 are normalized to the supplied 700, 800 and 900 faces. Emoji
+fonts and Kakao Maps' built-in UI remain under their existing font policies.
+
+FastAPI StaticFiles supplies ETag and Last-Modified validators for browser
+revalidation. Only Regular is preloaded; other weights are requested when
+rendered text needs them. font-display: swap keeps fallback text visible.

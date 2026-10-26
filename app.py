@@ -1,6 +1,7 @@
 import hmac
 import json
 import math
+import mimetypes
 import os
 import re
 import secrets
@@ -165,6 +166,8 @@ def create_app(test_config=None):
         database=str(database_path),
         secure=not app.state.testing,
     )
+    # Windows registry mappings can label WOFF2 as text/plain.
+    mimetypes.add_type("font/woff2", ".woff2")
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
     def context_processor(request: Request):
