@@ -13,6 +13,33 @@ def branch_terms(conn, category_id, active=False):
     return [r for r in descendants(conn, category_id, active) if r['id'] != category_id]
 
 
+def official_terms(conn, category_id, *, member=False):
+    """Current choices for every form, import and search, including ancestor policy.
+
+    Raw branch_terms remains available for preserving historical associations.
+    Never infer an official classification from old labels or seed definitions.
+    """
+    rows = descendants(conn, category_id)
+    root = next((r for r in rows if r['id'] == category_id), None)
+    if not root or not root['is_active']:
+        return []
+    kind = {'cafe': 'cafe_feature', 'food': 'restaurant_subcategory'}.get(root['slug'])
+    eligible = {r['id']: r for r in rows if r['id'] != category_id and r['is_active']
+                and not r['is_legacy'] and (kind is None or r['type'] == kind)}
+    def reachable(row):
+        seen = {row['id']}
+        parent = row['parent_id']
+        while parent != category_id:
+            if parent in seen or parent not in eligible:
+                return False
+            seen.add(parent)
+            parent = eligible[parent]['parent_id']
+        return True
+    return sorted((r for r in eligible.values() if reachable(r)
+                   and (not member or r['member_policy'] != 'admin')),
+                  key=lambda r: (r['sort_order'], r['id']))
+
+
 def classification_terms(conn, place_id, category_id):
     rows = branch_terms(conn, category_id)
     by_id = {r['id']: r for r in rows}
@@ -65,9 +92,10 @@ def parse_selection(conn, form, category_id, existing=None, required=False):
             raise ValueError('맛집 대분류를 선택해주세요.')
         return previous if existing and existing['category_id'] == category_id else []
     rows = {str(r['id']): r for r in branch_terms(conn, category_id)}
+    selectable = {r['id'] for r in official_terms(conn, category_id)}
     old_path = {r['id'] for r in classification_terms(conn, existing['id'], category_id)} if existing else set()
     def usable(row):
-        return row and not row['is_legacy'] and (row['is_active'] or row['id'] in old_path)
+        return row and not row['is_legacy'] and (row['id'] in selectable or row['id'] in old_path)
     parent = rows.get(main)
     subtype = rows.get(child)
     if not usable(parent) or parent['parent_id'] != category_id:

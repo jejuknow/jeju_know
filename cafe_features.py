@@ -1,6 +1,7 @@
 """Shared cafe choice permissions. Official features live only in categories."""
 from place_details import validate_detail_value
 from cafe_visit_times import validate_times
+from restaurant_taxonomy import official_terms
 
 DETAIL_KEYS = ("recommended_menu", "coffee_taste", "dessert_note")
 FIELDS = {"cafe_features_present", "cafe_feature_ids", "cafe_value_suggestion", "detail_cafe_visit_times", *("detail_" + k for k in DETAIL_KEYS)}
@@ -17,12 +18,11 @@ def parse_member_features(conn, form, category_id, existing=None):
         if form.getlist("cafe_feature_ids") or form.get("cafe_value_suggestion") == "1":
             raise ValueError("카페 특징 입력을 새로고침 후 다시 확인해주세요.")
         return None, None
-    choices = {str(r["id"]): dict(r) for r in conn.execute(
-        "SELECT * FROM categories WHERE parent_id=? AND type='cafe_feature' AND is_active=1 AND is_legacy=0", (category_id,))}
+    choices = {str(r["id"]): r for r in official_terms(conn, category_id, member=True)}
     selected = list(dict.fromkeys(form.getlist("cafe_feature_ids")))
     # Accept the prior cached form's value checkbox, but always queue it for review.
     if form.get("cafe_value_suggestion") == "1":
-        value = next((r for r in choices.values() if r["slug"] == "cafe-value" or r["name"] == "가성비"), None)
+        value = next((r for r in choices.values() if r["slug"] == "cafe-value"), None)
         if not value:
             raise ValueError("가성비 제안 항목이 변경되었습니다. 새로고침해주세요.")
         selected = list(dict.fromkeys(selected + [str(value["id"])]))

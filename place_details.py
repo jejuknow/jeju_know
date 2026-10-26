@@ -113,17 +113,22 @@ def decorate_details(conn, place):
         place[field] = place.get(field) or "미확인"
     for field in ("signature_menu", "recommended_menu"):
         place[field + "_items"] = [line.strip() for line in (place.get(field) or "").splitlines() if line.strip()]
-    from restaurant_taxonomy import classification_terms, form_selection
+    from restaurant_taxonomy import classification_terms, form_selection, official_terms
     place["classification_terms"] = classification_terms(conn, place['id'], place.get('category_id'))
     if place['category_slug'] == 'cafe':
-        place["classification_terms"] = [r for r in place["classification_terms"] if r["is_active"] and not r["is_legacy"]]
+        current = {r['id'] for r in official_terms(conn, place.get('category_id'))}
+        place["classification_terms"] = [r for r in place["classification_terms"] if r['id'] in current]
     if place['category_slug'] == 'food':
+        # Disabled official food paths remain readable on existing records.
+        # Legacy associations stay in storage and the admin review form only.
+        place['classification_terms'] = [r for r in place['classification_terms']
+                                         if r['type'] == 'restaurant_subcategory' and not r['is_legacy']]
         place.update(form_selection(conn, place['id'], place.get('category_id')))
     terms = [r["name"] for r in place["classification_terms"]]
     # Cafe presentation uses the same managed terms as FIND/MAP. Legacy tags stay stored.
     place["restaurant_label"] = ' · '.join(terms) if place['category_slug'] == 'food' else ''
     place["cafe_visit_times"] = json.loads(place.get("cafe_visit_times") or "[]")
-    place["detail_features"] = terms if place["category_slug"] == "cafe" else list(dict.fromkeys(place.get("features_public", [])))
+    place["detail_features"] = terms if place["category_slug"] in ("cafe", "food") else list(dict.fromkeys(place.get("features_public", [])))
     if place["category_slug"] == "cafe":
         # Shared PICK cards also use official features; raw legacy tags remain stored.
         usage = [label for field, label in (("parking_status", "주차"), ("accessible_status", "무장애")) if place.get(field) == "가능"]

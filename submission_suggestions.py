@@ -13,7 +13,7 @@ USAGE_LABELS = {"parking_status": "주차", "pet_status": "반려동물", "child
                 "accessible_status": "무장애", "reservation_status": "예약", "waiting_status": "웨이팅"}
 # Waiting has established facts (none / present / seasonal), unlike admission policies.
 WAITING_MAP = {"미확인": "미확인", "가능": "있음", "불가": "없음", "제한": "주말·성수기 있음"}
-INPUT_FIELDS = {"details_enabled", "detail_companions", "term_ids", "taxonomy_present",
+INPUT_FIELDS = {"details_enabled", "detail_companions", "term_ids", "taxonomy_present", "detail_note",
                 *("detail_" + k for k in USAGE_LABELS)}
 
 
@@ -35,7 +35,7 @@ def parse_proposal(form, conn, category_id):
     if cafe_terms:
         restricted = {r["id"] for r in cafe_terms if r["member_policy"] == "admin"}
         if set(data["term_ids"]) & restricted:
-            raise ValueError("인기 핫플은 관리자만 지정할 수 있어요.")
+            raise ValueError("관리자 전용 카페 특징은 회원이 지정할 수 없어요.")
         if len(data["term_ids"]) > 5:
             raise ValueError("카페 특징은 최대 5개까지 선택할 수 있어요.")
     usage = {}
@@ -45,13 +45,18 @@ def parse_proposal(form, conn, category_id):
             raise ValueError(label + " 선택값을 확인해주세요.")
         if value != "미확인":
             usage[key] = WAITING_MAP[value] if key == "waiting_status" else value
-    if not companions and not data["term_ids"] and not usage:
+    note = str(form.get('detail_note', '')).strip()
+    if len(note) > 4000 or any(ord(c) < 32 and c not in '\n\r\t' for c in note):
+        raise ValueError('꿀팁은 4,000자 이내로 입력해주세요.')
+    if not companions and not data["term_ids"] and not usage and not note:
         return None
-    return {"category_id": category_id, "companions": sorted(companions), "term_ids": sorted(data["term_ids"]), "usage": usage}
+    return {"category_id": category_id, "companions": sorted(companions), "term_ids": sorted(data["term_ids"]), "usage": usage, **({'note': note} if note else {})}
 
 
 def snapshot(conn, place, proposal):
     data = {"category_id": place["category_id"], "usage": {key: place[key] for key in proposal["usage"]}}
+    if proposal.get('note'):
+        data['note'] = place['note']
     if proposal["companions"]:
         data["companions"] = sorted(json.loads(place["companions"] or "[]"))
     if proposal["term_ids"]:
@@ -89,6 +94,9 @@ def approve_proposal(conn, place, suggestion):
         if key not in USAGE_LABELS or value not in (WAITING_OPTIONS if key == "waiting_status" else USE_OPTIONS):
             raise ValueError("이용 정보 선택값을 확인해주세요.")
     details = proposal.get("cafe_details", {})
+    note = proposal.get('note')
+    if note is not None and (not isinstance(note, str) or len(note) > 4000):
+        raise ValueError('꿀팁 제안 내용을 확인해주세요.')
     if details and conn.execute("SELECT slug FROM categories WHERE id=?", (place["category_id"],)).fetchone()[0] != "cafe":
         raise ValueError("카페 정보는 카페에서만 반영할 수 있어요.")
     for key, value in details.items():
@@ -99,6 +107,8 @@ def approve_proposal(conn, place, suggestion):
         else:
             validate_detail_value(key, value)
     # Validate the complete batch before the first canonical write.
+    if note:
+        conn.execute('UPDATE places SET note=? WHERE id=?', (note, place['id']))
     for key, value in proposal["usage"].items():
         conn.execute(f"UPDATE places SET {key}=? WHERE id=?", (value, place["id"]))
     if proposal["companions"]:
@@ -114,6 +124,8 @@ def approve_proposal(conn, place, suggestion):
 def display_proposal(conn, value):
     data = json.loads(value)
     lines = []
+    if data.get('note'):
+        lines.append('꿀팁: ' + data['note'])
     labels = {i["value"]: i["label"] for i in catalog(conn, "companion")}
     if data.get("companions"):
         lines.append("잘 맞는 동행: " + " / ".join(labels.get(c, c) for c in data["companions"]))

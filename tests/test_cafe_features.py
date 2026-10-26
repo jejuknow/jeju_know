@@ -44,7 +44,7 @@ class CafeFeaturesTest(unittest.TestCase):
         self.assertEqual(len([r for r in terms if r["member_policy"] == "review"]), 14)
         page = self.member.get("/map/register").text
         self.assertEqual(page.count('name="cafe_feature_ids"'), 14)
-        self.assertIn("가성비도 제안할 수 있어요", page)
+        self.assertIn("회원 제안이 가능한 특징만 표시됩니다", page)
         self.assertNotIn("인기 핫플", page)
         self.assertNotIn('name="cafe_focus"', page)
         admin = self.admin.get("/admin/places/new").text

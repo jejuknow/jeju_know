@@ -14,7 +14,7 @@ from community_places import coordinates, duplicates, opening
 from community_migrations import today
 from csv_import_migrations import backup
 from place_details import COFFEE_OPTIONS, USE_OPTIONS, validate_detail_value
-from restaurant_taxonomy import branch_terms, form_selection, parse_selection
+from restaurant_taxonomy import official_terms, form_selection, parse_selection
 from submission_fields import normalize_controls
 from starlette.datastructures import FormData
 
@@ -110,7 +110,7 @@ def exact_catalog(conn, kind, text):
 def validate_cafe_row(conn, raw, category_id, previous):
     if not raw['카페_특징']:
         return None
-    terms = [r for r in branch_terms(conn, category_id, True) if r['type'] == 'cafe_feature' and not r['is_legacy']]
+    terms = official_terms(conn, category_id)
     ids = []
     for name in split_values(raw['카페_특징']):
         matches = [r['id'] for r in terms if r['name'] == name]
@@ -125,7 +125,7 @@ def validate_cafe_row(conn, raw, category_id, previous):
 def validate_restaurant_row(conn, raw, category_id, previous):
     if not raw['맛집_대분류'] and not raw['맛집_세부유형'] and previous:
         return None
-    rows = [r for r in branch_terms(conn, category_id, True) if not r['is_legacy']]
+    rows = official_terms(conn, category_id)
     saved = form_selection(conn, previous['id'], category_id) if previous else {}
     parents = [r for r in rows if r['parent_id'] == category_id and
                (r['name'] == raw['맛집_대분류'] if raw['맛집_대분류'] else str(r['id']) == saved.get('restaurant_main_id'))]
@@ -353,8 +353,8 @@ def choice_lists(conn):
     lists.update({title: list(options) for title, (_, options) in CHOICES.items()})
     cafe = conn.execute("SELECT id FROM categories WHERE slug='cafe' AND type='place'").fetchone()[0]
     food = conn.execute("SELECT id FROM categories WHERE slug='food' AND type='place'").fetchone()[0]
-    lists['카페_특징'] = [r['name'] for r in sorted(branch_terms(conn, cafe, True), key=lambda r: (r['sort_order'],r['id'])) if r['type'] == 'cafe_feature' and not r['is_legacy']]
-    terms = sorted([r for r in branch_terms(conn, food, True) if not r['is_legacy']], key=lambda r: (r['sort_order'],r['id']))
+    lists['카페_특징'] = [r['name'] for r in official_terms(conn, cafe)]
+    terms = official_terms(conn, food)
     lists['맛집_대분류'] = [r['name'] for r in terms if r['parent_id'] == food]
     lists['맛집_세부유형'] = list(dict.fromkeys(r['name'] for r in terms if r['parent_id'] != food))
     parents = {r['id']: r['name'] for r in terms}

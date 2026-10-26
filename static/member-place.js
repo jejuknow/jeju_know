@@ -13,7 +13,7 @@
     const expanded=details.checked;
     document.getElementById('submissionDetails').hidden=!expanded;
     details.setAttribute('aria-expanded',String(expanded));
-    document.querySelectorAll('#submissionDetails input,#submissionDetails select').forEach(input=>{input.disabled=!expanded;});
+    document.querySelectorAll('#submissionDetails input,#submissionDetails select,#submissionDetails textarea').forEach(input=>{input.disabled=!expanded;});
     document.querySelectorAll('#memberPlaceTerms fieldset').forEach(group=>{
       const active=group.dataset.categoryId===category.value;
       group.hidden=!active||!group.querySelector('input');

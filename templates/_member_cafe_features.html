@@ -6,12 +6,12 @@
 <p class="form-help">이 카페를 가장 잘 설명하는 특징을 골라주세요. 최대 5개</p>
 <p class="form-help" data-cafe-feature-feedback role="status" aria-live="polite">0/5 선택</p>
 <div class="chips">
-{% for term in taxonomy.terms if term.parent_id == c.id and term.is_active and not term.is_legacy and term.member_policy != 'admin' %}
+{% for term in taxonomy.terms if term.parent_id == c.id and term.selectable and not term.is_legacy and term.member_policy != 'admin' %}
 <label class="member-term"><input type="checkbox" name="cafe_feature_ids" value="{{ term.id }}" {% if term.id|string in p.get('cafe_feature_ids',[]) %}checked{% endif %}>{{ term.name }}</label>
 {% endfor %}
 </div>
 <p class="form-help">케이크·푸딩 등은 디저트 전문, 빵·페이스트리 등은 베이커리로 골라주세요. 둘 다 선택할 수 있어요.</p>
-<p class="form-help">선택한 특징과 아래 메뉴 정보는 관리자 승인 후 반영됩니다. 가성비도 제안할 수 있어요. 이미 승인된 특징은 유지됩니다.</p>
+<p class="form-help">선택한 특징과 아래 메뉴 정보는 관리자 승인 후 반영됩니다. 회원 제안이 가능한 특징만 표시됩니다. 이미 승인된 특징은 유지됩니다.</p>
 <div class="form-grid two"><label class="span-2">추천메뉴 (선택)<textarea name="detail_recommended_menu" maxlength="1000" rows="2" placeholder="한 줄에 메뉴 이름 하나씩">{{ p.get('detail_recommended_menu','') }}</textarea></label>
 <label>커피 맛 특징<select name="detail_coffee_taste">{% for item in coffee_options %}<option value="{{ item }}" {% if (p.get('detail_coffee_taste') or '미확인') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
 <label>디저트·베이커리 특징<textarea name="detail_dessert_note" maxlength="300" rows="3">{{ p.get('detail_dessert_note','') }}</textarea></label></div>

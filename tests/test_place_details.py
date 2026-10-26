@@ -49,9 +49,9 @@ class PlaceDetailsTest(unittest.TestCase):
         self.assertEqual(edit.status_code, 200)
         self.assertIn('2020-03-04', edit.text)
         page = self.visitor.get('/place/details-test')
-        for text in ['한눈에 보기','10:00 ~ 18:00','매주 화요일','라스트오더 17:30','시즌 필터커피','오늘의 빵','JEJU_KNOW 추천 이유','부모님','제주다움','방문 전 알아둘 점','공식 Instagram / 현장 확인','2020-03-04','정보 바로잡기']:
+        for text in ['한눈에 보기','10:00 ~ 18:00','매주 화요일','라스트오더 17:30','시즌 필터커피','오늘의 빵','JEJU_KNOW 추천 이유','부모님','제주다움','꿀팁','공식 Instagram / 현장 확인','2020-03-04','정보 바로잡기']:
             self.assertIn(text, page.text)
-        order = ['한눈에 보기','대표 / 추천 메뉴','JEJU_KNOW 추천 이유','잘 맞는 동행','장소 특징','방문 전 알아둘 점','이용 정보','기본 정보 및 정보 확인']
+        order = ['한눈에 보기','대표 / 추천 메뉴','JEJU_KNOW 추천 이유','잘 맞는 동행','장소 특징','꿀팁','이용 정보','기본 정보 및 정보 확인']
         self.assertEqual(sorted(page.text.index(t) for t in order), [page.text.index(t) for t in order])
         response = self.post(self.admin,f"/admin/places/{p['id']}/edit", **self.form(slug=p['slug'],published='1',business_hours='11:00 ~ 19:00'))
         self.assertEqual(response.status_code,303)

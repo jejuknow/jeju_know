@@ -3,7 +3,7 @@ from taxonomy_migrations import json_list, legacy_term_ids
 from community_migrations import today
 from admin_settings import catalog
 from new_visibility import new_clause
-from restaurant_taxonomy import branch_terms, descendants
+from restaurant_taxonomy import branch_terms, descendants, official_terms
 
 CORE_ORDER = {"food": 0, "cafe": 1, "attraction": 2}
 
@@ -15,8 +15,9 @@ def navigation_order(categories):
 def taxonomy(conn, regions, companions, include_inactive=False):
     rows = [dict(r) for r in conn.execute("SELECT * FROM categories ORDER BY sort_order,id")]
     parents = navigation_order([r for r in rows if r["type"] == "place" and (include_inactive or r["is_active"])])
-    visible_ids = {r['id'] for parent in parents for r in branch_terms(conn, parent['id'], active=not include_inactive)}
-    terms = [r for r in rows if r['id'] in visible_ids and (include_inactive or r['type'] != 'cafe_feature' or not r['is_legacy'])]
+    selectable_ids = {r['id'] for parent in parents for r in official_terms(conn, parent['id'])}
+    visible_ids = {r['id'] for parent in parents for r in branch_terms(conn, parent['id'])} if include_inactive else selectable_ids
+    terms = [{**r, 'selectable': r['id'] in selectable_ids} for r in rows if r['id'] in visible_ids]
     region_items, companion_items = catalog(conn, 'region', include_inactive), catalog(conn, 'companion', include_inactive)
     return {"categories": parents, "terms": terms, "cafe_focus": catalog(conn, 'cafe_focus', include_inactive),
             "cafe_focus_labels": {i['value']:i['label'] for i in catalog(conn, 'cafe_focus', True)},
@@ -34,7 +35,7 @@ def validate_terms(conn, data, existing=None):
     cafe = conn.execute("SELECT slug FROM categories WHERE id=?", (data["category_id"],)).fetchone()
     is_cafe = cafe and cafe[0] == "cafe"
     if data["term_ids"] is None:  # Old clients keep associations and may still submit legacy tags.
-        candidates = set(previous + ([] if is_cafe else legacy_term_ids(conn, data["category_id"], data["features"])))
+        candidates = set(previous + ([] if cafe and cafe[0] in ('cafe', 'food') else legacy_term_ids(conn, data["category_id"], data["features"])))
         data["term_ids"] = [r['id'] for r in branch_terms(conn, data['category_id']) if r['id'] in candidates]
         return None
     try:
@@ -42,13 +43,14 @@ def validate_terms(conn, data, existing=None):
     except (ValueError, TypeError):
         return "세부 분류를 확인해 주세요."
     branch = {r['id'] for r in branch_terms(conn, data['category_id'])}
-    allowed = {r['id'] for r in branch_terms(conn, data['category_id'], active=True) if not r.get('is_legacy')} | (set(previous) & branch)
+    selectable = {r['id'] for r in official_terms(conn, data['category_id'])}
+    allowed = selectable | (set(previous) & branch)
     if len(selected) > 100 or not set(selected).issubset(allowed):
         return "선택한 상위 카테고리의 활성 세부 분류를 선택해 주세요."
     data["term_ids"] = selected
     if is_cafe:
         # Hidden legacy/inactive values must survive an unrelated admin form save.
-        hidden = {r['id'] for r in branch_terms(conn, data['category_id']) if r['is_legacy'] or not r['is_active']}
+        hidden = branch - selectable
         data["term_ids"] = sorted(set(selected) | (set(previous) & hidden))
     return None
 
@@ -85,7 +87,12 @@ def public_search(conn, category="", q="", region="", companion="", detail="", c
     if details or cuisine:
         # Unknown, inactive and mismatched terms produce no results; never silently relax filters.
         root = conn.execute("SELECT id FROM categories WHERE slug=? AND type='place' AND is_active=1", (category,)).fetchone()
-        allowed = {r['slug']:r for r in branch_terms(conn, root[0], active=True) if r['type'] != 'cafe_feature' or not r['is_legacy']} if root else {}
+        allowed = {r['slug']:r for r in official_terms(conn, root[0])} if root else {}
+        if root and category == 'food':
+            # Old shared URLs can still find linked historical records. These terms
+            # never appear in new choices or pass registration/import validation.
+            allowed.update({r['slug']: r for r in branch_terms(conn, root[0], active=True)
+                            if r['type'] == 'restaurant_subcategory' and r['is_legacy']})
         if len(details) > 100 or not set(details).issubset(allowed) or len(cuisine)>80:
             return []
         if cuisine:
@@ -95,7 +102,7 @@ def public_search(conn, category="", q="", region="", companion="", detail="", c
             valid = {r['slug'] for r in descendants(conn, main['id'], active=True)}
             if not set(details).issubset(valid):
                 return []
-        ids = {r['id'] for slug in (details or [cuisine]) for r in descendants(conn, allowed[slug]['id'], active=True)}
+        ids = {r['id'] for slug in (details or [cuisine]) for r in descendants(conn, allowed[slug]['id'], active=True) if r['slug'] in allowed}
         clauses.append("EXISTS(SELECT 1 FROM place_category_links l WHERE l.place_id=p.id AND l.category_id IN (" + ",".join("?" for _ in ids) + "))")
         params.extend(sorted(ids))
     rows = conn.execute("SELECT p.*,c.slug AS category_slug FROM places p LEFT JOIN categories c ON c.id=p.category_id WHERE " + " AND ".join(clauses) + " ORDER BY p.is_pick DESC,p.updated_at DESC,p.id DESC", params).fetchall()

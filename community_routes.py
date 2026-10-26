@@ -19,7 +19,7 @@ from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABEL
 from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
 from image_limits import MEMBER_PLACE_SLOTS
 from place_taxonomy import linked_ids, save_links
-from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, branch_terms
+from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, official_terms
 from admin_settings import catalog
 from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
 from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, USAGE_LABELS,
@@ -136,7 +136,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                     "region": query.get("region", "") if query.get("region") in {i['value'] for i in catalog(conn,'region')} else "", "term_ids": []}
             if category:
                 slugs = query.get("detail", "").split(",")
-                terms = branch_terms(conn, category['id'], active=True)
+                terms = official_terms(conn, category['id'], member=True)
                 data["term_ids"] = [r['id'] for r in terms if r['slug'] in slugs and not r['is_legacy']]
                 if category['slug'] == 'cafe':
                     data['cafe_feature_ids'] = [str(r['id']) for r in terms if r['id'] in data['term_ids'] and r['member_policy'] != 'admin'][:5]

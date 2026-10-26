@@ -1021,11 +1021,16 @@ def create_app(test_config=None):
                 if kind not in TYPES:
                     return HTMLResponse("분류 유형을 확인해 주세요.", status_code=400)
                 parent_id = validate_parent(conn, kind, form.get('parent_id'), original)
+                policy = str(form.get('member_policy', original['member_policy'] if original else 'review'))
+                if kind == 'cafe_feature' and policy not in ('review', 'admin'):
+                    raise ValueError('회원 선택 권한은 제안 가능 또는 관리자 전용으로 선택해주세요.')
                 if category_id is None:
-                    conn.execute("INSERT INTO categories(name,slug,sort_order,is_active,type,parent_id) VALUES (?,?,?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1"), kind, parent_id))
+                    conn.execute("INSERT INTO categories(name,slug,sort_order,is_active,type,parent_id,member_policy) VALUES (?,?,?,?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1"), kind, parent_id, policy))
                 else:
                     # The stable slug survives renaming so shared map URLs continue to work.
                     conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), parent_id, category_id))
+                    if kind == 'cafe_feature':
+                        conn.execute('UPDATE categories SET member_policy=? WHERE id=?', (policy, category_id))
                     if original['is_legacy'] and form.get('adopt_legacy') == '1':
                         conn.execute('UPDATE categories SET is_legacy=0 WHERE id=?', (category_id,))
                     if original["type"] != "place" and original["name"] != name:
