@@ -27,6 +27,11 @@ WAITING_OPTIONS = ("미확인", "없음", "있음", "주말·성수기 있음")
 COFFEE_OPTIONS = ("미확인", "산미 있음", "산미 적음", "고소한 편", "밸런스형", "기타")
 CHOICE_OPTIONS = {"reservation_status": USE_OPTIONS, "waiting_status": WAITING_OPTIONS, "coffee_taste": COFFEE_OPTIONS}
 DETAIL_FIELDS = (*TEXT_LIMITS, *CONTACT_TEXT_LIMITS, *CHOICE_OPTIONS, "representative_price", *SUBMISSION_CHOICES)
+# Retired admin controls stay in the schema and other workflows (CSV/review/detail).
+# Excluding them from admin parsing, validation and UPDATE also preserves historical
+# values verbatim, including values that no longer meet current input validation.
+ADMIN_RETIRED_DETAIL_FIELDS = {"reservation_status", "waiting_status", "recommended_menu", "dessert_note", "food_taste_note"}
+ADMIN_DETAIL_FIELDS = tuple(field for field in DETAIL_FIELDS if field not in ADMIN_RETIRED_DETAIL_FIELDS)
 
 
 def normalize_phone(value):
@@ -58,7 +63,7 @@ def phone_link(value):
 def parse_details(form, existing=None):
     previous = dict(existing or {})
     data = {field: str(form.get(field, previous.get(field) if previous.get(field) is not None else ("미확인" if field in CHOICE_OPTIONS or field in SUBMISSION_CHOICES else ""))).strip()
-            for field in DETAIL_FIELDS}
+            for field in ADMIN_DETAIL_FIELDS}
     data["phone"] = normalize_phone(data["phone"])
     return data
 
@@ -81,7 +86,7 @@ def validate_detail_value(field, value):
 
 
 def validate_details(data):
-    for field in DETAIL_FIELDS:
+    for field in ADMIN_DETAIL_FIELDS:
         if field in CHOICE_OPTIONS and not data[field]:
             data[field] = "미확인"
         data[field] = validate_detail_value(field, data[field])
@@ -98,8 +103,8 @@ def validate_details(data):
 
 def save_details(conn, place_id, data):
     # Column identifiers come only from this module's allowlist.
-    assignments = ",".join(f"{field}=?" for field in DETAIL_FIELDS)
-    conn.execute(f"UPDATE places SET {assignments} WHERE id=?", (*[data[field] for field in DETAIL_FIELDS], place_id))
+    assignments = ",".join(f"{field}=?" for field in ADMIN_DETAIL_FIELDS)
+    conn.execute(f"UPDATE places SET {assignments} WHERE id=?", (*[data[field] for field in ADMIN_DETAIL_FIELDS], place_id))
 
 
 def decorate_details(conn, place):

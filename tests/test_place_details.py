@@ -43,6 +43,11 @@ class PlaceDetailsTest(unittest.TestCase):
                      checked_at='2020-03-04', info_source='공식 Instagram / 현장 확인')
         local = self.rows("SELECT id FROM categories WHERE slug='cafe-local'")[0]['id']
         p = self.admin_place(taxonomy_present='1',term_ids=[str(local)],**facts)
+        # These fields are historical content now, not accepted by the admin form.
+        legacy = ('recommended_menu', 'dessert_note', 'food_taste_note', 'reservation_status', 'waiting_status', 'reason')
+        self.execute('UPDATE places SET ' + ','.join(f'{f}=?' for f in legacy) + ' WHERE id=?',
+                     (*[facts[f] for f in legacy], p['id']))
+        p = self.rows('SELECT * FROM places WHERE id=?', (p['id'],))[0]
         for field in DETAIL_FIELDS:
             self.assertEqual(p[field], facts[field])
         edit = self.admin.get(f"/admin/places/{p['id']}/edit")
@@ -61,6 +66,8 @@ class PlaceDetailsTest(unittest.TestCase):
 
     def test_category_specific_rendering_preserves_inactive_values(self):
         p=self.admin_place(signature_menu='대표 요리',recommended_menu='추천 요리',coffee_taste='산미 있음',dessert_note='디저트 설명',food_taste_note='담백한 편')
+        self.execute('UPDATE places SET recommended_menu=?,dessert_note=?,food_taste_note=? WHERE id=?',
+                     ('추천 요리', '디저트 설명', '담백한 편', p['id']))
         self.assertIn('디저트 설명',self.visitor.get('/place/details-test').text)
         self.assertNotIn('담백한 편',self.visitor.get('/place/details-test').text)
         for category in ('food','attraction','cafe'):
@@ -85,7 +92,7 @@ class PlaceDetailsTest(unittest.TestCase):
         self.assertIn(p['emoji'],page.text)
 
     def test_validation_and_xss(self):
-        for data in ({'business_hours':'가'*201},{'signature_menu':'가'*1001},{'coffee_taste':'invented'},{'waiting_status':'invented'},{'reservation_status':'invented'},{'checked_at':'2026-02-30'}):
+        for data in ({'business_hours':'가'*201},{'signature_menu':'가'*1001},{'coffee_taste':'invented'},{'checked_at':'2026-02-30'}):
             response=self.post(self.admin,'/admin/places/new',**self.form(**data))
             self.assertEqual(response.status_code,400,data)
         self.assertFalse(self.rows('SELECT id FROM places'))

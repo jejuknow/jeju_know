@@ -500,7 +500,8 @@ def create_app(test_config=None):
             "child_status": str(form.get("child_status", "미확인")),
             "accessible_status": str(form.get("accessible_status", "미확인")),
             "one_line": str(form.get("one_line", "")).strip(),
-            "reason": str(form.get("reason", "")).strip(),
+            # PICK still reads the historical reason; the editor never writes it.
+            "reason": existing["reason"] if existing else "",
             "note": str(form.get("note", "")).strip(),
             "address": str(form.get("address", "")).strip(),
             "map_url": str(form.get("map_url", "")).strip(),
@@ -1109,15 +1110,15 @@ def create_app(test_config=None):
                 INSERT INTO places (
                     slug, name, region, category, emoji, image_url, is_pick,
                     companions, features, parking_status, pet_status, child_status,
-                    accessible_status, one_line, reason, note, address, map_url,
+                    accessible_status, one_line, note, address, map_url,
                     info_source, checked_at, is_example, published, updated_at, category_id, latitude, longitude
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["slug"], data["name"], data["region"], data["category"], data["emoji"], data["image_url"],
                     data["is_pick"], json.dumps(data["companions"], ensure_ascii=False),
                     json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
-                    data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
+                    data["child_status"], data["accessible_status"], data["one_line"], data["note"],
                     data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
                     data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     data["category_id"], data["latitude"], data["longitude"],
@@ -1178,7 +1179,7 @@ def create_app(test_config=None):
                 UPDATE places SET
                     slug=?, name=?, region=?, category=?, emoji=?, image_url=?, is_pick=?,
                     companions=?, features=?, parking_status=?, pet_status=?, child_status=?,
-                    accessible_status=?, one_line=?, reason=?, note=?, address=?, map_url=?,
+                    accessible_status=?, one_line=?, note=?, address=?, map_url=?,
                     info_source=?, checked_at=?, is_example=?, published=?, updated_at=?, category_id=?, latitude=?, longitude=?
                 WHERE id=?
                 """,
@@ -1186,7 +1187,7 @@ def create_app(test_config=None):
                     data["slug"], data["name"], data["region"], data["category"], data["emoji"], data["image_url"],
                     data["is_pick"], json.dumps(data["companions"], ensure_ascii=False),
                     json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
-                    data["child_status"], data["accessible_status"], data["one_line"], data["reason"], data["note"],
+                    data["child_status"], data["accessible_status"], data["one_line"], data["note"],
                     data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
                     data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"), data["category_id"], data["latitude"], data["longitude"], place_id,
                 ),

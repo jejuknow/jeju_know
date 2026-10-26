@@ -51,7 +51,7 @@ class CafeFeaturesTest(unittest.TestCase):
         for _, name in FEATURES:
             self.assertIn(name, admin)
         self.assertNotIn(">맛 중심", admin)
-        self.assertIn("디저트·베이커리 특징", admin)
+        self.assertNotIn('name="dessert_note"', admin)
 
     def test_member_choices_search_menu_and_no_inference(self):
         p = self.create_cafe(["bakery", "dessert", "coffee"], signature_menu="소금빵", latitude="33.4", longitude="126.5")
@@ -111,6 +111,7 @@ class CafeFeaturesTest(unittest.TestCase):
         legacy = self.term("taste")["id"]
         self.execute("INSERT INTO place_category_links VALUES (?,?)", (p["id"], legacy))
         self.execute("UPDATE places SET cafe_focus=?,features=? WHERE id=?", ('["taste"]', '["맛 중심"]', p["id"]))
+        self.execute("UPDATE places SET dessert_note=? WHERE id=?", ('직접 만든 빵과 시즌 디저트', p['id']))
         keys = [key for key, _ in FEATURES]
         response = self.post(self.admin, f"/admin/places/{p['id']}/edit", **self.form(
             slug=p["slug"], published="1", taxonomy_present="1",
