@@ -166,8 +166,9 @@ def create_app(test_config=None):
         database=str(database_path),
         secure=not app.state.testing,
     )
-    # Windows registry mappings can label WOFF2 as text/plain.
+    # Windows registry mappings can label web assets as text/plain.
     mimetypes.add_type("font/woff2", ".woff2")
+    mimetypes.add_type("image/webp", ".webp")
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
     def context_processor(request: Request):

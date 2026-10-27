@@ -1,0 +1,4 @@
+{# Adjacent labels name these decorative images once for screen readers. #}
+{% macro navigation_icon(name, variant='page-nav-icon', size=72) -%}
+<img class="icon-image {{ variant }}" src="/static/images/icons/icon-{{ name }}.webp" alt="" aria-hidden="true" width="{{ size }}" height="{{ size }}" decoding="async">
+{%- endmacro %}

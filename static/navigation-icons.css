@@ -1,0 +1,6 @@
+/* User-provided artwork retains its original background and proportions. */
+.icon-image{display:block;object-fit:contain;flex-shrink:0}
+.chip-with-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px;vertical-align:middle}
+.icon-image--chip{width:24px;height:24px;border-radius:50%;background:#fff}
+.page-nav-icon{width:72px;height:72px;margin-bottom:14px;border-radius:18px;background:#fff}
+@media(max-width:640px){.page-nav-icon{width:56px;height:56px;margin-bottom:12px;border-radius:14px}}

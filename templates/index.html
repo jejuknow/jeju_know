@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}JEJU_KNOW | 제주를 아는 사람의 제주 기록{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261021-cafe-flow">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261027-3d-icons">{% endblock %}
 {% block body %}
 <main id="top">
   <section class="editorial-hero">
@@ -17,19 +17,19 @@
       <div class="hero-discovery">
         <nav class="hero-board" aria-label="빠른 탐색">
           {% if site_settings.home_new %}<a href="/new" class="hero-board-card blue">
-            <span class="hero-board-icon" aria-hidden="true">🆕</span>
+            {{ navigation_icon('new', 'hero-board-icon', 80) }}
             <strong>제주 신상</strong><p>새로 생긴 카페와 맛집</p><small>최근 6개월 NEW →</small>
           </a>{% endif %}
           {% if site_settings.home_issue %}<a href="{{ url_for('news_list') }}" class="hero-board-card green">
-            <span class="hero-board-icon" aria-hidden="true">📣</span>
+            {{ navigation_icon('issue', 'hero-board-icon', 80) }}
             <strong>제주 이슈</strong><p>지금 알아두면 좋은 제주 소식</p><small>행사 · 팝업 · 지역소식 →</small>
           </a>{% endif %}
           <a href="/map" class="hero-board-card orange">
-            <span class="hero-board-icon" aria-hidden="true">🗺️</span>
+            {{ navigation_icon('map', 'hero-board-icon', 80) }}
             <strong>제주 지도</strong><p>지도에서 제주 장소 찾기</p><small>맛집 · 카페 · 가볼 곳 →</small>
           </a>
           {% if site_settings.home_best %}<a href="/best" class="hero-board-card lavender">
-            <span class="hero-board-icon" aria-hidden="true">⭐</span>
+            {{ navigation_icon('best', 'hero-board-icon', 80) }}
             <strong>베스트</strong><p>상황별로 골라본 추천 모음</p><small>데이트 · 부모님 · 혼자 →</small>
           </a>{% endif %}
         </nav>
@@ -83,4 +83,4 @@
 </main>
 <footer><div class="wrap footer-inner">{{ brand_logo(variant='footer-brand') }}<p>{{ site_settings.site_description }} · <a href="{{ url_for('admin_dashboard') }}">관리자</a>{% if site_settings.instagram_url %} · <a href="{{ site_settings.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}</p></div></footer>
 {% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261020-cafe-bakery"></script><script src="/static/home-cards.js?v=20261012-map-flow"></script><script src="/static/app.js?v=20261021-cafe-flow"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261027-3d-icons"></script><script src="/static/home-cards.js?v=20261012-map-flow"></script><script src="/static/app.js?v=20261027-3d-icons"></script>{% endblock %}

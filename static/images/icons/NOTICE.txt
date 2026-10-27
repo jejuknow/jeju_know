@@ -1,0 +1,29 @@
+JEJU_KNOW navigation artwork
+User-provided PNGs, optimized 2026-10-27.
+256 x 256 WebP, quality 86. Original white RGB backgrounds preserved.
+No cropping, background removal, or generated replacement artwork.
+Original source files are preserved outside the web static directory.
+
+restaurant: ChatGPT 이미지 2026년 10월 27일 오전 09_27_24-1.png
+Source SHA-256: c46672a82c8520eb5cf24fd3d7d0981bd8fe985d94a38b9cdfa26354e91ac16e
+1207903 PNG bytes -> 2808 WebP bytes
+
+cafe: ChatGPT 이미지 2026년 10월 27일 오전 09_27_25-2.png
+Source SHA-256: a77cf8702ace21d960e868bd94806a08cea4e29f7081d1c4c40a0089dc51322e
+1216771 PNG bytes -> 3024 WebP bytes
+
+best: ChatGPT 이미지 2026년 10월 27일 오전 09_26_30-4.png
+Source SHA-256: f8d4c32e70483158784fbd92a773c2732230a07bdffb9a1c1982651e3a2f3864
+1089508 PNG bytes -> 2764 WebP bytes
+
+map: ChatGPT 이미지 2026년 10월 27일 오전 09_26_29-3.png
+Source SHA-256: ac4b57c9d1ceb264c64d3016a8f599fd1a1441b02b1533316f53d3a867a7c12a
+1266857 PNG bytes -> 4776 WebP bytes
+
+issue: ChatGPT 이미지 2026년 10월 27일 오전 09_26_28-2.png
+Source SHA-256: 60659c8d548430cdd74c6c20d1eb4ef94d0c42940f9eb0fc7021a52f14b6d294
+957605 PNG bytes -> 3462 WebP bytes
+
+new: ChatGPT 이미지 2026년 10월 27일 오전 09_26_27-1.png
+Source SHA-256: 3bf8cf5429a8da5ee29c321719007a1374bb2c2817f763c83d54fd005e8ad943
+1176622 PNG bytes -> 3578 WebP bytes

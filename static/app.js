@@ -7,7 +7,7 @@ $('finderMapLink').href=search.href('/map',state);
 $('finderRegisterLink').href=search.registrationHref(state);
 function buildFilters(){
   search.chips($('regionChips'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:taxonomy.region_labels?.[v]||search.regionLabel(v)}))],state.region);
-  search.chips($('categoryChips'),[{value:'',label:'전체'},...taxonomy.categories.map(v=>({value:v.slug,label:v.name}))],state.category);
+  search.chips($('categoryChips'),[{value:'',label:'전체'},...taxonomy.categories.map(v=>({value:v.slug,label:v.name,icon:v.slug}))],state.category);
   search.chips($('companionChips'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:taxonomy.companion_labels?.[v]||v}))],state.companions);
   const cuisine=search.selectedCuisine(taxonomy,state),terms=search.termsFor(taxonomy,state.category,cuisine);
   $('categoryDetails').hidden=state.category!=='food'&&!terms.length;

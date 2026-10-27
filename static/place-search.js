@@ -66,8 +66,14 @@
   }
   function chips(container,options,selected,css='chip'){
     container.replaceChildren();
-    options.forEach(({value,label})=>{
+    options.forEach(({value,label,icon})=>{
       const button=document.createElement('button');button.type='button';button.className=css;button.dataset.value=value;button.textContent=label;
+      const asset=icon==='food'?'restaurant':icon==='cafe'?'cafe':'';
+      if(asset){
+        const image=document.createElement('img');image.src='/static/images/icons/icon-'+asset+'.webp';
+        image.alt='';image.setAttribute('aria-hidden','true');image.width=24;image.height=24;image.decoding='async';image.className='icon-image icon-image--chip';
+        button.prepend(image);button.classList.add('chip-with-icon');
+      }
       const active=Array.isArray(selected)?(value?selected.includes(value):!selected.length):value===selected;
       button.classList.toggle('is-selected',active);button.setAttribute('aria-pressed',String(active));container.append(button);
     });

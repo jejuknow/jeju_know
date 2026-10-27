@@ -1,4 +1,5 @@
 {% from '_brand.html' import brand_logo %}
+{% from '_navigation_icon.html' import navigation_icon %}
 <!doctype html>
 <html lang="ko">
 <head>
@@ -24,6 +25,7 @@
   {% block head %}{% endblock %}
   <link rel="stylesheet" href="/static/community.css?v=20261027-paperlogy">
   <link rel="stylesheet" href="/static/brand.css?v=20261012-brand">
+  <link rel="stylesheet" href="/static/navigation-icons.css?v=20261027-3d-icons">
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% include '_site_header.html' %}{% endif %}

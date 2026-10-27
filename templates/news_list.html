@@ -2,7 +2,7 @@
 {% block title %}제주 이슈 | JEJU_KNOW{% endblock %}
 {% block body %}
 <main class="news-page">
-  <section class="news-page-hero"><div class="wrap"><p class="kicker">JEJU_KNOW TODAY</p><h1>제주의 지금을<br>한눈에 확인하세요.</h1><p>{{ news_categories|join(', ') }}을 출처·확인일과 함께 관리합니다.</p></div></section>
+  <section class="news-page-hero"><div class="wrap">{{ navigation_icon('issue') }}<p class="kicker">JEJU_KNOW TODAY</p><h1>제주의 지금을<br>한눈에 확인하세요.</h1><p>{{ news_categories|join(', ') }}을 출처·확인일과 함께 관리합니다.</p></div></section>
   <section class="wrap news-browser">
     <div class="category-tabs"><a class="{% if not active_category %}active{% endif %}" href="{{ url_for('news_list') }}">전체</a>{% for category in news_categories %}<a class="{% if active_category == category %}active{% endif %}" href="{{ url_for('news_list') }}?category={{ category }}">{{ category }}</a>{% endfor %}</div>
     <form class="news-search" method="get" action="{{ url_for('news_list') }}">{% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}<input type="search" name="q" value="{{ q }}" placeholder="행사명·장소·키워드 검색"><button type="submit">검색</button></form>
