@@ -1,62 +1,51 @@
 {% extends "base.html" %}
 {% block title %}{{ place.name }} | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/place-details.css?v=20261027-paperlogy">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/place-details.css?v=20261028-public">{% endblock %}
+{% block body_class %}place-detail-body{% endblock %}
 {% block body %}
 <main class="detail-page wrap">
+  <a class="text-btn" href="/find">← FIND에서 장소 찾기</a>
   <article class="detail-shell">
     <div class="detail-media">
-      <div class="detail-visual {% if place.image_url %}uploaded-visual{% endif %}">{% if place.image_url %}<a href="{{ place.image_url }}" target="_blank" rel="noopener" aria-label="{{ place.name }} 대표사진 크게 보기"><img src="{{ place.image_url }}" alt="{{ place.name }} 대표사진"></a>{% else %}<span>{{ place.emoji }}</span>{% endif %}</div>
+      <div class="detail-visual {% if place.image_url %}uploaded-visual{% endif %}">{% if place.image_url %}<a href="{{ place.image_url }}" target="_blank" rel="noopener" aria-label="{{ place.name }} 대표사진 크게 보기"><img src="{{ place.image_url }}" alt="{{ place.name }}" width="960" height="720" fetchpriority="high"></a>{% else %}<span>{{ place.emoji }}</span>{% endif %}</div>
       {% set gallery = (place.images|rejectattr('is_primary')|list) + place.merged_images %}
-      {% if gallery %}<section aria-label="추가사진" class="place-gallery">{% for image in gallery %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ loop.index }}" loading="lazy"></a><figcaption>추가사진 {{ loop.index }}</figcaption></figure>{% endfor %}</section>{% endif %}
+      {% if gallery %}<section aria-label="추가사진" class="place-gallery">{% for image in gallery %}<figure><a href="{{ image.url }}" target="_blank" rel="noopener"><img src="{{ image.url }}" alt="{{ place.name }} 추가사진 {{ loop.index }}" width="320" height="240" loading="lazy"></a><figcaption>추가사진 {{ loop.index }}</figcaption></figure>{% endfor %}</section>{% endif %}
     </div>
     <div class="detail-content">
-      <div class="meta-row"><span class="badge primary">{{ region_labels.get(place.region,place.region) }}</span><span class="badge">{{ place.category }}{{ " · "~place.restaurant_label if place.restaurant_label else "" }}</span>{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
+      <p class="compact-place-meta">{{ region_labels.get(place.region,place.region) }} · {{ place.category }}{% if place.restaurant_label %} · {{ place.restaurant_label }}{% endif %}</p>
       <h1 class="detail-title">{{ place.name }}</h1>
-      <p class="place-provenance">{{ place.status_label }}</p>
+      <div class="meta-row"><span class="badge {{ 'primary' if place.verification_status == 'jejuno_verified' else '' }}">{{ 'JEJU_KNOW 확인' if place.verification_status == 'jejuno_verified' else place.status_label }}</span>{% if place.is_new %}<span class="badge">NEW</span>{% endif %}{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
-      {% if place.website_url %}<p><a href="{{ place.website_url }}" target="_blank" rel="noopener noreferrer">홈페이지·Instagram →</a></p>{% endif %}
-      <p class="detail-lead">{{ place.one_line }}</p>
+      {% if place.one_line %}<p class="detail-lead">{{ place.one_line }}</p>{% endif %}
+      {% if place.detail_features or place.companions %}<section class="detail-section detail-highlights" aria-label="핵심 특징">
+        {% if place.detail_features %}<h2>장소 특징</h2><div class="tag-row">{% for item in place.detail_features %}<span class="tag">#{{ item }}</span>{% endfor %}</div>{% endif %}
+        {% if place.companions %}<h2>잘 맞는 동행</h2><div class="tag-row">{% for item in place.companions %}<span class="tag">#{{ companion_labels.get(item,item) }}</span>{% endfor %}</div>{% endif %}
+      </section>{% endif %}
       <section class="detail-section"><h2>한눈에 보기</h2><dl class="place-glance">
-        {% for field,label in [('business_hours','🕒 영업시간'),('closed_days','📅 휴무일'),('phone','☎ 전화'),('tamnaneunjeon_status','탐나는전'),('reservation_status','📞 예약'),('waiting_status','👥 웨이팅'),('parking_status','🚗 주차')] %}<div><dt>{{ label }}</dt><dd{% if field == 'business_hours' %} class="place-hours"{% endif %}>{% if field == 'phone' and place.phone_href %}<a href="{{ place.phone_href }}">{{ place.phone }}</a>{% else %}{{ place.get(field) or '미확인' }}{% endif %}{% if field == 'business_hours' and place.last_order %}<small>라스트오더 {{ place.last_order }}</small>{% endif %}</dd></div>{% endfor %}
-      {% if place.category_slug in ('cafe','food') %}<div><dt>🍽 대표메뉴</dt><dd class="place-paragraph">{{ place.signature_menu or '미확인' }}</dd></div><div><dt>💳 가격</dt><dd>{{ place.price_label }}</dd></div>{% endif %}
-      </dl></section>
-      {% if place.category_slug in ('cafe','food') %}
-      {% if place.signature_menu_items or place.recommended_menu_items %}<section class="detail-section"><h2>대표 / 추천 메뉴</h2><div class="place-menu-grid">
-        {% for field,label in [('signature_menu_items','대표 메뉴'),('recommended_menu_items','추천 메뉴')] %}{% if place[field] %}<div><h3>{{ label }}</h3><ul>{% for item in place[field] %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}{% endfor %}
-      </div></section>{% endif %}
-      {% if place.category_slug == 'cafe' and place.cafe_visit_times %}<section class="detail-section"><h2>추천 시간대</h2><div class="chips">{% for value in place.cafe_visit_times %}<span class="tag">{{ value }}</span>{% endfor %}</div></section>{% endif %}
-      {% if place.category_slug == 'cafe' and (place.coffee_taste != '미확인' or place.dessert_note) %}<section class="detail-section"><h2>커피와 디저트·베이커리</h2>{% if place.coffee_taste != '미확인' %}<p><strong>커피 맛</strong> {{ place.coffee_taste }}</p>{% endif %}{% if place.dessert_note %}<p class="place-paragraph">{{ place.dessert_note }}</p>{% endif %}</section>{% endif %}
-      {% if place.category_slug == 'food' and place.food_taste_note %}<section class="detail-section"><h2>음식/맛 특징</h2><p class="place-paragraph">{{ place.food_taste_note }}</p></section>{% endif %}
-      {% endif %}
-      {% if place.pick_note or place.reason %}<section class="detail-section"><h2>👍 JEJU_KNOW 추천 이유</h2><p class="place-paragraph">{{ place.pick_note or place.reason }}</p></section>{% endif %}
-      <section class="detail-section"><h2>👥 잘 맞는 동행</h2><div class="tag-row">{% for item in place.companions %}<span class="tag">#{{ companion_labels.get(item, item) }}</span>{% else %}<span class="muted">미확인</span>{% endfor %}</div></section>
-      <section class="detail-section"><h2>✨ 장소 특징</h2><div class="tag-row">{% for item in place.detail_features %}<span class="tag">#{{ item }}</span>{% else %}<span class="muted">미확인</span>{% endfor %}</div></section>
-      {% if place.note %}<section class="detail-section place-visit-note"><h2>📝 꿀팁</h2><p class="place-paragraph">{{ place.note }}</p></section>{% endif %}
-      <section class="detail-section"><h2>ℹ️ 이용 정보</h2><div class="status-grid">{% for field,label in [('parking_status','주차'),('pet_status','반려동물'),('child_status','아이 동반'),('accessible_status','무장애'),('reservation_status','예약'),('waiting_status','웨이팅')] %}<div><span>{{ label }}</span><strong>{{ place.get(field) or '미확인' }}</strong></div>{% endfor %}</div></section>
-      <section class="detail-section facts"><h2>📌 기본 정보 및 정보 확인</h2><dl class="place-facts">
-        <div><dt>주소</dt><dd>{{ place.address or '미확인' }}</dd></div>
-        <div><dt>정보 출처</dt><dd>{{ place.info_source or '미확인' }}</dd></div>
-        <div><dt>최근 정보 확인</dt><dd>{{ place.checked_at or '미확인' }}</dd></div>
-        <div><dt>등록</dt><dd>{{ '사용자 등록' if place.source_type == 'user' else 'JEJU_KNOW 등록' }}</dd></div>
-        <div><dt>확인</dt><dd>{{ verification_labels.get(place.verification_status, '미확인') }}</dd></div>
-      </dl></section>
-      <div class="detail-actions">
-        {% if place.map_url %}<a class="map-btn" href="{{ place.map_url }}" target="_blank" rel="noreferrer">지도에서 보기</a>{% else %}<a class="map-btn" href="https://map.naver.com/p/search/{{ place.name|urlencode }}" target="_blank" rel="noreferrer">네이버지도 검색</a>{% endif %}
-        <button class="share-btn" id="sharePlace" data-title="{{ place.name }}">공유하기</button>
-      </div>
+        <div><dt>영업시간</dt><dd class="place-hours">{{ place.business_hours or '영업시간 미확인' }}{% if place.last_order %}<small>라스트오더 {{ place.last_order }}</small>{% endif %}</dd></div>
+        <div><dt>휴무일</dt><dd>{{ place.closed_days or '미확인' }}</dd></div>
+        <div><dt>전화</dt><dd>{% if place.phone_href %}<a href="{{ place.phone_href }}">{{ place.phone }}</a>{% else %}{{ place.phone or '미확인' }}{% endif %}</dd></div>
+        {% if place.category_slug in ('cafe','food') and place.signature_menu %}<div><dt>대표메뉴</dt><dd class="place-paragraph">{{ place.signature_menu }}{% if place.representative_price is not none %} · {{ place.price_label }}{% endif %}</dd></div>{% endif %}
+        <div><dt>탐나는전</dt><dd>{{ place.tamnaneunjeon_status }}</dd></div>
+      </dl><h3 class="usage-heading">이용 정보</h3><div class="status-grid">{% for field,label in [('parking_status','주차'),('pet_status','반려동물'),('child_status','아이 동반'),('accessible_status','무장애')] %}<div><span>{{ label }}</span><strong>{{ place.get(field) or '미확인' }}</strong></div>{% endfor %}</div></section>
+      {% if place.category_slug == 'cafe' and place.coffee_taste != '미확인' %}<p><strong>커피 맛</strong> {{ place.coffee_taste }}</p>{% endif %}
+      {% if place.category_slug == 'cafe' and place.cafe_visit_times %}<p><strong>추천 시간대</strong> {{ place.cafe_visit_times|join(' · ') }}</p>{% endif %}
+      {% if place.note %}<section class="detail-section place-visit-note"><h2>꿀팁</h2><p class="place-paragraph">{{ place.note }}</p></section>{% endif %}
+      {% if place.is_pick and place.pick_note %}<section class="detail-section"><h2>JEJU_KNOW PICK</h2><p class="place-paragraph">{{ place.pick_note }}</p></section>{% endif %}
+      <section class="detail-section"><h2>주소·지도</h2><p class="place-paragraph">{{ place.address or '주소 미확인' }}</p>{% if not place.has_coordinates %}<p class="muted">지도 위치 미등록</p>{% endif %}<div class="detail-actions"><a class="map-btn" href="{{ place.internal_map_url }}">지도에서 보기</a>{% if place.directions_url %}<a class="share-btn" href="{{ place.directions_url }}" target="_blank" rel="noopener noreferrer">길찾기 ↗</a>{% endif %}</div>{% if place.website_url %}<p><a href="{{ place.website_url }}" target="_blank" rel="noopener noreferrer">홈페이지·Instagram ↗</a></p>{% endif %}</section>
+      <section class="detail-section facts"><h2>기본 정보 및 정보 확인</h2><dl class="place-facts"><div><dt>정보 출처</dt><dd>{{ place.info_source or '미확인' }}</dd></div><div><dt>최근 정보 확인</dt><dd>{{ place.checked_at or '미확인' }}</dd></div><div><dt>등록</dt><dd>{{ '사용자 등록' if place.source_type == 'user' else 'JEJU_KNOW 등록' }}</dd></div></dl></section>
+      {% if place.reason or place.recommended_menu or place.dessert_note or place.food_taste_note %}<details class="detail-section legacy-place-info"><summary>이전에 기록한 추가 정보</summary>
+        {% if place.reason %}<h3>JEJU_KNOW 추천 이유</h3><p class="place-paragraph">{{ place.reason }}</p>{% endif %}
+        {% if place.category_slug in ('cafe','food') and place.recommended_menu %}<h3>대표 / 추천 메뉴 기록</h3><p class="place-paragraph">{{ place.recommended_menu }}</p>{% endif %}
+        {% if place.category_slug == 'cafe' and place.dessert_note %}<p class="place-paragraph">{{ place.dessert_note }}</p>{% endif %}
+        {% if place.category_slug == 'food' and place.food_taste_note %}<p class="place-paragraph">{{ place.food_taste_note }}</p>{% endif %}
+      </details>{% endif %}
+      {% include '_share_actions.html' %}
       <div class="community-callout"><div><strong>정보가 달라졌나요?</strong><p>주소, 상호명, 영업 여부 등 달라진 정보를 알려주세요.</p><p>변경된 정보는 관리자가 확인한 뒤 반영합니다.</p></div><a class="secondary-btn" href="/places/{{ place.id }}/suggest">정보 바로잡기</a></div>
       {% if member and member.id == place.submitted_by_user_id and place.verification_status == 'unverified' %}<a class="text-btn" href="/places/{{ place.id }}/edit">내가 등록한 장소 수정 →</a>{% endif %}
     </div>
   </article>
+  <div class="place-sticky-actions" aria-label="장소 바로가기">{% if place.directions_url %}<a class="primary-inline" href="{{ place.directions_url }}" target="_blank" rel="noopener noreferrer">길찾기</a>{% else %}<a class="primary-inline" href="{{ place.internal_map_url }}">지도에서 보기</a>{% endif %}<button type="button" class="secondary-btn" data-share>공유</button></div>
 </main>
 {% endblock %}
-{% block scripts %}
-<script>
-document.getElementById('sharePlace')?.addEventListener('click', async (e) => {
-  const title = e.currentTarget.dataset.title;
-  const data = {title:`JEJU_KNOW | ${title}`, text:`JEJU_KNOW 장소 정보: ${title}`, url:location.href};
-  if (navigator.share) { try { await navigator.share(data); } catch(_){} }
-  else { try { await navigator.clipboard.writeText(location.href); alert('링크를 복사했습니다.'); } catch(_) { prompt('링크를 복사해주세요.', location.href); } }
-});
-</script>
-{% endblock %}
+{% block scripts %}<script src="/static/share.js?v=20261028" defer></script>{% endblock %}

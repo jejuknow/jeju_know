@@ -8,10 +8,13 @@
   }
   function visual(place,className){
     const url=imageUrl(place.image_url);
-    return `<div class="${className}">${url?`<img src="${escapeHtml(url)}" alt="${escapeHtml(place.name)}" loading="lazy" decoding="async">`:`<span aria-hidden="true">${escapeHtml(place.emoji||'📍')}</span>`}${place.is_example?'<span class="badge example card-example">예시</span>':''}</div>`;
+    return `<div class="${className}">${url?`<img src="${escapeHtml(url)}" alt="${escapeHtml(place.name)}" loading="lazy" decoding="async" width="480" height="320">`:`<span aria-hidden="true">${escapeHtml(place.emoji||'📍')}</span>`}${place.is_example?'<span class="badge example card-example">예시</span>':''}</div>`;
   }
   function placeCard(place,region){
-    return `<article class="compact-place-card">${visual(place,'compact-place-visual')}<div class="compact-place-body"><span class="place-provenance">${escapeHtml(place.status_label||'')}</span>${place.is_pick?'<span class="badge pick">JEJU_KNOW PICK</span>':''}${place.opening_label?`<p class="place-opening">${escapeHtml(place.opening_label)}</p>`:''}<p class="compact-place-meta">${escapeHtml(region)} · ${escapeHtml(place.category)}</p><h3>${escapeHtml(place.name)}</h3><p class="compact-place-reason">${escapeHtml(place.one_line||'')}</p><a class="detail-link" href="/place/${encodeURIComponent(place.slug)}">상세보기 →</a></div></article>`;
+    const tags=(place.detail_features||[]).slice(0,3);
+    const highlights=tags.length?`<div class="tag-row">${tags.map(tag=>`<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>`:'';
+    const menu=place.signature_menu?`<p class="card-menu">${escapeHtml(place.signature_menu.split('\n')[0])}</p>`:'';
+    return `<article class="compact-place-card">${visual(place,'compact-place-visual')}<div class="compact-place-body"><span class="place-provenance">${escapeHtml(place.status_label||'')}</span>${place.is_pick?'<span class="badge pick">JEJU_KNOW PICK</span>':''}${place.is_new?'<span class="badge">NEW</span>':''}${place.opening_label?`<p class="place-opening">${escapeHtml(place.opening_label)}</p>`:''}<p class="compact-place-meta">${escapeHtml(region)} · ${escapeHtml(place.category)}</p><h3>${escapeHtml(place.name)}</h3>${highlights}${menu}<p class="compact-place-reason">${escapeHtml(place.one_line||'')}</p><div class="card-actions"><a class="detail-link" href="/place/${encodeURIComponent(place.slug)}">상세보기 →</a><a class="detail-link" href="/map?place=${encodeURIComponent(place.slug)}">지도에서 보기</a></div></div></article>`;
   }
   function pickCard(place,region){
     const tags=[...new Set([...(place.features_public||place.features||[]),...(place.companions||[])])].slice(0,4);

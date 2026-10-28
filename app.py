@@ -12,7 +12,9 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, PlainTextResponse
+from public_seo import page_metadata, place_metadata, issue_metadata, sitemap, private_page
+from new_visibility import new_clause
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 from place_migrations import backup_before_migration, migrate_place_categories
@@ -171,6 +173,13 @@ def create_app(test_config=None):
     mimetypes.add_type("image/webp", ".webp")
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
+    @app.middleware('http')
+    async def indexing_policy(request, call_next):
+        response = await call_next(request)
+        if private_page(request.url.path) or response.status_code >= 400:
+            response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+        return response
+
     def context_processor(request: Request):
         if "csrf_token" not in request.session:
             request.session["csrf_token"] = secrets.token_urlsafe(32)
@@ -183,6 +192,7 @@ def create_app(test_config=None):
             active_regions = [i['value'] for i in catalog(conn, 'region')]
             active_companions = [i['value'] for i in catalog(conn, 'companion')]
         return {
+            "default_seo": page_metadata(request, settings['site_description']),
             "site_settings": settings, "region_labels": region_labels, "companion_labels": companion_labels, **admin_data,
             "active_regions": active_regions, "active_companions": active_companions,
             "csrf_token": request.session["csrf_token"], "flashes": flashes,
@@ -392,6 +402,8 @@ def create_app(test_config=None):
             decorate_details(conn, place)
             decorate_focus(place, conn)
             place['region_label'] = {i['value']:i['label'] for i in catalog(conn,'region',True)}.get(place['region'],place['region'])
+            clause, values = new_clause()
+            place['is_new'] = bool(conn.execute('SELECT 1 FROM places p JOIN categories c ON c.id=p.category_id WHERE p.id=? AND '+clause, [place['id'], *values]).fetchone())
         finally:
             conn.close()
         return image_store.decorate(place, "places")
@@ -671,7 +683,21 @@ def create_app(test_config=None):
         conn.close()
         if not row or not row["published"]:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
-        return templates.TemplateResponse(request=request, name="place_detail.html", context={"place": row_to_place(row)})
+        place = row_to_place(row)
+        from urllib.parse import quote
+        place['internal_map_url'] = '/map?place=' + quote(place['slug'], safe='')
+        place['directions_url'] = (f"https://map.kakao.com/link/to/{quote(place['name'], safe='')},{place['latitude']},{place['longitude']}"
+                                   if place['has_coordinates'] else place.get('map_url') or '')
+        return templates.TemplateResponse(request=request, name="place_detail.html", context={"place": place, "seo": place_metadata(place)})
+
+    @app.get('/sitemap.xml', include_in_schema=False)
+    async def public_sitemap():
+        with closing(connect_db()) as conn:
+            return Response(sitemap(conn), media_type='application/xml')
+
+    @app.get('/robots.txt', include_in_schema=False)
+    async def robots():
+        return PlainTextResponse('User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nDisallow: /api/\nSitemap: https://www.jeju-know.com/sitemap.xml\n')
 
     @app.get("/api/places")
     async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = "", focus: str = "", cuisine: str = ""):
@@ -692,6 +718,12 @@ def create_app(test_config=None):
     @app.get("/api/place-taxonomy")
     async def api_place_taxonomy():
         return JSONResponse(get_taxonomy(), headers={"Cache-Control": "no-store"})
+
+    @app.get('/api/place-search/suggestions')
+    async def search_relaxations(request: Request):
+        from search_suggestions import suggestions
+        with closing(connect_db()) as conn:
+            return JSONResponse(suggestions(conn, request.query_params, get_taxonomy()), headers={'Cache-Control':'no-store'})
 
     @app.get("/places", response_class=HTMLResponse)
     async def place_list(request: Request):
@@ -747,7 +779,8 @@ def create_app(test_config=None):
         conn.close()
         if not row:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
-        return templates.TemplateResponse(request=request, name="news_detail.html", context={"item": row_to_news(row)})
+        item = row_to_news(row)
+        return templates.TemplateResponse(request=request, name="news_detail.html", context={"item": item, "seo": issue_metadata(item)})
 
     @app.get("/partnership", response_class=HTMLResponse)
     async def partnership(request: Request):

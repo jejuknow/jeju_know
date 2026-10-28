@@ -1,3 +1,5 @@
 {% extends "base.html" %}{% block title %}{{ collection.title if collection else 'BEST · 상황별 추천 모음' }} | JEJU_KNOW{% endblock %}{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261027-3d-icons">{% endblock %}
 {% block body %}<main class="section wrap">{% if not collection %}{{ navigation_icon('best') }}{% endif %}<p class="kicker">BEST · JEJU_KNOW COLLECTIONS</p><h1>{{ collection.title if collection else '상황별 추천 모음' }}</h1><p class="section-copy">{{ collection.description if collection else 'JEJU_KNOW가 직접 구성한 주제별 장소 모음입니다.' }}</p>
-{% if collection %}<a class="text-btn" href="/best">모든 추천 모음 →</a><div class="compact-place-grid">{% for p in places %}{% include '_place_card.html' %}{% else %}<p>이 모음에 공개된 장소를 준비 중입니다.</p>{% endfor %}</div>{% else %}{% include '_best_collections.html' %}{% endif %}</main>{% endblock %}
+{% if collection %}{% include "_share_actions.html" %}<a class="text-btn" href="/best">모든 추천 모음 →</a><div class="compact-place-grid">{% for p in places %}{% include '_place_card.html' %}{% else %}<p>이 모음에 공개된 장소를 준비 중입니다.</p>{% endfor %}</div>{% else %}{% include '_best_collections.html' %}{% endif %}</main>{% endblock %}
+
+{% block scripts %}{% if collection %}<script src="/static/share.js?v=20261028" defer></script>{% endif %}{% endblock %}

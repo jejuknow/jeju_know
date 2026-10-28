@@ -32,6 +32,13 @@ async function renderResults(scroll=false,updateUrl=true){
   if(updateUrl&&url!==location.pathname+location.search+location.hash)history.pushState(null,'',url);
   $('finderMapLink').href=search.href('/map',state);
   $('finderRegisterLink').href=search.registrationHref(state);
+  search.activeChips($('resultFilters'),state,taxonomy,item=>{
+    const removed=item.label+((item.key==='category'&&(state.cuisine||state.terms.length||state.focus.length))?' 및 하위 분류':item.key==='cuisine'&&state.terms.length?' 및 세부유형':'');
+    search.removeFilter(state,item.key,item.value);buildFilters();renderResults();
+    $('relaxationNotice').hidden=false;$('relaxationNotice').textContent=`'${removed}' 조건을 제외한 결과입니다.`;
+  });
+  $('relaxationNotice').hidden=true;$('resultError').hidden=true;$('resultLoading').hidden=false;
+  $('placeGrid').hidden=true;$('emptyState').hidden=true;$('relaxations').hidden=true;
   $('placeGrid').setAttribute('aria-busy','true');$('allResultsBtn').hidden=true;
   try{
     const response=await fetch('/api/places?'+query,{signal:pending.signal,headers:{Accept:'application/json'}});
@@ -42,9 +49,27 @@ async function renderResults(scroll=false,updateUrl=true){
     $('allResultsBtn').hidden=places.length<5;$('allResultsBtn').href='/places?'+query;
     $('allResultsBtn').textContent=`전체 결과 ${places.length}곳 보기 →`;
     $('resultSummary').textContent=labels.length?`${labels.join(' · ')} 조건에 맞는 장소 ${places.length}곳을 찾았어요.`:`현재 공개된 장소 ${places.length}곳을 보여드리고 있어요.`;
+    $('emptyConditions').textContent='현재 선택: '+(labels.join(' · ')||'전체');
+    if(places.length<=2)loadSuggestions(query,request);
     if(scroll)$('places').scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(error){if(error.name!=='AbortError'&&request===requestId){$('placeGrid').replaceChildren();$('emptyState').hidden=true;$('resultSummary').textContent='장소를 불러오지 못했습니다. 검색 버튼을 다시 눌러 주세요.';}}
-  finally{if(request===requestId)$('placeGrid').setAttribute('aria-busy','false');}
+  }catch(error){if(error.name!=='AbortError'&&request===requestId){$('placeGrid').replaceChildren();$('emptyState').hidden=true;$('resultError').hidden=false;$('resultSummary').textContent='검색을 완료하지 못했습니다.';}}
+  finally{if(request===requestId){$('placeGrid').setAttribute('aria-busy','false');$('resultLoading').hidden=true;}}
+}
+async function loadSuggestions(query,request){
+  try{
+    const response=await fetch('/api/place-search/suggestions?'+query,{signal:pending.signal});
+    if(!response.ok)return;
+    const options=await response.json();if(request!==requestId)return;
+    $('relaxationOptions').replaceChildren();$('relaxations').hidden=!options.length;
+    options.forEach(option=>{
+      const button=document.createElement('button');button.type='button';button.className='secondary-btn';
+      button.textContent=`${option.label} 조건 제외하고 보기 · ${option.count}곳`;
+      button.addEventListener('click',()=>{
+        Object.assign(state,search.fromParams(new URLSearchParams(option.filters)));buildFilters();renderResults();
+        $('relaxationNotice').hidden=false;$('relaxationNotice').textContent=`'${option.label}' 조건을 제외한 결과입니다.`;
+      });$('relaxationOptions').append(button);
+    });
+  }catch{/* Optional suggestions never replace successful original results. */}
 }
 document.querySelector('.compact-finder').addEventListener('click',event=>{
   const button=event.target.closest('.chip');if(!button||!taxonomy)return;
@@ -57,6 +82,7 @@ document.querySelector('.compact-finder').addEventListener('click',event=>{
 });
 // Keep keywords received from MAP/shared URLs; FIND only edits the three filter groups.
 $('findBtn').addEventListener('click',()=>renderResults(true));
+$('retrySearch').addEventListener('click',()=>taxonomy?renderResults():boot());
 addEventListener('popstate',()=>{if(taxonomy){Object.assign(state,search.fromParams(new URLSearchParams(location.search)));buildFilters();renderResults(false,false);}});
 $('resetBtn').addEventListener('click',()=>{if(!taxonomy)return;Object.assign(state,search.defaultState());buildFilters();renderResults();});
 document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListener('click',event=>{
@@ -68,12 +94,14 @@ document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListen
 }));
 async function boot(){
   try{
-    const [config,places]=await Promise.all([fetch('/api/place-taxonomy'),fetch('/api/places?pick=current')]);
-    if(!config.ok||!places.ok)throw new Error('데이터 로딩 실패');
-    taxonomy=await config.json();const all=await places.json();
-    const picks=all.filter(p=>p.is_pick).slice(0,3);
-    if($('pickGrid'))$('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,(p.region_label||search.regionLabel(p.region)))).join(''):'<p>아직 공개된 JEJU_KNOW PICK이 없습니다.</p>';
+    const config=await fetch('/api/place-taxonomy');
+    if(!config.ok)throw new Error('데이터 로딩 실패');
+    taxonomy=await config.json();
+    if($('pickGrid'))fetch('/api/places?pick=current').then(r=>{if(!r.ok)throw new Error();return r.json();}).then(all=>{
+      const picks=all.filter(p=>p.is_pick).slice(0,3);
+      $('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,(p.region_label||search.regionLabel(p.region)))).join(''):'<p>아직 공개된 JEJU_KNOW PICK이 없습니다.</p>';
+    }).catch(()=>{$('pickGrid').textContent='PICK 정보를 불러오지 못했습니다.';});
     buildFilters();await renderResults(false,false);$('findBtn').disabled=false;
-  }catch{$('resultSummary').textContent='장소 데이터를 불러오지 못했습니다. 새로고침해 주세요.';}
+  }catch{$('resultError').hidden=false;$('resultLoading').hidden=true;$('resultSummary').textContent='장소 데이터를 불러오지 못했습니다.';}
 }
 boot();

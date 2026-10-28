@@ -64,6 +64,31 @@
     return {region:taxonomy.region_labels?.[place.region]||regionLabel(place.region)||'미확인',what:[place.category,...details].filter(Boolean).join(' · '),
       companions:companions.slice(0,3).map(v=>taxonomy.companion_labels?.[v]||v).join(' · ')||'미확인',moreCompanions:Math.max(0,companions.length-3)};
   }
+  function selectedFilters(state,taxonomy){
+    const items=[];
+    const add=(key,value,label)=>{if(value)items.push({key,value,label});};
+    add('region',state.region,taxonomy.region_labels?.[state.region]||regionLabel(state.region));
+    add('category',state.category,taxonomy.categories.find(c=>c.slug===state.category)?.name||state.category);
+    add('cuisine',state.cuisine,taxonomy.terms.find(t=>t.slug===state.cuisine)?.name||state.cuisine);
+    state.terms.forEach(value=>add('terms',value,taxonomy.terms.find(t=>t.slug===value)?.name||value));
+    state.companions.forEach(value=>add('companions',value,taxonomy.companion_labels?.[value]||value));
+    (state.focus||[]).forEach(value=>add('focus',value,taxonomy.cafe_focus_labels?.[value]||value));
+    add('q',state.q,state.q);add('condition',state.condition,state.condition==='rain'?'비 오는 날':state.condition);
+    add('pick',state.pick,'JEJU_KNOW PICK');add('new',state.new,'NEW');
+    return items;
+  }
+  function removeFilter(state,key,value){
+    if(['terms','companions','focus'].includes(key))state[key]=state[key].filter(v=>v!==value);
+    else select(state,key,'');
+  }
+  function activeChips(container,state,taxonomy,onRemove){
+    container.replaceChildren();
+    selectedFilters(state,taxonomy).forEach(item=>{
+      const button=document.createElement('button');button.type='button';button.className='chip is-selected';
+      button.textContent=item.label+' ×';button.setAttribute('aria-label',item.label+' 조건 제거');
+      button.addEventListener('click',()=>onRemove(item));container.append(button);
+    });
+  }
   function chips(container,options,selected,css='chip'){
     container.replaceChildren();
     options.forEach(({value,label,icon})=>{
@@ -78,6 +103,6 @@
       button.classList.toggle('is-selected',active);button.setAttribute('aria-pressed',String(active));container.append(button);
     });
   }
-  const api={defaultState,select,params,fromParams,termsFor,cuisinesFor,selectedCuisine,labels,chips,regionLabel,href,registrationHref,discoveryAttributes};
+  const api={defaultState,select,params,fromParams,termsFor,cuisinesFor,selectedCuisine,labels,chips,regionLabel,href,registrationHref,discoveryAttributes,selectedFilters,removeFilter,activeChips};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PlaceSearch=api;
 })(typeof window==='undefined'?globalThis:window);

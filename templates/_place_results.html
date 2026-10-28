@@ -3,7 +3,12 @@
       <div><p class="kicker">SEARCH RESULT</p><h2>조건에 맞는 장소</h2><p id="resultSummary" class="section-copy" role="status">장소 데이터를 불러오는 중입니다.</p></div>
       <button class="text-btn" id="resetBtn">필터 초기화</button>
     </div>
+    <div id="resultFilters" class="chips result-filter-chips" aria-label="현재 선택 조건"></div>
+    <p id="relaxationNotice" class="section-copy" role="status" hidden></p>
+    <p id="resultLoading" class="section-copy" role="status" hidden>장소 정보를 불러오고 있어요.</p>
+    <div id="resultError" class="empty-state" role="alert" hidden><h3>장소 정보를 불러오지 못했습니다.</h3><p>잠시 후 다시 시도해주세요.</p><button id="retrySearch" type="button" class="secondary-btn">다시 시도</button></div>
     <div id="placeGrid" class="place-grid compact-place-grid" aria-live="polite"></div>
-    <div class="results-footer"><a class="primary-inline" id="finderMapLink" href="/map{% if request.url.query %}?{{ request.url.query }}{% endif %}">지도에서 보기 →</a><a class="text-btn" id="allResultsBtn" href="/places" hidden>전체 결과 보기 →</a></div>
-    <div id="emptyState" class="empty-state" hidden><div class="empty-emoji">🔎</div><h3>선택한 조건에 맞는 장소가 아직 없습니다.</h3><p>현재 공개된 정보만 기준으로 보여드리고 있어요.<br>조건을 조금 줄여보세요.</p><a id="finderRegisterLink" class="text-btn" href="/map/register">MAP에서 장소 알려주기 →</a></div>
+    <div class="results-footer"><a class="primary-inline" id="finderMapLink" href="/map{% if request.url.query %}?{{ request.url.query }}{% endif %}">이 조건으로 지도에서 보기</a><a class="text-btn" id="allResultsBtn" href="/places" hidden>전체 결과 보기 →</a></div>
+    <div id="emptyState" class="empty-state" hidden><div class="empty-emoji">🔎</div><h3>선택한 조건에 맞는 장소가 아직 없습니다.</h3><p id="emptyConditions"></p><p>현재 공개된 정보만 기준으로 보여드리고 있어요.</p><a id="finderRegisterLink" class="text-btn" href="/map/register">MAP에서 장소 알려주기 →</a></div>
+    <section id="relaxations" class="search-relaxations" aria-label="조건 완화 제안" hidden><h3>조건을 조금 넓히면 더 볼 수 있어요.</h3><div id="relaxationOptions"></div></section>
   </section>

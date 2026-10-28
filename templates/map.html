@@ -7,8 +7,9 @@
   <section class="map-tools" aria-label="장소 검색">
     <div class="map-title"><p class="kicker">JEJU MAP</p><h1>지도로 만나는 제주</h1></div>
     <form id="mapSearch" role="search"><label class="map-sr-only" for="mapQuery">장소명·지역·키워드 검색</label><input type="search" id="mapQuery" placeholder="장소명·지역·키워드 검색" autocomplete="off"><button type="submit" class="primary-inline">검색</button></form>
-    <div class="map-flow-actions"><a id="mapFindLink" class="text-btn" href="/find">FIND에서 찾기 →</a></div>
-    <div class="map-filter-summary"><p id="mapActiveFilters"></p><button id="mapReset" type="button" class="text-btn">초기화</button></div>
+    <div class="map-flow-actions"><a id="mapFindLink" class="text-btn" href="/find">FIND에서 조건으로 찾기</a></div>
+    <details class="map-extra-filters"><summary>지역·동행 조건</summary><div class="map-extra-options"><p>어디로 갈까요?</p><div class="chips" id="mapRegions"></div><p>누구와 가나요?</p><div class="chips" id="mapCompanions"></div></div></details>
+    <div class="map-filter-summary"><div id="mapActiveFilters" class="chips" aria-label="현재 선택 조건"></div><button id="mapReset" type="button" class="text-btn">초기화</button></div>
   </section>
   <div class="map-explore-panel">
     <div class="map-filter-panel"><nav class="map-categories" aria-label="장소 카테고리"><button type="button" class="map-category is-selected" data-category="" aria-pressed="true">전체</button>{% for category in categories %}<button type="button" class="map-category{{ ' chip-with-icon' if category.slug in ['food','cafe'] }}" data-category="{{ category.slug }}" aria-pressed="false">{% if category.slug in ['food','cafe'] %}{{ navigation_icon('restaurant' if category.slug=='food' else 'cafe', 'icon-image--chip', 24) }}{% endif %}{{ category.name }}</button>{% endfor %}<button type="button" class="map-category" data-pick="current" aria-pressed="false">JEJU_KNOW PICK</button></nav><nav id="mapCuisines" class="map-details" aria-label="맛집 대분류" hidden></nav><nav id="mapDetails" class="map-details" aria-label="세부 분류" hidden></nav></div>
@@ -25,4 +26,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261027-3d-icons"></script><script src="/static/map.js?v=20261020-restaurants"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/map.js?v=20261028-public"></script>{% endblock %}

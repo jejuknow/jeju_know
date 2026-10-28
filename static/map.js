@@ -92,7 +92,8 @@
   const cuisineNav=document.getElementById('mapCuisines');
   const parameters=new URLSearchParams(location.search);
   const state={...filters.fromParams(parameters),places:[],selected:null};
-  let view=null, pending=null, sequence=0, debounce;
+  let focusedSlug=parameters.get('place')||'';
+  let view=null, pending=null, sequence=0, debounce, searchFailed=false;
   query.value=state.q;
   const element=(tag,className,text)=>{
     const node=document.createElement(tag);
@@ -112,6 +113,8 @@
   }
   function categoryName() { return filters.labels(state,taxonomy).join(' · ')||'전체'; }
   function renderDetails(){
+    filters.chips(document.getElementById('mapRegions'),[{value:'',label:'전체'},...taxonomy.regions.map(v=>({value:v,label:taxonomy.region_labels?.[v]||v}))],state.region);
+    filters.chips(document.getElementById('mapCompanions'),[{value:'',label:'상관없음'},...taxonomy.companions.map(v=>({value:v,label:taxonomy.companion_labels?.[v]||v}))],state.companions);
     const cuisine=filters.selectedCuisine(taxonomy,state);
     cuisineNav.hidden=state.category!=='food';
     filters.chips(cuisineNav,[{value:'',label:'전체 음식'},...filters.cuisinesFor(taxonomy).map(t=>({value:t.slug,label:t.name}))],cuisine,'map-category');
@@ -120,7 +123,7 @@
     filters.chips(detailNav,[{value:'',label:'전체'},...terms.map(t=>({value:t.slug,label:t.name}))],state.terms,'map-category');
   }
   function updateNotice() {
-    if(!view) return;
+    if(!view||searchFailed) return;
     const mapped=state.places.filter(hasCoordinates).length;
     notice.hidden=mapped>0;
     notice.textContent=state.places.length?'이 조건의 장소는 아직 지도 위치를 준비 중이에요. 목록에서 상세 정보를 확인하세요.':'현재 조건에 맞는 장소가 없습니다.';
@@ -209,30 +212,35 @@
       card.append(button,link);list.append(card);
     });
     if(view) view.render(state.places);
+    const focused=state.places.find(p=>p.slug===focusedSlug);if(focused)selectPlace(focused.id);
     fitButton.disabled=!view||!mapped;
     updateNotice();
   }
   async function search(historyMode='push') {
     clearTimeout(debounce);pending?.abort();pending=new AbortController();const request=++sequence;
     list.setAttribute('aria-busy','true');
+    count.textContent='장소 정보를 불러오고 있어요.';
     const params=filters.params(state);
     const url=filters.href(location.pathname,state);
     if(historyMode&&url!==location.pathname+location.search)history[historyMode+'State'](null,'',url);
     document.getElementById('mapFindLink').href=filters.href('/find',state);
     document.getElementById('mapRegisterLink').href=filters.registrationHref(state);
-    document.getElementById('mapActiveFilters').textContent=filters.labels(state,taxonomy).join(' · ');
+    filters.activeChips(document.getElementById('mapActiveFilters'),state,taxonomy,item=>{filters.removeFilter(state,item.key,item.value);query.value=state.q;renderDetails();search();});
     try {
       const response=await fetch('/api/places?'+params,{signal:pending.signal,headers:{Accept:'application/json'}});
       if(!response.ok) throw new Error('장소를 불러오지 못했습니다. 다시 검색해 주세요.');
       const places=await response.json();if(request!==sequence)return;
-      state.places=places;render();
+      searchFailed=false;state.places=places;render();
     } catch(error) {
       if(error.name==='AbortError'||request!==sequence)return;
-      state.places=[];render();count.textContent='장소를 불러오지 못했습니다.';
-      list.replaceChildren(element('p','map-empty','연결을 확인하고 검색 버튼을 다시 눌러 주세요.'));
+      searchFailed=true;state.places=[];render();count.textContent='장소를 불러오지 못했습니다.';
+      notice.hidden=false;notice.textContent='장소 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.';
+      const retry=element('button','secondary-btn','다시 시도');retry.type='button';retry.addEventListener('click',()=>search(false));
+      list.replaceChildren(element('p','map-empty','연결을 확인한 후 다시 시도해주세요.'),retry);
     } finally { if(request===sequence)list.setAttribute('aria-busy','false'); }
   }
   categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category],[data-pick]');if(!button)return;if(button.dataset.pick)state.pick=state.pick?'':'current';else filters.select(state,'category',button.dataset.category||'');renderDetails();state.q=query.value.trim();search();});
+  for(const [id,key] of [['mapRegions','region'],['mapCompanions','companions']])document.getElementById(id).addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,key,button.dataset.value);renderDetails();search();});
   cuisineNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,'cuisine',button.dataset.value);renderDetails();search();});
   detailNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;
     if(state.category==='food'){
@@ -244,7 +252,7 @@
   document.getElementById('mapSearch').addEventListener('submit',event=>{event.preventDefault();state.q=query.value.trim();search();});
   query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search('replace');},250);});
   document.getElementById('mapReset').addEventListener('click',()=>{Object.assign(state,filters.defaultState());query.value='';renderDetails();search();});
-  addEventListener('popstate',()=>{Object.assign(state,filters.fromParams(new URLSearchParams(location.search)));query.value=state.q;renderDetails();search(false);});
+  addEventListener('popstate',()=>{const params=new URLSearchParams(location.search);focusedSlug=params.get('place')||'';Object.assign(state,filters.fromParams(params));query.value=state.q;renderDetails();search(false);});
   fitButton.addEventListener('click',()=>view?.fit());
   sheetToggle.addEventListener('click',()=>setListExpanded(!workspace.classList.contains('is-list-expanded')));
   renderDetails();search(false);

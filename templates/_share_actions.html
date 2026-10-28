@@ -1,0 +1,6 @@
+<div class="public-share" data-share-content data-title="{{ page_seo.share_title|default(page_seo.title) }}" data-text="{{ page_seo.share_text|default(page_seo.description) }}" data-url="{{ page_seo.canonical }}">
+  <button type="button" class="secondary-btn" data-share>공유</button>
+  <button type="button" class="text-btn" data-copy-link>링크 복사</button>
+  <p class="share-status" role="status" aria-live="polite"></p>
+  <label class="share-manual" hidden>링크를 길게 눌러 복사해주세요.<input type="text" readonly value="{{ page_seo.canonical }}" aria-label="공유 링크"></label>
+</div>

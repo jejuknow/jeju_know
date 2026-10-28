@@ -1,5 +1,10 @@
 const test=require('node:test'), assert=require('node:assert/strict');
 const filters=require('../static/place-search.js');
+test('individual condition removal preserves unrelated filters and clears dependent taxonomy',()=>{
+ const s={...filters.defaultState(),category:'food',cuisine:'food-korean',terms:['food-noodles'],companions:['부모님','아이'],region:'조천'};
+ filters.removeFilter(s,'companions','부모님');assert.deepEqual(s.companions,['아이']);
+ filters.removeFilter(s,'category','food');assert.equal(s.cuisine,'');assert.deepEqual(s.terms,[]);assert.equal(s.region,'조천');
+});
 test('monthly PICK and NEW survive URLs without masquerading as a category',()=>{
   const state={...filters.defaultState(),pick:'current',new:'current'};
   assert.deepEqual(filters.fromParams(filters.params(state)),state);
