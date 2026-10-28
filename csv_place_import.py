@@ -16,12 +16,13 @@ from csv_import_migrations import backup
 from place_details import COFFEE_OPTIONS, USE_OPTIONS, validate_detail_value
 from restaurant_taxonomy import official_terms, form_selection, parse_selection
 from submission_fields import normalize_controls
+from business_hours import csv_business_hours
 from starlette.datastructures import FormData
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_ROWS = 500
 KINDS = {'cafe': ('카페', 'cafe'), 'restaurant': ('맛집', 'food')}
-BEFORE = 'place_id,장소명,지역,주소,위도,경도,영업_시작,영업_종료,휴무일,전화번호,대표메뉴,대표메뉴_가격,추천메뉴,탐나는전,오픈연도,오픈월,꿀팁,잘맞는동행'.split(',')
+BEFORE = 'place_id,장소명,지역,주소,위도,경도,영업시간_상태,영업_시작,영업_종료,휴무일,전화번호,대표메뉴,대표메뉴_가격,추천메뉴,탐나는전,오픈연도,오픈월,꿀팁,잘맞는동행'.split(',')
 AFTER = '주차,반려동물,아이동반,무장애,확인상태,공개여부,JEJU_KNOW_PICK,PICK_연도,PICK_월,NEW_노출,대표사진,추가사진1,추가사진2,추가사진3,홈페이지_인스타그램,지도링크,비고'.split(',')
 HEADERS = {kind: BEFORE + fields + AFTER for kind, fields in (
     ('cafe', ['카페_특징', '커피맛_특징']), ('restaurant', ['맛집_대분류', '맛집_세부유형', '음식맛_특징']))}
@@ -52,6 +53,12 @@ def export_csv(headers, rows):
     return output.getvalue().encode('utf-8-sig')
 
 
+def template_examples(kind):
+    return [{'장소명': f'[예시] {KINDS[kind][0]} (실제 정보로 변경)',
+             '영업시간_상태': status, '영업_시작': start, '영업_종료': end}
+            for status, start, end in [('시간 입력', '09:30', '16:00'), ('미확인', '', '')]]
+
+
 def parse_csv(raw, filename, mime, kind):
     if Path(filename or '').suffix.lower() != '.csv':
         raise ValueError('CSV 파일만 업로드해주세요.')
@@ -71,7 +78,8 @@ def parse_csv(raw, filename, mime, kind):
         other = 'restaurant' if kind == 'cafe' else 'cafe'
         if set(HEADERS[other]) - set(HEADERS[kind]) & set(header):
             raise ValueError(f'{KINDS[other][0]} CSV 파일로 보입니다. {KINDS[other][0]} CSV 등록 메뉴에서 업로드해주세요.')
-        if len(set(header)) != len(header) or set(header) != set(HEADERS[kind]):
+        allowed_headers = (set(HEADERS[kind]), set(HEADERS[kind]) - {'영업시간_상태'})
+        if len(set(header)) != len(header) or set(header) not in allowed_headers:
             missing = ', '.join(x for x in HEADERS[kind] if x not in header)
             extra = ', '.join(x for x in header if x not in HEADERS[kind])
             raise ValueError('템플릿 헤더를 확인해주세요. ' + ('누락: ' + missing if missing else '') + (' 추가/중복: ' + (extra or '중복 열') if extra or len(set(header)) != len(header) else ''))
@@ -83,7 +91,7 @@ def parse_csv(raw, filename, mime, kind):
                 raise ValueError(f'{reader.line_num}행: 열 개수가 템플릿과 다릅니다.')
             if any(len(v) > 4000 or any(ord(c) < 32 and c not in '\r\n\t' for c in v) for v in values):
                 raise ValueError(f'{reader.line_num}행: 셀은 4,000자 이하이고 허용된 문자여야 합니다.')
-            rows.append({'line': reader.line_num, 'raw': dict(zip(header, (v.strip() for v in values)))})
+            rows.append({'line': reader.line_num, 'raw': {**dict.fromkeys(HEADERS[kind], ''), **dict(zip(header, (v.strip() for v in values)))}})
             if len(rows) > MAX_ROWS:
                 raise ValueError('한 번에 최대 500개 장소를 등록할 수 있습니다.')
     except csv.Error:
@@ -182,8 +190,9 @@ def normalize_common_fields(conn, raw, kind, previous, root):
         patch['region'] = exact_catalog(conn, 'region', raw['지역'])
     if raw['잘맞는동행']:
         patch['companions'] = json.dumps([exact_catalog(conn, 'companion', v) for v in split_values(raw['잘맞는동행'])], ensure_ascii=False)
-    if raw['영업_시작'] or raw['영업_종료']:
-        patch['business_hours'] = normalize_controls(FormData({'hours_present': '1', 'hours_same': '1', 'hours_start': raw['영업_시작'], 'hours_end': raw['영업_종료']}))['business_hours']
+    hours = csv_business_hours(raw, previous)
+    if hours is not None:
+        patch['business_hours'] = hours
     if raw['휴무일']:
         mode = {'미확인': 'unknown', '연중무휴': 'everyday'}.get(raw['휴무일'], 'days')
         pairs = [('closed_present', '1'), ('closed_mode', mode)] + [('closed_weekdays', v) for v in split_values(raw['휴무일'])]
@@ -258,7 +267,13 @@ def prepare_row(conn, raw, kind, root, target=None):
 def preview_rows(conn, rows, kind, root):
     result, seen = [], {}
     for source in rows:
-        item = {**source, 'errors': [], 'warnings': [], 'duplicates': [], 'status': '정상', 'default_action': 'create'}
+        item = {'line': source['line'], 'raw': source['raw'], 'errors': [], 'warnings': [], 'duplicates': [], 'status': '정상', 'default_action': 'create'}
+        try:
+            hours = csv_business_hours(source['raw'], bool(source['raw'].get('place_id')))
+            item['hours_status'] = '기존 값 유지' if hours is None else '시간 입력' if hours else '미확인'
+            item['hours_display'] = hours or ''
+        except ValueError as error:
+            item['hours_error'] = str(error)
         try:
             prepared = prepare_row(conn, source['raw'], kind, root)
             data = prepared['data']
@@ -347,9 +362,11 @@ def save_rows(database, connect_db, stage, choices, actor):
 
 
 def choice_lists(conn):
+    from submission_fields import TIME_OPTIONS
     lists = {'지역': [r['label'] for r in catalog(conn, 'region')], '잘맞는동행': [r['label'] for r in catalog(conn, 'companion')],
              '커피맛_특징': list(COFFEE_OPTIONS), '탐나는전': ['미확인', '가능', '불가'],
-             'JEJU_KNOW_PICK': ['아니오', '예']}
+             'JEJU_KNOW_PICK': ['아니오', '예'], '영업시간_상태': ['시간 입력', '미확인'],
+             '영업_시작': list(TIME_OPTIONS), '영업_종료': list(TIME_OPTIONS)}
     lists.update({title: list(options) for title, (_, options) in CHOICES.items()})
     cafe = conn.execute("SELECT id FROM categories WHERE slug='cafe' AND type='place'").fetchone()[0]
     food = conn.execute("SELECT id FROM categories WHERE slug='food' AND type='place'").fetchone()[0]

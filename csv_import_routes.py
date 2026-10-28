@@ -13,7 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 from auth_security import current_user
 from csv_place_import import (MAX_BYTES, HEADERS, KINDS, parse_csv, preview_rows,
-                              state_hash, export_csv, save_rows, choice_lists)
+                              state_hash, export_csv, save_rows, choice_lists, template_examples)
 from community_places import coordinates
 
 TTL = 3600
@@ -96,7 +96,7 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
         if response := guard(request):
             return response
         kind_check(kind)
-        return file_response(export_csv(HEADERS[kind], []), kind + '-template.csv')
+        return file_response(export_csv(HEADERS[kind], template_examples(kind)), kind + '-template.csv')
 
     @app.get('/admin/imports/{kind}', response_class=HTMLResponse)
     def upload_page(request: Request, kind: str):
@@ -181,6 +181,37 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
                         row['raw']['위도'], row['raw']['경도'] = str(lat), str(lng)
                 stage['rows'] = preview_rows(conn, stage['rows'], kind, root)
             store.write(stage)
+        except ValueError as error:
+            flash(request, str(error), 'error')
+        return RedirectResponse(f'/admin/imports/{kind}/preview/{token}', status_code=303)
+
+    @app.post('/admin/imports/{kind}/preview/{token}/hours')
+    async def correct_hours(request: Request, kind: str, token: str):
+        if response := guard(request):
+            return response
+        kind_check(kind)
+        form = await request.form(max_fields=5)
+        if not csrf(request, form):
+            return HTMLResponse('CSRF 검증에 실패했습니다.', status_code=400)
+        try:
+            stage = store.read(token, owner(request), kind)
+            row = next((r for r in stage['rows'] if str(r['line']) == form.get('line')), None)
+            if row is None:
+                raise ValueError('수정할 행을 찾을 수 없습니다.')
+            status = form.get('hours_status')
+            if status not in ('시간 입력', '미확인'):
+                raise ValueError('영업시간 상태를 선택해주세요.')
+            row['raw'].update({'영업시간_상태': status,
+                               '영업_시작': '' if status == '미확인' else str(form.get('hours_start', ''))[:80],
+                               '영업_종료': '' if status == '미확인' else str(form.get('hours_end', ''))[:80]})
+            with closing(connect_db()) as conn:
+                conn.execute('BEGIN')
+                if state_hash(conn) != stage['state_hash'] or conn.execute('SELECT 1 FROM csv_import_runs WHERE token=?', (token,)).fetchone():
+                    raise ValueError('미리보기가 변경되었거나 이미 저장되었습니다. 다시 업로드해주세요.')
+                prepared = preview_rows(conn, stage['rows'], kind, root)
+            # New immutable preview: a second tab cannot commit edited rows unseen.
+            stage = store.create(owner(request), kind, prepared, stage['state_hash'])
+            token = stage['token']
         except ValueError as error:
             flash(request, str(error), 'error')
         return RedirectResponse(f'/admin/imports/{kind}/preview/{token}', status_code=303)

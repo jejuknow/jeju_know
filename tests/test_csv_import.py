@@ -223,6 +223,77 @@ class CsvImportTest(unittest.TestCase):
         self.commit(path,action_2='create')
         self.assertEqual(self.rows('SELECT latitude FROM places')[0]['latitude'],33.45)
 
+    def test_hours_legacy_headers_preview_and_database(self):
+        for kind in HEADERS:
+            old_headers = [h for h in HEADERS[kind] if h != '영업시간_상태']
+            rows = [self.row(kind, 장소명='시간 정규화 ' + kind, 영업_시작='0.395833', 영업_종료='16:00:00', NEW_노출=''),
+                    self.row(kind, 장소명='시간 미확인 ' + kind, 주소='다른 주소')]
+            response = self.upload([], kind, raw=export_csv(old_headers, rows))
+            self.assertEqual(response.status_code, 303)
+            path = response.headers['location']
+            page = self.admin.get(path)
+            self.assertIn('09:30 ~ 16:00', page.text)
+            self.assertIn('오픈월이 없어 NEW 자동 노출 대상이 아닙니다.', page.text)
+            self.assertNotIn('class="csv-state">오류', page.text)
+            self.commit(path, action_2='create', action_3='create')
+            saved = self.rows('SELECT business_hours FROM places WHERE name=?', ('시간 정규화 ' + kind,))[0]
+            self.assertEqual(saved['business_hours'], '09:30 ~ 16:00')
+            self.assertEqual(self.rows('SELECT business_hours FROM places WHERE name=?', ('시간 미확인 ' + kind,))[0]['business_hours'], '')
+
+    def test_hours_blank_update_preserves_and_explicit_unknown_clears(self):
+        path, _ = self.preview([self.row(영업_시작='9:30', 영업_종료='16:00')])
+        self.commit(path, action_2='create')
+        place = self.rows('SELECT * FROM places')[0]
+        row = dict.fromkeys(HEADERS['cafe'], '')
+        row['place_id'] = str(place['id'])
+        path, page = self.preview([row])
+        self.assertIn('기존 값 유지', page.text)
+        self.commit(path, action_2='update', target_2=str(place['id']))
+        self.assertEqual(self.rows('SELECT business_hours FROM places')[0]['business_hours'], '09:30 ~ 16:00')
+        row['영업시간_상태'] = '미확인'
+        path, _ = self.preview([row])
+        self.commit(path, action_2='update', target_2=str(place['id']))
+        self.assertEqual(self.rows('SELECT business_hours FROM places')[0]['business_hours'], '')
+
+    def test_correct_hours_preview_only_csrf_and_revalidation(self):
+        path, page = self.preview([self.row(영업시간_상태='시간 입력', 영업_시작='9시30분', 영업_종료='')])
+        self.assertIn('다시 검증', page.text)
+        self.assertEqual(self.admin.post(path + '/hours').status_code, 400)
+        self.assertEqual(self.member.post(path + '/hours', follow_redirects=False).status_code, 303)
+        data = {'csrf_token': self.csrf(self.admin, '/admin'), 'line': '2', 'hours_status': '시간 입력', 'hours_start': '09:30', 'hours_end': '16:00'}
+        response = self.admin.post(path + '/hours', data=data, follow_redirects=False)
+        corrected = response.headers['location']
+        self.assertNotEqual(path, corrected)
+        self.assertIn('class="csv-state">오류', self.admin.get(path).text)
+        self.assertNotIn('class="csv-state">오류', self.admin.get(corrected).text)
+        self.assertEqual(len(self.rows('SELECT * FROM places')), 0)
+        self.commit(corrected, action_2='create')
+        self.assertEqual(self.rows('SELECT business_hours FROM places')[0]['business_hours'], '09:30 ~ 16:00')
+        rejected = self.admin.post(corrected + '/hours', data=data)
+        self.assertIn('이미 저장되었습니다', rejected.text)
+
+    def test_time_workbook_text_and_dropdown_ranges(self):
+        response = self.admin.get('/admin/imports/template.xlsx')
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            ns = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+            style_doc = ET.fromstring(archive.read('xl/styles.xml'))
+            styles = style_doc.find('x:cellXfs', ns)
+            formats = {f.get('numFmtId'): f.get('formatCode') for f in style_doc.find('x:numFmts', ns)}
+            choices = ET.fromstring(archive.read('xl/worksheets/sheet4.xml'))
+            text_values = [t.text for t in choices.findall('.//x:t', ns)]
+            self.assertIn('00:00', text_values)
+            self.assertIn('23:30', text_values)
+            for n in (1, 2):
+                sheet = ET.fromstring(archive.read(f'xl/worksheets/sheet{n}.xml'))
+                rules = {r.get('sqref'): r for r in sheet.find('x:dataValidations', ns)}
+                for col in ('G', 'H', 'I'):
+                    self.assertIn(f'{col}2:{col}501', rules)
+                    self.assertEqual(rules[f'{col}2:{col}501'].get('showDropDown', '0'), '0')
+                for col in ('H', 'I'):
+                    cell = sheet.find(f'.//x:c[@r="{col}2"]', ns)
+                    format_id = styles[int(cell.get('s'))].get('numFmtId')
+                    self.assertEqual('@' if format_id == '49' else formats.get(format_id), '@')
+
     def test_internal_photo_reuse_keeps_original_file(self):
         from PIL import Image
         image=io.BytesIO();Image.new('RGB',(20,20),'blue').save(image,'PNG')

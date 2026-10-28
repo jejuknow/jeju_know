@@ -1,6 +1,12 @@
 /* Reuses the same Kakao address lookup as single-place forms; never saves places. */
 (function () {
   'use strict';
+  document.querySelectorAll('[data-hours-editor]').forEach(editor => {
+    editor.addEventListener('change', () => {
+      const unknown = editor.querySelector('input[type=radio]:checked')?.value === '미확인';
+      editor.querySelectorAll('select').forEach(select => { select.disabled = unknown; });
+    });
+  });
   const form = document.getElementById('csvGeocode');
   if (!form) return;
   const button = document.getElementById('csvGeocodeButton');
