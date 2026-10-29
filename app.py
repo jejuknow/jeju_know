@@ -46,6 +46,7 @@ from submission_migrations import backup_before_submission, migrate_submission
 from admin_place_cleanup_migrations import backup_before_admin_place_cleanup, migrate_admin_place_cleanup
 from submission_fields import normalize_controls, controls, TIME_OPTIONS, WEEKDAYS, CONTROL_FIELDS
 from starlette.concurrency import run_in_threadpool
+from analytics import Analytics
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = BASE_DIR / "data"
@@ -192,6 +193,7 @@ def create_app(test_config=None):
             active_regions = [i['value'] for i in catalog(conn, 'region')]
             active_companions = [i['value'] for i in catalog(conn, 'companion')]
         return {
+            "analytics_token": app.state.analytics.context(request),
             "default_seo": page_metadata(request, settings['site_description']),
             "site_settings": settings, "region_labels": region_labels, "companion_labels": companion_labels, **admin_data,
             "active_regions": active_regions, "active_companions": active_companions,
@@ -331,6 +333,8 @@ def create_app(test_config=None):
         migrate_cafe_flow(app.state.database, cafe_flow_backup)
         from csv_import_migrations import migrate as migrate_csv_import
         migrate_csv_import(app.state.database)
+        from analytics_migrations import migrate as migrate_analytics
+        migrate_analytics(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -1290,6 +1294,7 @@ def create_app(test_config=None):
     register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
                               row_to_place, form_options, REGIONS, secret_key, image_store)
     app.state.admin_ui = AdminUI(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place, row_to_news, NEWS_CATEGORIES, NEWS_CATEGORY_ALIASES)
+    app.state.analytics = Analytics(app, str(database_path), secret_key, admin_guard, templates)
     from csv_import_routes import register_csv_routes
     register_csv_routes(app, templates, connect_db, admin_guard, require_csrf, flash)
     app.state.admin_ui.register()

@@ -98,6 +98,8 @@ def admin_context(request, conn):
         section, title, active = "콘텐츠 관리", "BEST", "best"
     elif path.startswith("/admin/users"):
         section, title, active = "회원 관리", "회원 목록", "users"
+    elif path == '/admin/analytics':
+        section, title, active = '통계', '방문·FIND 통계', 'analytics'
     elif path.startswith("/admin/settings"):
         section, active = "운영 설정", path.rsplit("/", 1)[-1]
         title = "홈 화면" if active == "home" else "기본 설정"
@@ -133,9 +135,11 @@ class AdminUI:
         if response := self.guard(request):
             return response
         with closing(self.db()) as conn:
+            from analytics import report
+            stats = report(conn, {'period':'30d'})
             places = conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE " + ACTIVE + " AND p.source_type='user' AND p.verification_status='unverified' ORDER BY p.id DESC LIMIT 5").fetchall()
             suggestions = conn.execute("SELECT s.*,p.name FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id WHERE s.status='pending' ORDER BY s.id DESC LIMIT 5").fetchall()
-        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS)
+        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS, analytics=stats)
 
     def places(self, request, mode="all"):
         if response := self.guard(request):

@@ -25,7 +25,7 @@ function buildFilters(){
   $('categoryDetailCount').textContent=state.terms.length?`${state.terms.length}개 선택`:'';
   search.chips($('categoryDetailChips'),terms.map(v=>({value:v.slug,label:v.name})),state.terms);
 }
-async function renderResults(scroll=false,updateUrl=true){
+async function renderResults(scroll=false,updateUrl=true,track=true){
   pending?.abort();pending=new AbortController();const request=++requestId;
   const query=search.params(state), labels=search.labels(state,taxonomy);
   const url=search.href(location.pathname,state)+location.hash;
@@ -44,6 +44,8 @@ async function renderResults(scroll=false,updateUrl=true){
     const response=await fetch('/api/places?'+query,{signal:pending.signal,headers:{Accept:'application/json'}});
     if(!response.ok)throw new Error('장소 검색 실패');
     const places=await response.json();if(request!==requestId)return;
+    // Only completed, explicit searches count. Initial render/history/retry do not.
+    if(track)window.JejuAnalytics?.search(search.fromParams(query));
     $('placeGrid').innerHTML=places.slice(0,5).map(p=>cards.placeCard(p,(p.region_label||search.regionLabel(p.region)))).join('');
     $('placeGrid').hidden=!places.length;$('emptyState').hidden=!!places.length;
     $('allResultsBtn').hidden=places.length<5;$('allResultsBtn').href='/places?'+query;
@@ -82,8 +84,8 @@ document.querySelector('.compact-finder').addEventListener('click',event=>{
 });
 // Keep keywords received from MAP/shared URLs; FIND only edits the three filter groups.
 $('findBtn').addEventListener('click',()=>renderResults(true));
-$('retrySearch').addEventListener('click',()=>taxonomy?renderResults():boot());
-addEventListener('popstate',()=>{if(taxonomy){Object.assign(state,search.fromParams(new URLSearchParams(location.search)));buildFilters();renderResults(false,false);}});
+$('retrySearch').addEventListener('click',()=>taxonomy?renderResults(false,true,false):boot());
+addEventListener('popstate',()=>{if(taxonomy){Object.assign(state,search.fromParams(new URLSearchParams(location.search)));buildFilters();renderResults(false,false,false);}});
 $('resetBtn').addEventListener('click',()=>{if(!taxonomy)return;Object.assign(state,search.defaultState());buildFilters();renderResults();});
 document.querySelectorAll('[data-collection]').forEach(link=>link.addEventListener('click',event=>{
   if(!taxonomy)return;event.preventDefault();Object.assign(state,search.defaultState());
@@ -101,7 +103,7 @@ async function boot(){
       const picks=all.filter(p=>p.is_pick).slice(0,3);
       $('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,(p.region_label||search.regionLabel(p.region)))).join(''):'<p>아직 공개된 JEJU_KNOW PICK이 없습니다.</p>';
     }).catch(()=>{$('pickGrid').textContent='PICK 정보를 불러오지 못했습니다.';});
-    buildFilters();await renderResults(false,false);$('findBtn').disabled=false;
+    buildFilters();await renderResults(false,false,false);$('findBtn').disabled=false;
   }catch{$('resultError').hidden=false;$('resultLoading').hidden=true;$('resultSummary').textContent='장소 데이터를 불러오지 못했습니다.';}
 }
 boot();

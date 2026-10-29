@@ -5,6 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  {% if analytics_token %}<meta name="analytics-token" content="{{ analytics_token }}">{% endif %}
   {% set brand_description = site_settings.site_description %}
   {% set page_seo = seo|default(default_seo) %}
   <meta name="description" content="{{ page_seo.description }}" />
@@ -40,6 +41,7 @@
 <body class="{% block body_class %}{% endblock %}">
   {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% include '_site_header.html' %}{% endif %}
   {% block body %}{% endblock %}
+  {% if analytics_token %}<script src="/static/analytics.js?v=20261029"></script>{% endif %}
   <script src="/static/site-nav.js?v=20261008-home"></script>
   <script src="/static/image-uploads.js?v=20261017-still-photo" defer></script>
   {% block scripts %}{% endblock %}

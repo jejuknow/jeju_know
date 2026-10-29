@@ -2,7 +2,7 @@
 {% from 'admin/_ui.html' import icon %}
 {% block title %}{{ admin_title }} | JEJU_KNOW ADMIN{% endblock %}
 {% block body_class %}admin-body admin-shell{% endblock %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin.css?v=20261015-admin">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin.css?v=20261015-admin"><link rel="stylesheet" href="/static/analytics.css?v=20261029">{% endblock %}
 {% block body %}
 <a class="admin-skip" href="#adminContent">본문으로 건너뛰기</a>
 <div class="admin-drawer-shade" id="adminDrawerShade" hidden></div>
@@ -17,6 +17,7 @@
       ('분류 관리','classification',[]),
       ('콘텐츠 관리','content',[('issues','ISSUE','/admin/issues'),('best','BEST','/admin/best')]),
       ('회원 관리','user',[('users','회원 목록','/admin/users')]),
+      ('통계','dashboard',[('analytics','방문·FIND 통계','/admin/analytics')]),
       ('운영 설정','settings',[('home','홈 화면','/admin/settings/home'),('general','기본 설정','/admin/settings/general')])
     ] %}
     <details class="admin-nav-group" {% if admin_section==group %}open{% endif %}><summary>{{ icon(symbol) }}{{ group }}<span class="admin-chevron" aria-hidden="true">⌄</span></summary>
