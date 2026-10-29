@@ -10,7 +10,7 @@ FEATURES = (
     ("coffee", "커피 전문"), ("dessert", "디저트 전문"), ("bakery", "베이커리"),
     ("view", "좋은 뷰"), ("mood", "감성 공간"), ("quiet", "조용한 공간"),
     ("healing", "힐링"), ("work", "작업하기 좋은"), ("garden", "야외·정원"),
-    ("local", "제주다움"), ("space", "넓은 공간"), ("premium", "고급 분위기"),
+    ("local", "제주다움"), ("space", "넓은 공간"), ("premium", "포토스팟"),
     ("unique", "이색 경험"), ("popular", "인기 핫플"), ("value", "가성비"),
 )
 
@@ -51,8 +51,8 @@ def migrate_cafe_features(database, backup_path):
         if root:
             conn.execute("UPDATE categories SET is_legacy=1,member_policy='admin' WHERE type='cafe_feature'")
             for order, (key, name) in enumerate(FEATURES, 1):
-                # Prefer the old dessert row so its ID and all links remain stable.
-                old_name = "디저트 좋은" if key == "dessert" else name
+                # Prefer former names so custom slugs, IDs and links remain stable.
+                old_name = {"dessert": "디저트 좋은", "premium": "고급 분위기"}.get(key, name)
                 row = conn.execute("SELECT id,name,legacy_aliases FROM categories WHERE type='cafe_feature' AND (name=? OR name=? OR slug=?) ORDER BY name=? DESC,id LIMIT 1",
                                    (old_name, name, "cafe-" + key, old_name)).fetchone()
                 policy = "admin" if key == "popular" else "review" if key == "value" else "direct"

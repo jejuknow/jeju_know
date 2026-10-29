@@ -121,10 +121,10 @@ def validate_cafe_row(conn, raw, category_id, previous):
     terms = official_terms(conn, category_id)
     ids = []
     for name in split_values(raw['카페_특징']):
-        matches = [r['id'] for r in terms if r['name'] == name]
+        matches = [r['id'] for r in terms if r['name'] == name or name in json.loads(r['legacy_aliases'])]
         if len(matches) != 1:
             raise ValueError(f"카페 특징 '{name}'은 활성 분류에 없습니다.")
-        ids.extend(matches)
+        ids.extend(value for value in matches if value not in ids)
     # Replace only visible cafe features, preserving legacy/other linked terms.
     active = {r['id'] for r in terms}
     return ids + [r[0] for r in conn.execute('SELECT category_id FROM place_category_links WHERE place_id=?', (previous.get('id', 0),)) if r[0] not in active]

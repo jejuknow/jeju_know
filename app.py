@@ -335,6 +335,8 @@ def create_app(test_config=None):
         migrate_csv_import(app.state.database)
         from analytics_migrations import migrate as migrate_analytics
         migrate_analytics(app.state.database)
+        from cafe_photo_spot_migrations import migrate as migrate_cafe_photo_spot
+        migrate_cafe_photo_spot(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
