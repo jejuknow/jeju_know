@@ -109,6 +109,7 @@ def issue_metadata(item):
 
 
 def sitemap(conn):
+    from issue_discovery import public_where, today
     root = ET.Element('urlset', xmlns='http://www.sitemaps.org/schemas/sitemap/0.9')
     def add(url, modified=None):
         node = ET.SubElement(root, 'url')
@@ -122,6 +123,7 @@ def sitemap(conn):
     for path in ('/', '/find', '/map', '/new', '/news', '/best'):
         add(ORIGIN+path)
     for table,prefix,extra in [('places','/place/',' AND merged_into_id IS NULL'), ('best_collections','/best/',''), ('news_posts','/news/','')]:
-        for row in conn.execute(f'SELECT slug,updated_at FROM {table} WHERE published=1 AND deleted_at IS NULL{extra} ORDER BY id'):
+        where, params = public_where(today()) if table == 'news_posts' else ('published=1 AND deleted_at IS NULL'+extra, [])
+        for row in conn.execute(f'SELECT slug,updated_at FROM {table} WHERE {where} ORDER BY id', params):
             add(content_url(prefix,row['slug']),row['updated_at'])
     return ET.tostring(root, encoding='utf-8', xml_declaration=True)

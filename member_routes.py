@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
 from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_password, rate_limited, safe_external_url, verify_password
+from community_places import coordinates
 from image_uploads import ImagePlan, ImageError
 
 
@@ -17,9 +18,10 @@ SIGNUP_PASSWORD_MIN_LENGTH = 8
 SIGNUP_PASSWORD_MAX_LENGTH = 64
 
 
-def validate_news(data, categories):
+
+def validate_news(data, categories, *, require_dates=True):
     limits = {"title": 200, "summary": 600, "body": 20000, "venue": 200,
-              "source_name": 100, "sponsor_name": 100, "slug": 120}
+              "source_name": 100, "sponsor_name": 100, "slug": 120, "address": 300, "region": 100}
     if not data["title"] or data["category"] not in categories:
         return "제목과 카테고리를 확인해주세요."
     if any(len(data.get(key, "")) > limit for key, limit in limits.items()):
@@ -31,11 +33,21 @@ def validate_news(data, categories):
             if data.get(key):
                 if len(data[key]) != 10:
                     raise ValueError
-                date.fromisoformat(data[key])
+                if date.fromisoformat(data[key]).isoformat() != data[key]:
+                    raise ValueError
     except ValueError:
         return "날짜 형식을 확인해주세요."
     if data.get("event_start") and data.get("event_end") and data["event_start"] > data["event_end"]:
-        return "종료일은 시작일 이후로 입력해주세요."
+        return "종료일은 시작일 이후 날짜를 선택해주세요."
+    if (require_dates or data.get("event_start") or data.get("event_end")) and not (data.get("event_start") and data.get("event_end")):
+        return "시작일과 종료일을 모두 선택해주세요."
+    for key in ("start_time", "end_time"):
+        if data.get(key) and not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", data[key]):
+            return "시간은 00:00부터 23:59 사이로 입력해주세요."
+    try:
+        data["latitude"], data["longitude"] = coordinates(data.get("latitude"), data.get("longitude"))
+    except ValueError as exc:
+        return str(exc)
     return None
 
 
@@ -278,7 +290,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return render(request, "member_issue_form.html", status=400, item={**data, "id": news_id,
                 "legacy_image_url": data["image_url"], "images": images}, error=error)
         # Allowlist editable fields: never accept author, visibility, or featured flags from members.
-        fields = ("title", "category", "summary", "body", "image_url", "venue", "event_start", "event_end", "external_url", "source_name", "checked_at")
+        fields = ("title", "category", "summary", "body", "image_url", "venue", "event_start", "event_end", "start_time", "end_time", "region", "external_url", "source_name", "checked_at")
         values = [data[key] for key in fields]
         with plan.transaction() as conn:
             if post:

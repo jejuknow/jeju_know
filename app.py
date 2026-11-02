@@ -47,6 +47,9 @@ from admin_place_cleanup_migrations import backup_before_admin_place_cleanup, mi
 from submission_fields import normalize_controls, controls, TIME_OPTIONS, WEEKDAYS, CONTROL_FIELDS
 from starlette.concurrency import run_in_threadpool
 from analytics import Analytics
+from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES
+from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule
+from issue_calendar_migration import migrate as migrate_issue_calendar
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = BASE_DIR / "data"
@@ -58,22 +61,7 @@ REGIONS = [
 COMPANIONS = ["혼자", "연인", "친구", "부모님", "아이", "반려동물", "단체"]
 FEATURES = ["감성", "뷰", "비오는날", "사진", "힐링", "로컬", "전통", "이색", "가성비", "포장", "예약"]
 STATUS_OPTIONS = ["미확인", "가능", "불가", "제한"]
-NEWS_CATEGORY_LABELS = {
-    "events": "행사•축제",
-    "exhibitions": "전시•팝업",
-    "activities": "체험•교육",
-    "local": "지역소식",
-    "opportunities": "공모•지원",
-}
 NEWS_CATEGORIES = list(NEWS_CATEGORY_LABELS.values())
-# Read compatibility only: never rewrite existing rows on startup or during reads.
-# Ambiguous legacy values such as 마켓 remain unchanged until an editor chooses.
-NEWS_CATEGORY_ALIASES = {
-    "행사·축제": NEWS_CATEGORY_LABELS["events"],
-    "전시": NEWS_CATEGORY_LABELS["exhibitions"],
-    "체험·교육": NEWS_CATEGORY_LABELS["activities"],
-    "공모·지원": NEWS_CATEGORY_LABELS["opportunities"],
-}
 
 SEED_PLACES = [
     {
@@ -199,6 +187,7 @@ def create_app(test_config=None):
             "active_regions": active_regions, "active_companions": active_companions,
             "csrf_token": request.session["csrf_token"], "flashes": flashes,
             "news_categories": NEWS_CATEGORIES, "news_category_labels": NEWS_CATEGORY_LABELS,
+            "public_issue_categories": list(PUBLIC_CATEGORIES.values()), "issue_today": community_today().isoformat(),
             "member": current_user(request),
             "verification_labels": VERIFICATION_LABELS,
             "current_year": community_today().year, "current_month": community_today().month,
@@ -337,6 +326,7 @@ def create_app(test_config=None):
         migrate_analytics(app.state.database)
         from cafe_photo_spot_migrations import migrate as migrate_cafe_photo_spot
         migrate_cafe_photo_spot(app.state.database)
+        migrate_issue_calendar(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -414,7 +404,7 @@ def create_app(test_config=None):
             conn.close()
         return image_store.decorate(place, "places")
 
-    def row_to_news(row):
+    def row_to_news(row, day=None):
         item = dict(row)
         item["author_label"] = "사용자 등록" if item.get("author_type") == "user" else "JEJU_KNOW 등록"
         item["author_name"] = "JEJU_KNOW"
@@ -432,20 +422,10 @@ def create_app(test_config=None):
         item["is_promoted"] = bool(item.get("is_promoted"))
         item["is_sponsored"] = bool(item.get("is_sponsored"))
         item["published"] = bool(item.get("published"))
-        start = item.get("event_start") or ""
-        end = item.get("event_end") or ""
-        if start and end and start != end:
-            item["date_label"] = f"{start} ~ {end}"
-        elif start:
-            item["date_label"] = start
-        else:
-            item["date_label"] = "상시/일정 미정"
-        if end and end < date.today().isoformat():
-            item["event_status"] = "종료"
-        elif start and start > date.today().isoformat():
-            item["event_status"] = "예정"
-        else:
-            item["event_status"] = "진행/접수중"
+        item.update(schedule(item, day or community_today()))
+        item["category_label"] = item["category"].replace("•", "·")
+        item["mappable"] = bool(item.get("show_on_map") and item.get("latitude") is not None
+                                and item.get("longitude") is not None)
         return image_store.decorate(item, "issues")
 
     def unique_slug(candidate, exclude_id=None):
@@ -549,8 +529,11 @@ def create_app(test_config=None):
             "body": str(form.get("body", "")).strip(),
             "image_url": str(form.get("image_url", existing["image_url"] if existing else "")).strip(),
             "venue": str(form.get("venue", "")).strip(),
-            "event_start": str(form.get("event_start", "")).strip(),
-            "event_end": str(form.get("event_end", "")).strip(),
+            "event_start": str(form.get("event_start", existing["event_start"] if existing else "")).strip(),
+            "event_end": str(form.get("event_end", existing["event_end"] if existing else "")).strip(),
+            **{key: str(form.get(key, existing[key] if existing and existing[key] is not None else "")).strip()
+               for key in ("start_time", "end_time", "region", "address", "latitude", "longitude")},
+            "show_on_map": int(form.get("show_on_map") == "1"),
             "external_url": str(form.get("external_url", "")).strip(),
             "source_name": str(form.get("source_name", "")).strip(),
             "checked_at": str(form.get("checked_at", "")).strip(),
@@ -667,15 +650,17 @@ def create_app(test_config=None):
     @app.get("/", response_class=HTMLResponse)
     async def home(request: Request):
         conn = connect_db()
+        day = community_today()
+        where, params = public_where(day)
         news_rows = conn.execute(
-            "SELECT * FROM news_posts WHERE published=1 AND deleted_at IS NULL ORDER BY is_promoted DESC, datetime(created_at) DESC, id DESC LIMIT 5"
+            f"SELECT * FROM news_posts WHERE {where} ORDER BY is_promoted DESC, datetime(created_at) DESC, id DESC LIMIT 5", params
         ).fetchall()
         collections = [dict(r) for r in conn.execute("SELECT * FROM best_collections WHERE published=1 ORDER BY sort_order,id")]
         conn.close()
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"news_items": [row_to_news(row) for row in news_rows], "collections": collections},
+            context={"news_items": [row_to_news(row, day) for row in news_rows], "collections": collections},
         )
 
     @app.get("/place/{slug}", response_class=HTMLResponse)
@@ -749,43 +734,26 @@ def create_app(test_config=None):
 
     @app.get("/news", response_class=HTMLResponse)
     async def news_list(request: Request):
-        category = (request.query_params.get("category") or "").strip()
-        category = NEWS_CATEGORY_ALIASES.get(category, category)
-        q = (request.query_params.get("q") or "").strip()
-        clauses = ["published=1", "deleted_at IS NULL"]
-        params = []
-        if category:
-            category_values = [category] + [old for old, new in NEWS_CATEGORY_ALIASES.items() if new == category]
-            clauses.append(f"category IN ({','.join('?' for _ in category_values)})")
-            params.extend(category_values)
-        if q:
-            clauses.append("(title LIKE ? OR summary LIKE ? OR venue LIKE ?)")
-            token = f"%{q}%"
-            params.extend([token, token, token])
-        conn = connect_db()
-        rows = conn.execute(
-            f"SELECT * FROM news_posts WHERE {' AND '.join(clauses)} ORDER BY is_featured DESC, event_start DESC, updated_at DESC",
-            params,
-        ).fetchall()
-        conn.close()
-        return templates.TemplateResponse(
-            request=request,
-            name="news_list.html",
-            context={
-                "news_items": [row_to_news(row) for row in rows],
-                "active_category": category,
-                "q": q,
-            },
-        )
+        day = community_today()
+        with closing(connect_db()) as conn:
+            rows, selected, link = browse(conn, request.query_params, day)
+        items = [row_to_news(row, day) for row in rows]
+        return templates.TemplateResponse(request=request, name="news_list.html", context={
+            "news_items": items, "selected": selected, "active_category": selected["category"],
+            "issue_link": link, "periods": PERIODS, "map_count": sum(item["mappable"] for item in items),
+            "kakao_map_key": app.state.kakao_map_key,
+        })
 
     @app.get("/news/{slug}", response_class=HTMLResponse)
     async def news_detail(request: Request, slug: str):
         conn = connect_db()
-        row = conn.execute("SELECT * FROM news_posts WHERE slug=? AND published=1 AND deleted_at IS NULL", (slug,)).fetchone()
+        day = community_today()
+        where, params = public_where(day)
+        row = conn.execute(f"SELECT * FROM news_posts WHERE slug=? AND {where}", [slug, *params]).fetchone()
         conn.close()
         if not row:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
-        item = row_to_news(row)
+        item = row_to_news(row, day)
         return templates.TemplateResponse(request=request, name="news_detail.html", context={"item": item, "seo": issue_metadata(item)})
 
     @app.get("/partnership", response_class=HTMLResponse)
@@ -899,9 +867,13 @@ def create_app(test_config=None):
         form, data = await parse_news_form(request)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if error := validate_news(data, NEWS_CATEGORIES):
+        if error := validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"])):
             flash(request, error, "error")
-            return RedirectResponse(url="/admin/news/new", status_code=303)
+            images = []
+            return templates.TemplateResponse(request=request, name="admin_news_form.html", context={
+                "item": {**data, "id": None, "stored_category": data["category"],
+                         "legacy_image_url": data["image_url"], "images": images},
+                "mode": "new", **form_options()}, status_code=400)
         try:
             plan = await image_store.prepare(form, "issues")
         except ImageError as exc:
@@ -909,21 +881,10 @@ def create_app(test_config=None):
             return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": None, "legacy_image_url": data["image_url"], "images": []}, "mode": "new", **form_options()}, status_code=400)
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with plan.transaction() as conn:
-            cursor = conn.execute(
-                """
-                INSERT INTO news_posts (
-                    slug, title, category, summary, body, image_url, venue,
-                    event_start, event_end, external_url, source_name, checked_at,
-                    is_featured, is_sponsored, sponsor_name, published, updated_at, is_promoted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    data["slug"], data["title"], data["category"], data["summary"], data["body"],
-                    data["image_url"], data["venue"], data["event_start"], data["event_end"],
-                    data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
-                    data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"],
-                ),
-            )
+            values = {**data, "updated_at": now}
+            columns = ",".join(values)
+            placeholders = ",".join("?" for _ in values)
+            cursor = conn.execute(f"INSERT INTO news_posts ({columns}) VALUES ({placeholders})", tuple(values.values()))
             plan.apply(conn, cursor.lastrowid)
         flash(request, "제주 소식을 저장했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
@@ -957,9 +918,13 @@ def create_app(test_config=None):
         form, data = await parse_news_form(request, existing)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if error := validate_news(data, NEWS_CATEGORIES):
+        if error := validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"])):
             flash(request, error, "error")
-            return RedirectResponse(url=f"/admin/news/{news_id}/edit", status_code=303)
+            images = image_store.list("issues", news_id)
+            return templates.TemplateResponse(request=request, name="admin_news_form.html", context={
+                "item": {**data, "id": news_id, "stored_category": data["category"],
+                         "legacy_image_url": data["image_url"], "images": images},
+                "mode": "edit", **form_options()}, status_code=400)
         try:
             plan = await image_store.prepare(form, "issues")
         except ImageError as exc:
@@ -967,21 +932,9 @@ def create_app(test_config=None):
             return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": news_id, "legacy_image_url": data["image_url"], "images": image_store.list("issues", news_id)}, "mode": "edit", **form_options()}, status_code=400)
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with plan.transaction() as conn:
-            conn.execute(
-                """
-                UPDATE news_posts SET
-                    slug=?, title=?, category=?, summary=?, body=?, image_url=?, venue=?,
-                    event_start=?, event_end=?, external_url=?, source_name=?, checked_at=?,
-                    is_featured=?, is_sponsored=?, sponsor_name=?, published=?, updated_at=?, is_promoted=?
-                WHERE id=?
-                """,
-                (
-                    data["slug"], data["title"], data["category"], data["summary"], data["body"],
-                    data["image_url"], data["venue"], data["event_start"], data["event_end"],
-                    data["external_url"], data["source_name"], data["checked_at"], data["is_featured"],
-                    data["is_sponsored"], data["sponsor_name"], data["published"], now, data["is_promoted"], news_id,
-                ),
-            )
+            values = {**data, "updated_at": now}
+            assignments = ",".join(f"{key}=?" for key in values)
+            conn.execute(f"UPDATE news_posts SET {assignments} WHERE id=?", (*values.values(), news_id))
             plan.apply(conn, news_id)
         flash(request, "제주 소식을 수정했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
@@ -1292,7 +1245,7 @@ def create_app(test_config=None):
         return RedirectResponse(url=admin_return(form), status_code=303)
 
     register_member_routes(app, templates, connect_db, require_csrf, flash,
-                           parse_news_form, row_to_news, admin_guard, NEWS_CATEGORIES, secret_key, image_store)
+                           parse_news_form, row_to_news, admin_guard, list(PUBLIC_CATEGORIES.values()), secret_key, image_store)
     register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
                               row_to_place, form_options, REGIONS, secret_key, image_store)
     app.state.admin_ui = AdminUI(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place, row_to_news, NEWS_CATEGORIES, NEWS_CATEGORY_ALIASES)

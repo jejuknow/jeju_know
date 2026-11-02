@@ -69,7 +69,7 @@ class MembersTest(unittest.TestCase):
     def post(self, client=None, **changes):
         client = client or self.client
         data = {'csrf_token': self.csrf(client, '/issues/new'), 'title': '제주 행사', 'category': '행사•축제',
-                'summary': '함께 즐겨요', 'body': '직접 확인한 소식\n둘째 줄'}
+                'event_start':'2099-01-01','event_end':'2099-01-02','summary': '함께 즐겨요', 'body': '직접 확인한 소식\n둘째 줄'}
         data.update(changes)
         return client.post('/issues/new', data=data, follow_redirects=False)
 

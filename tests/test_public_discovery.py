@@ -69,7 +69,7 @@ class PublicDiscoveryTest(unittest.TestCase):
         p=self.place()
         self.execute("INSERT INTO best_collections(slug,title,description,published) VALUES ('public-best','공개 BEST','실제 모음 설명',1)")
         self.execute("INSERT INTO best_collections(slug,title,published) VALUES ('hidden-best','비공개 BEST',0)")
-        self.execute("INSERT INTO news_posts(slug,title,category,summary,published) VALUES ('public-issue','공개 이슈','지역소식','실제 소식',1)")
+        self.execute("INSERT INTO news_posts(slug,title,category,summary,published,event_start,event_end) VALUES ('public-issue','공개 이슈','지역소식','실제 소식',1,'2099-01-01','2099-01-02')")
         self.execute("INSERT INTO news_posts(slug,title,category,published) VALUES ('hidden-issue','비공개 이슈','지역소식',0)")
         page=self.visitor.get('/best/public-best')
         self.assertIn('data-share-content',page.text)

@@ -1,13 +1,34 @@
 {% extends "base.html" %}
-{% block title %}제주 이슈 | JEJU_KNOW{% endblock %}
+{% block title %}제주 ISSUE | JEJU_KNOW{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261102">{% endblock %}
 {% block body %}
-<main class="news-page">
-  <section class="news-page-hero"><div class="wrap">{{ navigation_icon('issue') }}<p class="kicker">JEJU_KNOW TODAY</p><h1>제주의 지금을<br>한눈에 확인하세요.</h1><p>{{ news_categories|join(', ') }}을 출처·확인일과 함께 관리합니다.</p></div></section>
-  <section class="wrap news-browser">
-    <div class="category-tabs"><a class="{% if not active_category %}active{% endif %}" href="{{ url_for('news_list') }}">전체</a>{% for category in news_categories %}<a class="{% if active_category == category %}active{% endif %}" href="{{ url_for('news_list') }}?category={{ category }}">{{ category }}</a>{% endfor %}</div>
-    <form class="news-search" method="get" action="{{ url_for('news_list') }}">{% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}<input type="search" name="q" value="{{ q }}" placeholder="행사명·장소·키워드 검색"><button type="submit">검색</button></form>
-    {% if news_items %}<div class="news-grid news-list-grid">{% for item in news_items %}<article class="news-card"><a class="news-card-link" href="{{ url_for('news_detail', slug=item.slug) }}"><div class="news-thumb {% if item.image_url %}has-image{% endif %}" {% if item.image_url %}style="background-image:url('{{ item.image_url }}')"{% endif %}>{% if not item.image_url %}<span>{{ '🎪' if item.category == news_category_labels.events else '📰' }}</span>{% endif %}<div class="news-overlay-badges"><span class="news-category">{{ item.category }}</span>{% if item.is_promoted or item.is_sponsored %}<span class="sponsor-badge">{{ '홍보·제휴' if item.is_promoted else '광고·협찬' }}</span>{% endif %}</div></div><div class="news-card-body"><p class="issue-author">{{ item.author_label }} · {{ item.author_name }}</p><div class="news-date">{{ item.event_status }} · {{ item.date_label }}</div><h3>{{ item.title }}</h3><p>{{ item.summary }}</p>{% if item.venue %}<div class="news-venue">📍 {{ item.venue }}</div>{% endif %}</div></a></article>{% endfor %}</div>{% else %}<div class="empty-state"><div class="empty-emoji">🗓️</div><h3>조건에 맞는 제주 소식이 없습니다.</h3><p>다른 카테고리나 검색어로 확인해보세요.</p></div>{% endif %}
+<main class="issue-discovery wrap" data-view="{{ selected.view }}" data-kakao-key="{{ kakao_map_key }}">
+  <header class="issue-intro"><p class="kicker">JEJU ISSUE</p><h1>지금 제주에서 뭐 하지?</h1><p>제주에서 열리는 행사부터 전시·팝업, 체험과 지역소식을 모았습니다.</p></header>
+  <section class="issue-filters" aria-label="ISSUE 탐색 조건">
+    <nav class="issue-filter-row" aria-label="기간"><strong>기간</strong>{% for key,label in periods.items() %}<a data-filter href="{{ issue_link(period=key) }}" {% if selected.period==key %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+    <nav class="issue-filter-row" aria-label="카테고리"><strong>종류</strong>{% for value in ['']+public_issue_categories %}<a data-filter href="{{ issue_link(category=value) }}" {% if selected.category==value %}aria-current="true"{% endif %}>{{ value.replace('•','·') or '전체' }}</a>{% endfor %}</nav>
+    <form class="issue-query" action="/news" method="get">
+      <input type="hidden" name="period" value="{{ selected.period }}"><input type="hidden" name="category" value="{{ selected.category }}"><input type="hidden" name="view" value="{{ selected.view }}">
+      <label>지역 <select name="region"><option value="">전체 제주</option>{% for value in active_regions %}<option value="{{ value }}" {% if selected.region==value %}selected{% endif %}>{{ region_labels.get(value,value) }}</option>{% endfor %}</select></label>
+      <label class="issue-search"><span>검색어</span><input type="search" name="q" value="{{ selected.q }}" placeholder="행사명·장소·키워드 검색" maxlength="200"></label><button type="submit">검색</button>
+    </form>
   </section>
+  <div class="issue-switch" role="group" aria-label="보기 방식"><button type="button" data-view-choice="list" aria-controls="issueResults">목록 보기</button><button type="button" data-view-choice="map" aria-controls="issueMapPanel">지도 보기</button></div>
+  <div class="issue-layout">
+    <section class="issue-map-panel" id="issueMapPanel" aria-label="제주 ISSUE 지도"><div id="issueMap" aria-label="행사 위치 지도"></div>
+      <div id="issueMapNotice" class="issue-map-notice" role="status">{% if not map_count %}지도에 표시할 수 있는 ISSUE가 없습니다.{% else %}지도를 불러오고 있습니다.{% endif %}</div>
+    </section>
+    <section class="issue-results" id="issueResults" aria-label="ISSUE 목록">
+      <div class="issue-results-heading"><h2>제주 ISSUE <span>{{ news_items|length }}건</span></h2><small>지도 위치 {{ map_count }}곳</small></div>
+      {% for item in news_items %}<article class="issue-card" data-issue-id="{{ item.id }}" {% if item.mappable %}data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}"{% endif %}>
+        <a href="{{ url_for('news_detail',slug=item.slug) }}"><div class="issue-poster">{% if item.image_url %}<img src="{{ item.image_url }}" alt="" loading="lazy">{% else %}{{ navigation_icon('issue') }}{% endif %}</div>
+          <div class="issue-copy"><div class="issue-tags"><span data-category>{{ item.category_label }}</span><strong data-badge>{{ item.date_badge }}</strong>{% if item.is_promoted or item.is_sponsored %}<span>{{ '홍보·제휴' if item.is_promoted else '광고·협찬' }}</span>{% endif %}</div><h3>{{ item.title }}</h3>
+          {% if item.region or item.venue %}<p>{{ region_labels.get(item.region,item.region) }}{% if item.region and item.venue %} · {% endif %}{{ item.venue }}</p>{% endif %}
+          <p data-dates>{{ item.date_label }}</p><small>{{ item.author_label }} · {{ item.author_name }}</small></div></a>
+      </article>{% else %}<div class="issue-empty"><h3>조건에 맞는 제주 ISSUE가 없습니다.</h3><a href="/news">전체 보기 →</a></div>{% endfor %}
+    </section>
+  </div>
 </main>
-<footer><div class="wrap footer-inner">{{ brand_logo(variant='footer-brand') }}<p><a href="{{ url_for('partnership') }}">광고·제휴 안내</a></p></div></footer>
+<footer><div class="wrap footer-inner">{{ brand_logo(variant='footer-brand') }}<p><a href="/partnership">광고·제휴 안내</a></p></div></footer>
 {% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/issue-discovery.js?v=20261102"></script>{% endblock %}

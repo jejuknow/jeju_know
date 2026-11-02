@@ -135,8 +135,8 @@ class JejunoAppTest(unittest.TestCase):
             "summary": "테스트 행사 한줄 요약",
             "body": "행사 상세 내용",
             "venue": "제주시 테스트 장소",
-            "event_start": "2026-10-10",
-            "event_end": "2026-10-11",
+            "event_start": "2099-10-10",
+            "event_end": "2099-10-11",
             "source_name": "공식 주최기관",
             "checked_at": "2026-10-05",
             "external_url": "https://example.com/event",
@@ -171,7 +171,7 @@ class JejunoAppTest(unittest.TestCase):
     def insert_news(self, slug, category, published=1):
         with closing(sqlite3.connect(self.db_path)) as conn:
             news_id = conn.execute(
-                "INSERT INTO news_posts (slug,title,category,body,published) VALUES (?,?,?,?,?)",
+                "INSERT INTO news_posts (slug,title,category,body,published,event_start,event_end) VALUES (?,?,?,?,?,'2099-10-10','2099-10-11')",
                 (slug, slug, category, "기존 내용 보존", published),
             ).lastrowid
             conn.commit()
@@ -198,8 +198,8 @@ class JejunoAppTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.context["news_categories"], self.news_categories)
         self.assertEqual(self.category_options(self.client.get('/admin/news/new').text), self.news_categories)
-        tabs = re.search(r'<div class="category-tabs">(.*?)</div>', self.client.get('/news').text).group(1)
-        self.assertEqual(re.findall(r'>([^<>]+)</a>', tabs), ['전체'] + self.news_categories)
+        tabs = re.search(r'<nav class="issue-filter-row" aria-label="카테고리">(.*?)</nav>', self.client.get('/news').text).group(1)
+        self.assertEqual(re.findall(r'>([^<>]+)</a>', tabs), ['전체'] + [c.replace('•','·') for c in self.news_categories[:-1]])
 
     def test_legacy_news_reads_filters_and_restart_do_not_rewrite_data(self):
         self.setup_admin_and_login()
@@ -211,7 +211,7 @@ class JejunoAppTest(unittest.TestCase):
         with closing(sqlite3.connect(self.db_path)) as conn:
             raw = conn.execute("SELECT slug,category FROM news_posts WHERE published=1").fetchall()
         for category in self.news_categories:
-            expected = {slug for slug, stored in raw if aliases.get(stored, stored) == category}
+            expected = {slug for slug, stored in raw if aliases.get(stored, stored) == category and category!='공모•지원'}
             for query_category in [category] + [old for old, new in aliases.items() if new == category]:
                 response = self.client.get('/news', params={'category':query_category})
                 self.assertEqual(response.status_code, 200)
@@ -219,10 +219,13 @@ class JejunoAppTest(unittest.TestCase):
                 self.assertEqual({item['slug'] for item in response.context['news_items']}, expected)
         for slug, category in raw:
             detail = self.client.get(f'/news/{slug}')
+            if aliases.get(category,category) not in self.news_categories[:-1]:
+                self.assertEqual(detail.status_code,404)
+                continue
             self.assertEqual(detail.status_code, 200)
             self.assertEqual(detail.context['item']['category'], aliases.get(category, category))
         market = self.client.get('/news', params={'category':'마켓'})
-        self.assertEqual([item['slug'] for item in market.context['news_items']], ['legacy-4'])
+        self.assertEqual([item['slug'] for item in market.context['news_items']], [])
         search = self.client.get('/news', params={'category':'행사•축제','q':'legacy-0'})
         self.assertEqual([item['slug'] for item in search.context['news_items']], ['legacy-0'])
         self.assertEqual(self.client.get('/news', params={'category':"' OR 1=1 --"}).context['news_items'], [])
@@ -262,11 +265,11 @@ class JejunoAppTest(unittest.TestCase):
 
     def test_each_new_news_category_create_edit_publish_and_delete(self):
         self.setup_admin_and_login()
-        for index, category in enumerate(self.news_categories):
+        for index, category in enumerate(self.news_categories[:-1]):
             with self.subTest(category=category):
                 slug = f'new-category-{index}'
                 token = self.get_csrf_from_cookie_session('/admin/news/new')
-                payload = {'csrf_token':token, 'title':slug, 'slug':slug, 'category':category, 'published':'1'}
+                payload = {'csrf_token':token, 'title':slug, 'slug':slug, 'category':category, 'published':'1', 'event_start':'2099-10-10','event_end':'2099-10-11'}
                 saved = self.client.post('/admin/news/new', data=payload)
                 self.assertEqual(saved.status_code, 200)
                 detail = self.client.get(f'/news/{slug}')
@@ -274,7 +277,7 @@ class JejunoAppTest(unittest.TestCase):
                 news_id = detail.context['item']['id']
                 edit = self.client.get(f'/admin/news/{news_id}/edit')
                 self.assertEqual(self.category_options(edit.text), self.news_categories)
-                payload['category'] = self.news_categories[(index+1) % 5]
+                payload['category'] = self.news_categories[(index+1) % 4]
                 payload['title'] = f'{slug} 수정'
                 self.client.post(f'/admin/news/{news_id}/edit', data=payload)
                 updated = self.client.get(f'/news/{slug}')

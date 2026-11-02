@@ -60,7 +60,7 @@ class ImageUploadTest(unittest.TestCase):
         url = f'/issues/{issue_id}/edit' if issue_id else '/issues/new'
         if client is self.admin:
             url = f'/admin/news/{issue_id}/edit' if issue_id else '/admin/news/new'
-        data = {'csrf_token': self.csrf(client, url), 'title':'이미지 테스트 소식', 'category':'지역소식', 'published':'1'}
+        data = {'csrf_token': self.csrf(client, url), 'event_start':'2099-01-01','event_end':'2099-01-02','title':'이미지 테스트 소식', 'category':'지역소식', 'published':'1'}
         data.update(changes)
         return client.post(url, data=data, files=files, follow_redirects=False)
 

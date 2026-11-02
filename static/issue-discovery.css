@@ -1,0 +1,53 @@
+.issue-discovery{padding-block:clamp(24px,4vw,52px);color:#192339}
+.issue-intro h1{font-size:clamp(1.9rem,4vw,3rem);letter-spacing:-.055em;margin:.2em 0}
+.issue-intro>p:last-child,.issue-copy p,.issue-results-heading small{color:#53617b}
+.issue-filters{margin:24px 0 16px;padding:16px 20px;background:#f6f8ff;border:1px solid #e1e6f3;border-radius:18px}
+.issue-filter-row,.issue-query,.issue-tags,.issue-switch{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.issue-filter-row+.issue-filter-row,.issue-query{margin-top:12px}
+.issue-filter-row strong,.issue-query label{font-weight:700;font-size:.87rem}
+.issue-filter-row strong{margin-right:6px}
+.issue-filter-row a,.issue-query button,.issue-switch button,.issue-query select,.issue-query input{min-height:40px;padding:8px 13px;border:1px solid #d5ddef;background:white;border-radius:12px;color:inherit;font:inherit}
+.issue-filter-row a,.issue-switch button{border-radius:999px;font-size:.87rem;font-weight:700;white-space:nowrap}
+.issue-filter-row a[aria-current],.issue-query button,.issue-switch button[aria-pressed=true]{background:var(--primary,#4864ef);color:white;border-color:transparent}
+.issue-query label{display:flex;align-items:center;gap:7px;min-width:0}
+.issue-query input{width:100%;min-width:0}
+.issue-search{flex:1}
+.issue-query button,.issue-switch button,.issue-pin,.issue-popup button{cursor:pointer}
+.issue-switch{display:none}
+.issue-layout{display:grid;grid-template-columns:minmax(0,58fr) minmax(0,42fr);gap:16px;height:70vh;min-height:340px}
+.issue-map-panel,.issue-results{min-width:0;min-height:0;border:1px solid #e1e6f3;border-radius:18px;overflow:hidden}
+.issue-map-panel{position:relative;background:#eef3f8}
+#issueMap{width:100%;height:100%}
+.issue-map-notice{position:absolute;z-index:4;left:12px;top:12px;background:white;color:#394963;padding:10px 14px;border-radius:12px;max-width:calc(100% - 24px)}
+.issue-map-notice[hidden]{display:none}
+.issue-results{overflow:auto;padding:16px}
+.issue-results-heading{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.issue-results-heading h2{font-size:1.1rem}
+.issue-results-heading span,.issue-empty a{color:var(--primary,#4864ef)}
+.issue-card{border-top:1px solid #e8ebf4}
+.issue-card a{display:grid;grid-template-columns:clamp(70px,8vw,110px) minmax(0,1fr);align-items:center;gap:14px;padding:14px 2px;color:inherit}
+.issue-card:focus-within,.issue-card:hover{background:#f6f8ff}
+.issue-poster{aspect-ratio:4/5;background:#f2f5ff;border-radius:12px;display:grid;place-items:center;overflow:hidden}
+.issue-poster>img{width:100%;height:100%;object-fit:cover}
+.issue-poster .icon-image{width:65%;height:auto;margin:0;object-fit:contain}
+.issue-copy h3{font-size:1.12rem;line-height:1.4;margin:6px 0}
+.issue-copy p,.issue-copy small{font-size:.85rem;line-height:1.5}
+.issue-tags span,.issue-tags strong{font-size:.75rem;color:#3448a6;background:#edf1ff;border-radius:8px;padding:3px 7px}
+.issue-empty{text-align:center;padding:40px 5px}.issue-empty h3{font-size:1rem;margin:0 0 12px}
+.issue-pin{background:#4a60db;color:white;border:2px solid white;border-radius:18px 18px 18px 2px;padding:7px 10px;font:inherit;font-weight:700;box-shadow:0 2px 6px #19233933}
+.issue-pin[data-kind="전시·팝업"]{background:#8559ae}.issue-pin[data-kind="체험·교육"]{background:#19745e}.issue-pin[data-kind="지역소식"]{background:#4c6178}
+.issue-pin.is-highlighted,.issue-pin:focus-visible{outline:3px solid #182b77;outline-offset:2px}
+.issue-popup{background:white;color:#192339;border:1px solid #d5ddef;border-radius:12px;padding:12px;width:min(210px,62vw);white-space:normal;overflow-wrap:anywhere;box-shadow:0 3px 14px #19233930}
+.issue-popup strong,.issue-popup small,.issue-popup a{display:block}.issue-popup button{float:right;background:white;border:0;font-size:1.1rem}.issue-popup a{margin-top:6px;color:#374bc3}
+@media(max-width:760px){
+  .issue-switch{display:flex;margin:14px 0}
+  .issue-layout{display:block;height:auto;min-height:0}
+  .issue-results{overflow:visible}
+  .issue-discovery[data-view="list"] .issue-map-panel,.issue-discovery[data-view="map"] .issue-results{display:none}
+  .issue-map-panel{height:68vh;height:68svh;min-height:290px}
+  .issue-filters{padding:12px}.issue-query label:first-child{width:100%}
+  .issue-search span{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+  .issue-filter-row a,.issue-switch button{min-height:44px;display:inline-flex;align-items:center}
+  .issue-results{padding:12px}
+}
+@media(prefers-reduced-motion:reduce){.issue-card,.issue-pin{scroll-behavior:auto}}

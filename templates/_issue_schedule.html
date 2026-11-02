@@ -1,0 +1,29 @@
+{% set p = item or {} %}
+<section class="form-card"><h2>일정</h2>
+  <div class="form-grid two">
+    <label>시작일<input type="date" name="event_start" value="{{ p.get('event_start','') }}" {% if member_form %}required{% endif %}></label>
+    <label>종료일<input type="date" name="event_end" value="{{ p.get('event_end','') }}" {% if member_form %}required{% endif %}></label>
+    <label>시작시간 <small>선택</small><input type="time" name="start_time" value="{{ p.get('start_time','') }}"></label>
+    <label>종료시간 <small>선택</small><input type="time" name="end_time" value="{{ p.get('end_time','') }}"></label>
+  </div>
+  <p class="form-help">하루 행사라면 같은 날짜를 선택하세요. 종료일 당일까지 탐색 목록에 표시됩니다.</p>
+  <p role="status" id="issueScheduleStatus" data-today="{{ issue_today }}">현재 상태 · {{ p.get('event_status','일정 미등록') }}</p>
+</section>
+<section class="form-card"><h2>위치</h2><div class="form-grid two">
+  <label>지역<select name="region"><option value="">지역 미지정</option>{% for value in active_regions %}<option value="{{ value }}" {% if p.get('region')==value %}selected{% endif %}>{{ region_labels.get(value,value) }}</option>{% endfor %}{% if p.get('region') and p.region not in active_regions %}<option selected>{{ p.region }}</option>{% endif %}</select></label>
+  <label>장소명<input name="venue" maxlength="200" value="{{ p.get('venue','') }}"></label>
+  {% if not member_form %}
+  <label class="span-2">주소<input name="address" maxlength="300" value="{{ p.get('address','') }}"></label>
+  <label class="switch-item"><input type="checkbox" name="show_on_map" value="1" {% if p.get('show_on_map') %}checked{% endif %}><span>지도에 표시</span></label>
+  </div>
+  <p id="locationFeedback" role="status">{{ '저장된 지도 위치가 있습니다.' if p.get('latitude') is not none and p.get('longitude') is not none and p.get('latitude') != '' else '지도 위치 미등록' }}</p>
+  <details id="locationPicker" data-auto-address><summary>지도 위치 확인 / 수정</summary>
+    <button type="button" class="secondary-btn" id="addressLocate" data-kakao-key="{{ kakao_map_key }}">주소로 위치 찾기</button>
+    <button type="button" class="secondary-btn" id="locationClear">위치 지우기</button>
+    <div id="placeLocationMap" class="place-location-map" aria-label="ISSUE 위치 선택 지도"></div>
+    <div class="form-grid two"><label>위도<input type="number" step="any" min="-90" max="90" name="latitude" value="{{ p.latitude if p.get('latitude') is not none else '' }}"></label>
+    <label>경도<input type="number" step="any" min="-180" max="180" name="longitude" value="{{ p.longitude if p.get('longitude') is not none else '' }}"></label></div>
+  </details>
+  <p class="form-help">주소나 좌표 없이 저장할 수 있습니다. 위치가 없는 ISSUE는 목록에서만 보입니다.</p>
+  {% else %}</div>{% endif %}
+</section>

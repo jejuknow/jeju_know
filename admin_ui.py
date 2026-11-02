@@ -9,6 +9,7 @@ from urllib.parse import urlencode, urlsplit
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from issue_discovery import VALID_DATES
 from admin_settings import catalog, catalog_usage, read_settings, write_setting, DEFAULTS
 from auth_security import current_user, safe_external_url
 from community_migrations import today
@@ -229,9 +230,21 @@ class AdminUI:
         if user_only or f.get("source") in ("admin", "user"):
             where.append("author_type=?"); args.append("user" if user_only else f["source"])
         if f.get("published") in ("0", "1"): where.append("published=?"); args.append(f["published"])
+        calendar_day = today()
+        day = calendar_day.isoformat()
+        status = f.get("status")
+        if status in ("upcoming", "ongoing", "ended"):
+            where.append(VALID_DATES)
+            expression, dates = {"upcoming": ("event_start>?", [day]),
+                                 "ongoing": ("event_start<=? AND event_end>=?", [day, day]),
+                                 "ended": ("event_end<?", [day])}[status]
+            where.append(expression)
+            args.extend(dates)
+        elif status == "private":
+            where.append("published=0")
         with closing(self.db()) as conn:
             rows, page = page_rows(conn, request, "*", "FROM news_posts", " AND ".join(where), args, "id DESC")
-        return self.render(request, "issues.html", issues=[self.news(row) for row in rows], pagination=page, user_only=user_only)
+        return self.render(request, "issues.html", issues=[self.news(row, calendar_day) for row in rows], pagination=page, user_only=user_only)
 
     def users(self, request):
         if response := self.guard(request): return response

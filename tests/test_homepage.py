@@ -32,7 +32,7 @@ class HomepageTest(unittest.TestCase):
         return self.client.get(path).context['csrf_token']
 
     def insert_news(self, slug, created='2026-10-01 00:00:00', promoted=0, published=1, featured=0, deleted=None):
-        return self.execute("INSERT INTO news_posts(slug,title,category,created_at,event_start,is_promoted,published,is_featured,deleted_at) VALUES (?,?,'지역소식',?,'2099-12-31',?,?,?,?)", (slug,slug,created,promoted,published,featured,deleted))
+        return self.execute("INSERT INTO news_posts(slug,title,category,created_at,event_start,event_end,is_promoted,published,is_featured,deleted_at) VALUES (?,?,'지역소식',?,'2099-12-31','2099-12-31',?,?,?,?)", (slug,slug,created,promoted,published,featured,deleted))
 
     def login_admin(self):
         self.execute('INSERT INTO admins(username,password_hash) VALUES (?,?)',('admin',hash_password('test-admin-password')))
@@ -60,7 +60,7 @@ class HomepageTest(unittest.TestCase):
         self.insert_news('newest',created='2099-01-01 00:00:00')
         self.login_admin()
         token=self.token('/admin/news/new')
-        payload={'csrf_token':token,'title':'홍보 테스트','slug':'promoted','category':'행사•축제','published':'1','is_promoted':'1','is_featured':'1','is_sponsored':'1'}
+        payload={'csrf_token':token,'event_start':'2099-01-01','event_end':'2099-01-02','title':'홍보 테스트','slug':'promoted','category':'행사•축제','published':'1','is_promoted':'1','is_featured':'1','is_sponsored':'1'}
         self.client.post('/admin/news/new',data=payload)
         promoted=self.client.get('/').context['news_items'][0]
         self.assertEqual(promoted['slug'],'promoted')
@@ -79,7 +79,7 @@ class HomepageTest(unittest.TestCase):
         token=self.token('/signup')
         self.client.post('/signup',data={'csrf_token':token,'username':'member','nickname':'회원','password':'Member-secret-2026','password_confirm':'Member-secret-2026'})
         self.client.post('/login',data={'csrf_token':self.token('/login'),'username':'member','password':'Member-secret-2026'})
-        payload={'csrf_token':self.token('/issues/new'),'title':'회원 글','category':'지역소식','is_promoted':'1'}
+        payload={'csrf_token':self.token('/issues/new'),'event_start':'2099-01-01','event_end':'2099-01-02','title':'회원 글','category':'지역소식','is_promoted':'1'}
         self.client.post('/issues/new',data=payload)
         post=self.client.get('/').context['news_items'][0]
         self.assertFalse(post['is_promoted'])

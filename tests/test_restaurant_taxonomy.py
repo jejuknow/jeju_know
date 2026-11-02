@@ -149,7 +149,7 @@ class RestaurantMigrationTest(unittest.TestCase):
     def test_backup_mapping_preservation_ambiguity_and_idempotence(self):
         with tempfile.TemporaryDirectory() as folder:
             database=str(Path(folder)/'jejuno.db')
-            with patch('app.migrate_restaurants'), patch('app.migrate_cafe_features'), patch('app.migrate_cafe_flow'):
+            with patch('app.migrate_restaurants'), patch('app.migrate_cafe_features'), patch('app.migrate_cafe_flow'), patch('cafe_photo_spot_migrations.migrate'):
                 create_app({'TESTING':True,'DATABASE':database,'SECRET_KEY':'test','SKIP_SEED':True})
             with closing(sqlite3.connect(database)) as conn,conn:
                 food=conn.execute("SELECT id FROM categories WHERE slug='food'").fetchone()[0]
