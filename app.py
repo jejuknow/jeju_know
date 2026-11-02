@@ -50,6 +50,8 @@ from analytics import Analytics
 from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES
 from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule
 from issue_calendar_migration import migrate as migrate_issue_calendar
+from fastapi import HTTPException
+from issue_review import migrate as migrate_issue_review, candidates, submission_error, review_label, has_poster
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = BASE_DIR / "data"
@@ -327,6 +329,7 @@ def create_app(test_config=None):
         from cafe_photo_spot_migrations import migrate as migrate_cafe_photo_spot
         migrate_cafe_photo_spot(app.state.database)
         migrate_issue_calendar(app.state.database)
+        migrate_issue_review(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -423,6 +426,7 @@ def create_app(test_config=None):
         item["is_sponsored"] = bool(item.get("is_sponsored"))
         item["published"] = bool(item.get("published"))
         item.update(schedule(item, day or community_today()))
+        item["review_label"] = review_label(item)
         item["category_label"] = item["category"].replace("•", "·")
         item["mappable"] = bool(item.get("show_on_map") and item.get("latitude") is not None
                                 and item.get("longitude") is not None)
@@ -889,6 +893,23 @@ def create_app(test_config=None):
         flash(request, "제주 소식을 저장했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
+    def review_screen(request, existing, *, data=None, error=None):
+        item = row_to_news(existing)
+        if data:
+            item.update(data, legacy_image_url=data["image_url"])
+            if not safe_external_url(item["external_url"]):
+                item["external_url"] = ""
+        with closing(connect_db()) as conn:
+            duplicates = candidates(conn, item, public_only=False) if item["author_type"] == "user" else []
+        if error:
+            flash(request, error, "error")
+        return templates.TemplateResponse(request=request, name="admin_news_form.html", context={
+            "item": item, "mode": "edit", "duplicates": duplicates, **form_options()}, status_code=400 if error else 200)
+
+    def reviewer(request):
+        return ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id")
+                else "user:" + str(current_user(request)["id"]))
+
     @app.get("/admin/news/{news_id}/edit", response_class=HTMLResponse)
     async def admin_news_edit_get(request: Request, news_id: int):
         guard = admin_guard(request)
@@ -899,11 +920,7 @@ def create_app(test_config=None):
         conn.close()
         if not row:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
-        return templates.TemplateResponse(
-            request=request,
-            name="admin_news_form.html",
-            context={"item": row_to_news(row), "mode": "edit", **form_options()},
-        )
+        return review_screen(request, row)
 
     @app.post("/admin/news/{news_id}/edit")
     async def admin_news_edit_post(request: Request, news_id: int):
@@ -918,26 +935,61 @@ def create_app(test_config=None):
         form, data = await parse_news_form(request, existing)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if error := validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"])):
-            flash(request, error, "error")
-            images = image_store.list("issues", news_id)
-            return templates.TemplateResponse(request=request, name="admin_news_form.html", context={
-                "item": {**data, "id": news_id, "stored_category": data["category"],
-                         "legacy_image_url": data["image_url"], "images": images},
-                "mode": "edit", **form_options()}, status_code=400)
+        member_post = existing["author_type"] == "user"
+        approve = form.get("review_action") == "approve"
+        if approve and (not member_post or existing["approval_status"] != "pending"):
+            return HTMLResponse("검토 대기 중인 ISSUE만 승인할 수 있습니다.", status_code=409)
+        if member_post and existing["approval_status"] != "approved":
+            data["published"] = int(approve)
+        error = validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"]))
+        if approve and not error:
+            with closing(connect_db()) as conn:
+                error = submission_error(conn, data)
+        if error:
+            return review_screen(request, existing, data=data, error=error)
         try:
             plan = await image_store.prepare(form, "issues")
+            with plan.transaction() as conn:
+                values = {**data, "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+                if approve:
+                    if not has_poster(conn, plan, news_id):
+                        raise ImageError("대표이미지 1장을 등록해주세요.")
+                    values.update(approval_status="approved", reviewed_by=reviewer(request),
+                                  reviewed_at=values["updated_at"], rejection_reason="")
+                condition = "id=? AND deleted_at IS NULL"
+                args = [news_id]
+                if member_post:
+                    condition += " AND review_version=?"
+                    args.append(form.get("review_version"))
+                    values["review_version"] = existing["review_version"] + 1
+                assignments = ",".join(f"{key}=?" for key in values)
+                if not conn.execute(f"UPDATE news_posts SET {assignments} WHERE {condition}", (*values.values(), *args)).rowcount:
+                    raise HTTPException(409, "내용이나 검토 상태가 변경되었습니다. 화면을 새로 열고 다시 검토해주세요.")
+                plan.apply(conn, news_id)
         except ImageError as exc:
-            flash(request, str(exc), "error")
-            return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": news_id, "legacy_image_url": data["image_url"], "images": image_store.list("issues", news_id)}, "mode": "edit", **form_options()}, status_code=400)
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        with plan.transaction() as conn:
-            values = {**data, "updated_at": now}
-            assignments = ",".join(f"{key}=?" for key in values)
-            conn.execute(f"UPDATE news_posts SET {assignments} WHERE id=?", (*values.values(), news_id))
-            plan.apply(conn, news_id)
-        flash(request, "제주 소식을 수정했습니다.", "success")
+            return review_screen(request, existing, data=data, error=str(exc))
+        flash(request, "ISSUE를 승인했습니다." if approve else "제주 소식을 수정했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
+
+    @app.post("/admin/news/{news_id}/reject")
+    async def reject_issue(request: Request, news_id: int):
+        if response := admin_guard(request):
+            return response
+        form = await request.form()
+        if not require_csrf(request, form):
+            return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
+        reason = str(form.get("rejection_reason", "")).strip()
+        if len(reason) > 500:
+            return HTMLResponse("반려 사유는 500자 이내로 입력해주세요.", status_code=400)
+        with closing(connect_db()) as conn, conn:
+            changed = conn.execute("""UPDATE news_posts SET approval_status='rejected',published=0,
+                rejection_reason=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,
+                review_version=review_version+1 WHERE id=? AND author_type='user' AND approval_status='pending'
+                AND deleted_at IS NULL AND review_version=?""", (reason, reviewer(request), news_id, form.get("review_version")))
+            if not changed.rowcount:
+                return HTMLResponse("내용이나 검토 상태가 변경되었습니다. 다시 확인해주세요.", status_code=409)
+        flash(request, "ISSUE를 반려했습니다.")
+        return RedirectResponse("/admin/issues?status=pending", status_code=303)
 
     @app.post("/admin/news/{news_id}/toggle-published")
     async def admin_news_toggle_published(request: Request, news_id: int):
@@ -948,13 +1000,16 @@ def create_app(test_config=None):
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         conn = connect_db()
-        row = conn.execute("SELECT published FROM news_posts WHERE id=? AND deleted_at IS NULL", (news_id,)).fetchone()
+        row = conn.execute("SELECT published,approval_status FROM news_posts WHERE id=? AND deleted_at IS NULL", (news_id,)).fetchone()
         if not row:
             conn.close()
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
+        if row["approval_status"] != "approved":
+            conn.close()
+            return HTMLResponse("검토 화면에서 승인한 뒤 공개할 수 있습니다.", status_code=409)
         new_value = 0 if row["published"] else 1
         conn.execute(
-            "UPDATE news_posts SET published=?, updated_at=? WHERE id=?",
+            "UPDATE news_posts SET published=?, updated_at=?,review_version=review_version+1 WHERE id=? AND approval_status='approved' AND deleted_at IS NULL",
             (new_value, datetime.now(timezone.utc).isoformat(timespec="seconds"), news_id),
         )
         conn.commit()

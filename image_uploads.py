@@ -244,7 +244,7 @@ class ImageStore:
             # Only registered images are served; private/deleted content remains protected.
             rows = conn.execute("""SELECT CASE WHEN COALESCE(c.deleted_at,p.deleted_at) IS NULL THEN COALESCE(c.published,p.published) ELSE 0 END AS place_public,
                 COALESCE(c.submitted_by_user_id,p.submitted_by_user_id) AS place_author,
-                COALESCE(c.deleted_at,p.deleted_at) AS place_deleted,n.published AS issue_public,
+                COALESCE(c.deleted_at,p.deleted_at) AS place_deleted,(n.published=1 AND n.approval_status='approved') AS issue_public,
                 n.author_id,n.deleted_at FROM images i
                 LEFT JOIN places p ON p.id=i.place_id LEFT JOIN places c ON c.id=p.merged_into_id
                 LEFT JOIN news_posts n ON n.id=i.issue_id

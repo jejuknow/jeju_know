@@ -138,7 +138,7 @@
       if(!form.querySelector('[name=duplicate_ack]')){
         const label=document.createElement('label');label.className='member-check';
         const check=document.createElement('input');check.type='checkbox';check.name='duplicate_ack';check.value='1';check.required=true;
-        label.append(check,document.createTextNode('기존 장소를 확인했으며 서로 다른 장소입니다.'));feedback.before(label);
+        label.append(check,document.createTextNode(form.hasAttribute('data-member-issue-form')?'기존 ISSUE를 확인했으며 다른 소식입니다.':'기존 장소를 확인했으며 서로 다른 장소입니다.'));feedback.before(label);
       }
     }
     form.addEventListener('submit',async event=>{
@@ -149,6 +149,7 @@
         await form.prepareLocation?.();
         if(!form.reportValidity())return;
         const data=new FormData(form);
+        if(event.submitter?.name)data.set(event.submitter.name,event.submitter.value);
         states.forEach(s=>{if(s.file&&!s.remove.checked)data.set(s.input.name,s.file,s.file.name);});
         feedback.textContent=form.hasAttribute('data-member-place-form')?'장소 등록 중...':'사진과 내용을 저장 중...';
         const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'});
@@ -156,7 +157,8 @@
         const text=await response.text(),doc=new DOMParser().parseFromString(text,'text/html');
         if(response.status===409)showDuplicate(doc);
         const message=doc.querySelector('.member-error,.flash.error,[role=alert]')?.textContent?.trim();
-        feedback.textContent=message||(!/<(?:html|body)/i.test(text)&&text.length<500?text:'사진 업로드 중 문제가 발생했습니다. 입력 내용을 확인하고 다시 시도해주세요.');
+        const apiError=response.headers.get('content-type')?.includes('application/json')?JSON.parse(text).detail:null;
+        feedback.textContent=message||apiError||(!/<(?:html|body)/i.test(text)&&text.length<500?text:'사진 업로드 중 문제가 발생했습니다. 입력 내용을 확인하고 다시 시도해주세요.');
         feedback.setAttribute('role','alert');feedback.scrollIntoView({block:'nearest'});
       } catch (_) {
         feedback.textContent='사진 업로드 중 연결 문제가 발생했습니다. 내 장소에서 등록 여부를 확인한 뒤 다시 시도해주세요.';

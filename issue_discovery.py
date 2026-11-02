@@ -39,7 +39,7 @@ VALID_DATES = ("date(event_start,'+0 days')=event_start AND "
 def public_where(day):
     names = [name for label in PUBLIC_CATEGORIES.values() for name in stored_names(label)]
     placeholders = ",".join("?" for _ in names)
-    return (f"published=1 AND deleted_at IS NULL AND {VALID_DATES} AND event_end>=? "
+    return (f"approval_status='approved' AND published=1 AND deleted_at IS NULL AND {VALID_DATES} AND event_end>=? "
             f"AND category IN ({placeholders})", [day.isoformat(), *names])
 
 

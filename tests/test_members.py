@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from test_images import picture
 from app import create_app
 from auth_security import COOKIE_NAME, ServerSessionMiddleware, hash_password, verify_password
 from user_migrations import VERSION, backup_before_user_migration, migrate_users
@@ -69,9 +70,9 @@ class MembersTest(unittest.TestCase):
     def post(self, client=None, **changes):
         client = client or self.client
         data = {'csrf_token': self.csrf(client, '/issues/new'), 'title': '제주 행사', 'category': '행사•축제',
-                'event_start':'2099-01-01','event_end':'2099-01-02','summary': '함께 즐겨요', 'body': '직접 확인한 소식\n둘째 줄'}
+                'event_start':'2099-01-01','event_end':'2099-01-02','region':'애월','summary': '함께 즐겨요', 'body': '직접 확인한 소식\n둘째 줄'}
         data.update(changes)
-        return client.post('/issues/new', data=data, follow_redirects=False)
+        return client.post('/issues/new', data=data, files={'image_0':('poster.png', picture(),'image/png')}, follow_redirects=False)
 
     def admin(self):
         admin = self.new_client()
@@ -195,17 +196,16 @@ class MembersTest(unittest.TestCase):
             self.assertEqual(len(row['key_hash']),64)
             self.assertNotIn('traveler', row['key_hash'])
 
-    def test_publish_owner_permissions_immediate_public_and_no_mass_assignment(self):
+    def test_pending_owner_permissions_never_public_and_no_mass_assignment(self):
         self.member()
         response = self.post(author_id=999,author_type='admin',published='0',is_featured='1')
         self.assertEqual(response.status_code,303)
         item = self.rows('SELECT * FROM news_posts')[0]
-        self.assertEqual((item['author_id'],item['author_type'],item['published'],item['is_featured']), (1,'user',1,0))
+        self.assertEqual((item['author_id'],item['author_type'],item['published'],item['is_featured']), (1,'user',0,0))
         visitor = self.new_client()
         detail = visitor.get('/news/'+item['slug'])
-        self.assertEqual(detail.status_code,200)
-        self.assertIn('사용자 등록 · 제주 여행자', detail.text)
-        self.assertIn('제주 행사', visitor.get('/').text)
+        self.assertEqual(detail.status_code,404)
+        self.assertNotIn('제주 행사', visitor.get('/').text)
         stranger = self.new_client()
         self.member(stranger, 'another')
         for method in ('get','post'):
@@ -217,9 +217,10 @@ class MembersTest(unittest.TestCase):
         for url in ('/admin','/admin/users','/admin/user-posts'):
             self.assertEqual(self.client.get(url,follow_redirects=False).status_code,303)
         token = self.csrf(self.client,'/account')
-        changed = self.client.post(f"/issues/{item['id']}/edit",data={'csrf_token':token,'title':'수정한 제목','category':'전시•팝업','author_id':2},follow_redirects=False)
+        changed = self.client.post(f"/issues/{item['id']}/edit",data={'csrf_token':token,'title':'수정한 제목','category':'전시•팝업','summary':'수정 요약','author_id':2},follow_redirects=False)
         self.assertEqual(changed.status_code,303)
-        self.assertIn('수정한 제목',visitor.get('/news/'+item['slug']).text)
+        self.assertIn('수정한 제목',self.client.get('/account').text)
+        self.assertEqual(visitor.get('/news/'+item['slug']).status_code,404)
         self.client.post(f"/issues/{item['id']}/delete",data={'csrf_token':token})
         self.assertEqual(visitor.get('/news/'+item['slug']).status_code,404)
         self.assertIsNotNone(self.rows('SELECT deleted_at FROM news_posts')[0]['deleted_at'])
@@ -227,11 +228,10 @@ class MembersTest(unittest.TestCase):
     def test_xss_urls_sql_lengths_dates_and_all_csrf_boundaries(self):
         self.member()
         attack = "<script>alert('x')</script>"
-        self.assertEqual(self.post(title=attack,body=attack).status_code,303)
+        self.assertEqual(self.post(title=attack,body=attack).status_code,400)
+        self.assertEqual(self.rows('SELECT * FROM news_posts'),[])
+        self.post()
         item = self.rows('SELECT * FROM news_posts')[0]
-        page = self.client.get('/news/'+item['slug'])
-        self.assertNotIn(attack,page.text)
-        self.assertIn('&lt;script&gt;',page.text)
         for changes in ({'external_url':'javascript:alert(1)'},{'image_url':'data:image/svg+xml,test'}, {'title':'x'*201},{'body':'x'*20001},{'event_start':'2026-99-99'},{'event_start':'2026-10-10','event_end':'2026-01-01'}):
             self.assertEqual(self.post(**changes).status_code,400)
         self.assertEqual(self.client.get("/news?q=' OR 1=1 --").status_code,200)
@@ -263,6 +263,7 @@ class MembersTest(unittest.TestCase):
         self.member()
         self.post()
         item=self.rows('SELECT * FROM news_posts')[0]
+        self.execute("UPDATE news_posts SET approval_status='approved',published=1 WHERE id=?", (item['id'],))
         other=self.new_client(); self.login(other)
         token=self.csrf(self.client,'/account')
         self.client.post('/account/delete',data={'csrf_token':token,'current_password':'A-long-secret-2026','confirm_delete':'yes'})
@@ -282,7 +283,7 @@ class MembersTest(unittest.TestCase):
         self.assertIn('제주 여행자',admin.get('/admin/users').text)
         self.assertIn('제주 행사',admin.get('/admin/user-posts').text)
         token=self.csrf(admin,'/admin')
-        admin.post(f"/admin/news/{item['id']}/edit",data={'csrf_token':token,'title':'관리자 수정','slug':item['slug'],'category':'지역소식','published':'1'})
+        admin.post(f"/admin/news/{item['id']}/edit",data={'csrf_token':token,'title':'관리자 수정','slug':item['slug'],'category':'지역소식','summary':'확인한 소식','review_version':'0','review_action':'approve'})
         self.assertEqual(self.rows('SELECT title,author_id,author_type FROM news_posts')[0],{'title':'관리자 수정','author_id':1,'author_type':'user'})
         self.assertEqual(admin.post('/admin/users/1/status',data={'status':'blocked'}).status_code,400)
         admin.post(f"/admin/news/{item['id']}/toggle-published",data={'csrf_token':token})

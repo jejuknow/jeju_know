@@ -1,6 +1,6 @@
 .issue-discovery{padding-block:clamp(24px,4vw,52px);color:#192339}
 .issue-intro h1{font-size:clamp(1.9rem,4vw,3rem);letter-spacing:-.055em;margin:.2em 0}
-.issue-intro>p:last-child,.issue-copy p,.issue-results-heading small{color:#53617b}
+.issue-intro>div>p:last-child,.issue-copy p,.issue-results-heading small{color:#53617b}
 .issue-filters{margin:24px 0 16px;padding:16px 20px;background:#f6f8ff;border:1px solid #e1e6f3;border-radius:18px}
 .issue-filter-row,.issue-query,.issue-tags,.issue-switch{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .issue-filter-row+.issue-filter-row,.issue-query{margin-top:12px}
@@ -51,3 +51,8 @@
   .issue-results{padding:12px}
 }
 @media(prefers-reduced-motion:reduce){.issue-card,.issue-pin{scroll-behavior:auto}}
+
+.issue-intro { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.issue-submit-link { flex:none; white-space:nowrap; }
+.issue-empty .secondary-btn { margin-top:6px; }
+@media(max-width:760px){.issue-intro{align-items:stretch;flex-direction:column}.issue-submit-link{text-align:center}}

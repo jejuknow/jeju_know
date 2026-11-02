@@ -11,6 +11,8 @@ from starlette.concurrency import run_in_threadpool
 
 from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_password, rate_limited, safe_external_url, verify_password
 from community_places import coordinates
+from issue_review import candidates, submission_error, has_poster
+from fastapi import HTTPException
 from image_uploads import ImagePlan, ImageError
 
 
@@ -64,11 +66,11 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
     def login_destination(value):
         # Only known participation pages; never redirect to an arbitrary host.
         value = str(value or '')
-        return value if len(value) <= 10000 and re.fullmatch(r'/map/register(?:\?[^\s#]*)?|/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places', value) else '/account'
+        return value if len(value) <= 10000 and re.fullmatch(r'/issues/new|/map/register(?:\?[^\s#]*)?|/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places', value) else '/account'
 
     def guard(request):
         if not current_user(request):
-            return redirect("/login")
+            return redirect("/login?next=/issues/new" if request.url.path == "/issues/new" else "/login")
 
     async def checked_form(request):
         form = await request.form()
@@ -248,13 +250,15 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return None, HTMLResponse("게시물을 찾을 수 없습니다.", status_code=404)
         if post["author_type"] != "user" or post["author_id"] != current_user(request)["id"]:
             return None, HTMLResponse("본인의 게시물만 관리할 수 있습니다.", status_code=403)
+        if post["approval_status"] != "pending":
+            return None, HTMLResponse("검토 대기 중인 ISSUE만 수정하거나 취소할 수 있습니다.", status_code=403)
         return post, None
 
     @app.get("/issues/new", response_class=HTMLResponse)
     async def user_issue_new_get(request: Request):
         if response := guard(request):
             return response
-        return render(request, "member_issue_form.html", item=None)
+        return render(request, "member_issue_form.html", item=None, kakao_map_key=app.state.kakao_map_key)
 
     @app.get("/issues/{news_id}/edit", response_class=HTMLResponse)
     async def user_issue_edit_get(request: Request, news_id: int):
@@ -263,7 +267,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         post, response = owned_post(request, news_id)
         if response:
             return response
-        return render(request, "member_issue_form.html", item=row_to_news(post))
+        return render(request, "member_issue_form.html", item=row_to_news(post), kakao_map_key=app.state.kakao_map_key)
 
     async def save_issue(request, news_id=None):
         if response := guard(request):
@@ -279,31 +283,61 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         if limited(request, "publish", str(current_user(request)["id"]), limit=30, window=3600):
             return throttled()
         error = validate_news(data, categories)
-        plan = None
-        if not error:
-            try:
-                plan = await image_store.prepare(form, "issues")
-            except ImageError as exc:
-                error = str(exc)
+        with closing(connect_db()) as conn:
+            error = error or submission_error(conn, data)
+            similar = [] if error else candidates(conn, {**data, "id": news_id}, public_only=True)
+        def problem(message, status=400):
+            return render(request, "member_issue_form.html", status=status, item={**data, "id": news_id,
+                "images": image_store.list("issues", news_id) if news_id else []},
+                error=message, duplicates=similar, kakao_map_key=app.state.kakao_map_key)
         if error:
-            images = image_store.list("issues", news_id) if news_id else []
-            return render(request, "member_issue_form.html", status=400, item={**data, "id": news_id,
-                "legacy_image_url": data["image_url"], "images": images}, error=error)
-        # Allowlist editable fields: never accept author, visibility, or featured flags from members.
-        fields = ("title", "category", "summary", "body", "image_url", "venue", "event_start", "event_end", "start_time", "end_time", "region", "external_url", "source_name", "checked_at")
+            return problem(error)
+        if similar and form.get("duplicate_ack") != "1":
+            return problem("비슷한 ISSUE가 이미 등록되어 있습니다.", 409)
+        try:
+            plan = await image_store.prepare(form, "issues")
+        except ImageError as exc:
+            return problem(str(exc))
+        # Visibility, source, review and map flags never come from the member.
+        fields = ("title", "category", "summary", "body", "venue", "event_start", "event_end", "start_time",
+                  "end_time", "region", "address", "latitude", "longitude", "external_url", "show_on_map")
+        if not data["address"]:
+            data["latitude"] = data["longitude"] = None
+        data["show_on_map"] = int(data["latitude"] is not None and data["longitude"] is not None)
         values = [data[key] for key in fields]
-        with plan.transaction() as conn:
-            if post:
-                conn.execute("UPDATE news_posts SET " + ",".join(key + "=?" for key in fields) + ",updated_at=CURRENT_TIMESTAMP WHERE id=? AND author_id=? AND author_type='user' AND deleted_at IS NULL", (*values, news_id, current_user(request)["id"]))
-                slug = post["slug"]
-            else:
-                slug = "issue-" + secrets.token_hex(12)
-                cursor = conn.execute("INSERT INTO news_posts (" + ",".join(fields) + ",slug,author_id,author_type,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user',1)", (*values, slug, current_user(request)["id"]))
-                news_id = cursor.lastrowid
-            plan.apply(conn, news_id)
-        flash(request, "제주 이슈를 저장했습니다." if post else "제주 이슈가 바로 공개되었습니다.")
-        # Hidden posts stay hidden even after the author edits them.
-        return redirect("/account")
+        user_id = current_user(request)["id"]
+        try:
+            with plan.transaction() as conn:
+                if not has_poster(conn, plan, news_id):
+                    raise ImageError("대표이미지 1장을 등록해주세요.")
+                if post:
+                    updated = conn.execute("UPDATE news_posts SET " + ",".join(key + "=?" for key in fields) +
+                        ",review_version=review_version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND author_id=? "
+                        "AND author_type='user' AND approval_status='pending' AND deleted_at IS NULL", (*values, news_id, user_id))
+                    if not updated.rowcount:
+                        raise HTTPException(409, "검토 상태가 변경되었습니다. 내 활동에서 확인해주세요.")
+                else:
+                    recent = conn.execute("SELECT count(*) FROM news_posts WHERE author_type='user' AND author_id=? "
+                        "AND datetime(created_at)>=datetime('now','-1 minute')", (user_id,)).fetchone()[0]
+                    if recent >= 2:
+                        raise HTTPException(429, "1분에 2건까지 등록할 수 있습니다. 잠시 후 다시 시도해주세요.", headers={"Retry-After":"60"})
+                    slug = "issue-" + secrets.token_hex(12)
+                    news_id = conn.execute("INSERT INTO news_posts (" + ",".join(fields) +
+                        ",slug,author_id,author_type,approval_status,published) VALUES (" + ",".join("?" for _ in fields) +
+                        ",?,?,'user','pending',0)", (*values, slug, user_id)).lastrowid
+                plan.apply(conn, news_id)
+        except ImageError as exc:
+            return problem(str(exc))
+        if post:
+            flash(request, "검토 대기 중인 ISSUE를 수정했습니다.")
+            return redirect("/account#my-posts")
+        return redirect("/issues/submitted")
+
+    @app.get("/issues/submitted", response_class=HTMLResponse)
+    async def submission_done(request: Request):
+        if response := guard(request):
+            return response
+        return render(request, "issue_submitted.html")
 
     @app.post("/issues/new")
     async def user_issue_new_post(request: Request):
@@ -324,8 +358,11 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return response
         plan = ImagePlan(image_store, "issues")
         with plan.transaction() as conn:
+            updated = conn.execute("UPDATE news_posts SET deleted_at=CURRENT_TIMESTAMP,published=0,updated_at=CURRENT_TIMESTAMP "
+                "WHERE id=? AND author_id=? AND author_type='user' AND deleted_at IS NULL AND approval_status='pending'", (news_id, current_user(request)["id"]))
+            if not updated.rowcount:
+                raise HTTPException(409, "이미 검토되었거나 취소된 ISSUE입니다.")
             plan.delete_owner(conn, news_id)
-            conn.execute("UPDATE news_posts SET deleted_at=CURRENT_TIMESTAMP,published=0,updated_at=CURRENT_TIMESTAMP WHERE id=? AND author_id=? AND author_type='user'", (news_id, current_user(request)["id"]))
         flash(request, "게시물을 삭제했습니다.")
         return redirect("/account")
 

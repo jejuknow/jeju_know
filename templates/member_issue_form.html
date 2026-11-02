@@ -3,23 +3,25 @@
 {% block title %}제주 이슈 {{ '수정' if item and item.id else '등록' }} | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
-<main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>제주 이슈 {{ '수정' if item and item.id else '등록' }}</h1><p>공개한 글은 종료일까지 ISSUE 목록에 표시됩니다. 본인이 확인한 정보를 요약하고 출처를 남겨주세요.</p></div></div>
+<main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>{{ '검토 대기 ISSUE 수정' if item and item.id else '제주 ISSUE 알려주기' }}</h1><p>제주에서 열리는 행사·축제·전시·팝업·체험 또는 지역소식을 알려주세요. 등록된 내용은 JEJU_KNOW 확인 후 공개됩니다.</p></div></div>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
-{% if item and item.id and not item.published %}<p class="member-help">관리자가 숨긴 글입니다. 수정해도 공개 상태는 변경되지 않습니다.</p>{% endif %}
-<form class="admin-form place-form" method="post" enctype="multipart/form-data" action="{{ '/issues/' ~ item.id ~ '/edit' if item and item.id else '/issues/new' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+{% if duplicates %}<aside class="form-card duplicate-warning"><strong>비슷한 ISSUE가 이미 등록되어 있습니다.</strong>{% for d in duplicates %}<p><a href="/news/{{ d.slug }}" target="_blank" rel="noopener">{{ d.title }} · {{ d.event_start }} ~ {{ d.event_end }}</a></p>{% endfor %}</aside>{% endif %}
+<form class="admin-form place-form" data-member-issue-form method="post" enctype="multipart/form-data" action="{{ '/issues/' ~ item.id ~ '/edit' if item and item.id else '/issues/new' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 <section class="form-card"><h2>기본 정보</h2><div class="form-grid two">
 <label class="span-2">제목 *<input name="title" required maxlength="200" value="{{ item.title if item else '' }}"></label>
 <label class="span-2">카테고리 *<select name="category" required>{% for category in public_issue_categories %}<option value="{{ category }}" {% if item and item.category == category %}selected{% endif %}>{{ category.replace("•","·") }}</option>{% endfor %}</select></label>
-<label class="span-2">한줄 요약<textarea name="summary" rows="3" maxlength="600">{{ item.summary if item else '' }}</textarea></label>
-<label class="span-2">상세 내용<textarea name="body" rows="10" maxlength="20000">{{ item.body if item else '' }}</textarea></label>
-
 </div></section>
-  {{ image_uploads(item, "issues") }}
-
+  {{ image_uploads(item, "issues", legacy=false, required_primary=true) }}
+  <p class="form-help">직접 촬영했거나 사용 권한이 있는 이미지, 또는 주최 측이 공개 사용을 허용한 이미지만 등록해주세요.</p>
 {% set member_form = true %}{% include "_issue_schedule.html" %}
-<section class="form-card"><h2>출처</h2><div class="form-grid two"><label>출처명<input name="source_name" maxlength="100" value="{{ item.source_name if item else '' }}"></label><label>정보 확인일<input type="date" name="checked_at" value="{{ item.checked_at if item else '' }}"></label><label class="span-2">공식 정보/신청 URL<input type="url" name="external_url" maxlength="2048" value="{{ item.external_url if item else '' }}" placeholder="https://..."></label></div></section>
-<p class="member-help">본문은 일반 텍스트로 표시됩니다. 타인의 개인정보나 허락받지 않은 콘텐츠는 등록하지 마세요.</p><div class="form-actions"><a class="secondary-btn" href="/account">취소</a><button type="submit" class="primary-inline">{{ '수정 저장' if item and item.id else '등록하고 공개하기' }}</button></div>
+<section class="form-card"><h2>내용과 출처</h2><div class="form-grid two">
+<label class="span-2">한줄 소개 *<textarea name="summary" required rows="2" maxlength="600">{{ item.summary if item else '' }}</textarea></label>
+<label class="span-2">상세 내용<textarea name="body" rows="6" maxlength="20000">{{ item.body if item else '' }}</textarea></label>
+<label class="span-2">공식/참고 링크<input type="url" name="external_url" maxlength="2048" value="{{ item.external_url if item else '' }}" placeholder="https://…"><small>행사 정보를 확인할 수 있는 공식 페이지나 SNS 링크를 입력해주세요.</small></label>
+</div></section>
+{% if duplicates %}<label class="member-check"><input type="checkbox" name="duplicate_ack" value="1" required>기존 ISSUE를 확인했으며 다른 소식입니다.</label>{% endif %}
+<div class="form-actions"><a class="secondary-btn" href="/news">취소</a><button type="submit" class="primary-inline">{{ '수정 저장' if item and item.id else '검토 요청하기' }}</button></div>
 </form></main>
 {% endblock %}
 
-{% block scripts %}<script src="/static/issue-schedule.js"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/admin-location.js"></script><script src="/static/issue-schedule.js?v=review"></script>{% endblock %}

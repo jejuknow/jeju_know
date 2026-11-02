@@ -80,13 +80,16 @@ class HomepageTest(unittest.TestCase):
         self.client.post('/signup',data={'csrf_token':token,'username':'member','nickname':'회원','password':'Member-secret-2026','password_confirm':'Member-secret-2026'})
         self.client.post('/login',data={'csrf_token':self.token('/login'),'username':'member','password':'Member-secret-2026'})
         payload={'csrf_token':self.token('/issues/new'),'event_start':'2099-01-01','event_end':'2099-01-02','title':'회원 글','category':'지역소식','is_promoted':'1'}
-        self.client.post('/issues/new',data=payload)
-        post=self.client.get('/').context['news_items'][0]
+        from test_images import picture
+        payload.update(region='애월',summary='소개')
+        self.client.post('/issues/new',data=payload,files={'image_0':('p.png',picture(),'image/png')})
+        self.assertFalse(self.client.get('/').context['news_items'])
+        post=self.client.get('/account').context['posts'][0]
         self.assertFalse(post['is_promoted'])
         self.execute('UPDATE news_posts SET is_promoted=1 WHERE id=?',(post['id'],))
         payload.pop('is_promoted')
         self.client.post(f"/issues/{post['id']}/edit",data=payload)
-        self.assertTrue(self.client.get('/').context['news_items'][0]['is_promoted'])
+        self.assertTrue(self.client.get('/account').context['posts'][0]['is_promoted'])
         self.assertEqual(self.client.post(f"/admin/news/{post['id']}/edit",data=payload,follow_redirects=False).status_code,303)
 
     def test_home_structure_hero_links_and_optional_preferences(self):

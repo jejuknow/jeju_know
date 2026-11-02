@@ -60,7 +60,7 @@ class ImageUploadTest(unittest.TestCase):
         url = f'/issues/{issue_id}/edit' if issue_id else '/issues/new'
         if client is self.admin:
             url = f'/admin/news/{issue_id}/edit' if issue_id else '/admin/news/new'
-        data = {'csrf_token': self.csrf(client, url), 'event_start':'2099-01-01','event_end':'2099-01-02','title':'이미지 테스트 소식', 'category':'지역소식', 'published':'1'}
+        data = {'csrf_token': self.csrf(client, url), 'event_start':'2099-01-01','event_end':'2099-01-02','region':'애월','summary':'행사 소개','review_version':'0','title':'이미지 테스트 소식', 'category':'지역소식', 'published':'1'}
         data.update(changes)
         return client.post(url, data=data, files=files, follow_redirects=False)
 
@@ -81,22 +81,21 @@ class ImageUploadTest(unittest.TestCase):
         url = '/uploads/' + image['file_path']
         self.assertRegex(image['file_path'],r'^issues/[0-9a-f]{32}\.webp$')
         self.assertEqual((image['width'],image['height']), (120,180))
-        self.assertEqual(post['image_url'],'https://example.com/legacy.jpg')
+        self.assertEqual(post['image_url'],'')
         for page in ('/','/news','/news/'+post['slug']):
-            self.assertIn(url,self.visitor.get(page).text)
-        served = self.visitor.get(url)
+            self.assertNotIn(url,self.visitor.get(page).text)
+        self.assertEqual(self.visitor.get(url).status_code,404)
+        served = self.client.get(url)
         self.assertEqual(served.status_code,200)
         self.assertEqual(served.headers['content-type'],'image/webp')
         self.assertEqual(served.headers['x-content-type-options'],'nosniff')
-        self.assertIn('https://example.com/legacy.jpg',self.client.get(f"/issues/{post['id']}/edit").text)
         self.assertEqual(self.save_issue(issue_id=post['id'],files=[self.file(raw=picture(color='green'))]).status_code,303)
         self.assertFalse(self.store.path(image['file_path']).exists())
         replacement = self.rows('SELECT * FROM images')[0]
         self.assertNotEqual(image['file_path'],replacement['file_path'])
-        self.assertEqual(self.save_issue(issue_id=post['id'],remove_image_0='1').status_code,303)
-        self.assertEqual(self.rows('SELECT * FROM images'),[])
-        self.assertFalse(self.store.path(replacement['file_path']).exists())
-        self.assertIn('https://example.com/legacy.jpg',self.visitor.get('/news/'+post['slug']).text)
+        self.assertEqual(self.save_issue(issue_id=post['id'],remove_image_0='1').status_code,400)
+        self.assertTrue(self.store.path(replacement['file_path']).exists())
+        self.assertEqual(self.rows('SELECT id FROM images'),[{'id':replacement['id']}])
 
     def test_place_five_images_gallery_primary_pick_and_restart(self):
         files = [(f'image_{n}',(f'photo{n}.png',picture(color='green'),'image/png')) for n in range(4)]

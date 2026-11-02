@@ -70,6 +70,7 @@ def counters(conn):
     scalar = lambda sql, args=(): conn.execute(sql, args).fetchone()[0]
     return dict(total=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE),
                 unverified=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE + " AND source_type='user' AND verification_status='unverified'"),
+                issue_pending=scalar("SELECT count(*) FROM news_posts WHERE author_type='user' AND approval_status='pending' AND deleted_at IS NULL"),
                 suggestions=scalar("SELECT count(*) FROM place_correction_suggestions WHERE status='pending'"),
                 new=scalar("SELECT count(*) FROM places p JOIN categories c ON c.id=p.category_id WHERE " + ACTIVE + " AND " + new_sql, new_args),
                 picks=scalar("SELECT count(*) FROM place_pick_periods k JOIN places p ON p.id=k.place_id WHERE " + ACTIVE + " AND k.year=? AND k.month=? AND k.is_active=1", (now.year, now.month)))
@@ -240,6 +241,8 @@ class AdminUI:
                                  "ended": ("event_end<?", [day])}[status]
             where.append(expression)
             args.extend(dates)
+        elif status in ("pending", "rejected"):
+            where.extend(["approval_status=?", "deleted_at IS NULL", "author_type='user'"]); args.append(status)
         elif status == "private":
             where.append("published=0")
         with closing(self.db()) as conn:

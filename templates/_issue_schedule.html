@@ -10,10 +10,10 @@
   <p role="status" id="issueScheduleStatus" data-today="{{ issue_today }}">현재 상태 · {{ p.get('event_status','일정 미등록') }}</p>
 </section>
 <section class="form-card"><h2>위치</h2><div class="form-grid two">
-  <label>지역<select name="region"><option value="">지역 미지정</option>{% for value in active_regions %}<option value="{{ value }}" {% if p.get('region')==value %}selected{% endif %}>{{ region_labels.get(value,value) }}</option>{% endfor %}{% if p.get('region') and p.region not in active_regions %}<option selected>{{ p.region }}</option>{% endif %}</select></label>
+  <label>지역{{ " *" if member_form else "" }}<select name="region" {% if member_form %}required{% endif %}><option value="">{{ "지역 선택" if member_form else "지역 미지정" }}</option>{% for value in active_regions %}<option value="{{ value }}" {% if p.get('region')==value %}selected{% endif %}>{{ region_labels.get(value,value) }}</option>{% endfor %}{% if p.get('region') and p.region not in active_regions %}<option selected>{{ p.region }}</option>{% endif %}</select></label>
   <label>장소명<input name="venue" maxlength="200" value="{{ p.get('venue','') }}"></label>
-  {% if not member_form %}
   <label class="span-2">주소<input name="address" maxlength="300" value="{{ p.get('address','') }}"></label>
+  {% if not member_form %}
   <label class="switch-item"><input type="checkbox" name="show_on_map" value="1" {% if p.get('show_on_map') %}checked{% endif %}><span>지도에 표시</span></label>
   </div>
   <p id="locationFeedback" role="status">{{ '저장된 지도 위치가 있습니다.' if p.get('latitude') is not none and p.get('longitude') is not none and p.get('latitude') != '' else '지도 위치 미등록' }}</p>
@@ -25,5 +25,8 @@
     <label>경도<input type="number" step="any" min="-180" max="180" name="longitude" value="{{ p.longitude if p.get('longitude') is not none else '' }}"></label></div>
   </details>
   <p class="form-help">주소나 좌표 없이 저장할 수 있습니다. 위치가 없는 ISSUE는 목록에서만 보입니다.</p>
-  {% else %}</div>{% endif %}
+  {% else %}</div>
+  <div id="locationPicker" data-auto-address><input type="hidden" name="latitude" value="{{ p.latitude if p.get('latitude') is not none else '' }}"><input type="hidden" name="longitude" value="{{ p.longitude if p.get('longitude') is not none else '' }}">
+  <button type="button" class="secondary-btn" id="addressLocate" data-kakao-key="{{ kakao_map_key }}">주소 위치 확인</button>
+  <p role="status" id="locationFeedback">{{ '지도 위치 확인됨' if p.get('latitude') is not none and p.get('latitude') != '' else '주소에서 위치를 찾지 못해도 등록할 수 있습니다.' }}</p></div>{% endif %}
 </section>

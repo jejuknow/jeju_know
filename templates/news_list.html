@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}제주 ISSUE | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261102">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261102-review">{% endblock %}
 {% block body %}
 <main class="issue-discovery wrap" data-view="{{ selected.view }}" data-kakao-key="{{ kakao_map_key }}">
-  <header class="issue-intro"><p class="kicker">JEJU ISSUE</p><h1>지금 제주에서 뭐 하지?</h1><p>제주에서 열리는 행사부터 전시·팝업, 체험과 지역소식을 모았습니다.</p></header>
+  <header class="issue-intro"><div><p class="kicker">JEJU ISSUE</p><h1>지금 제주에서 뭐 하지?</h1><p>제주에서 열리는 행사부터 전시·팝업, 체험과 지역소식을 모았습니다.</p></div><a class="secondary-btn issue-submit-link" href="/issues/new">+ ISSUE 등록하기</a></header>
   <section class="issue-filters" aria-label="ISSUE 탐색 조건">
     <nav class="issue-filter-row" aria-label="기간"><strong>기간</strong>{% for key,label in periods.items() %}<a data-filter href="{{ issue_link(period=key) }}" {% if selected.period==key %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>
     <nav class="issue-filter-row" aria-label="카테고리"><strong>종류</strong>{% for value in ['']+public_issue_categories %}<a data-filter href="{{ issue_link(category=value) }}" {% if selected.category==value %}aria-current="true"{% endif %}>{{ value.replace('•','·') or '전체' }}</a>{% endfor %}</nav>
@@ -25,7 +25,7 @@
           <div class="issue-copy"><div class="issue-tags"><span data-category>{{ item.category_label }}</span><strong data-badge>{{ item.date_badge }}</strong>{% if item.is_promoted or item.is_sponsored %}<span>{{ '홍보·제휴' if item.is_promoted else '광고·협찬' }}</span>{% endif %}</div><h3>{{ item.title }}</h3>
           {% if item.region or item.venue %}<p>{{ region_labels.get(item.region,item.region) }}{% if item.region and item.venue %} · {% endif %}{{ item.venue }}</p>{% endif %}
           <p data-dates>{{ item.date_label }}</p><small>{{ item.author_label }} · {{ item.author_name }}</small></div></a>
-      </article>{% else %}<div class="issue-empty"><h3>조건에 맞는 제주 ISSUE가 없습니다.</h3><a href="/news">전체 보기 →</a></div>{% endfor %}
+      </article>{% else %}<div class="issue-empty"><h3>조건에 맞는 제주 ISSUE가 없습니다.</h3><a href="/news">전체 보기 →</a><p>제주에서 열리는 행사를 알고 계신가요?</p><a class="secondary-btn" href="/issues/new">ISSUE 등록하기</a></div>{% endfor %}
     </section>
   </div>
 </main>
