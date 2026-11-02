@@ -1,8 +1,12 @@
 {% extends "base.html" %}
+{% from "_home_banner.html" import banner %}
 {% block title %}JEJU_KNOW | 제주를 아는 사람의 제주 기록{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261027-3d-icons">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261102-banners">{% endblock %}
 {% block body %}
 <main id="top">
+  {% if banners.get('SIDE-01') %}<aside class="sponsor-rail" aria-label="홈 우측 {{ banners['SIDE-01'].label }}">
+    {{ banner(banners['SIDE-01']) }}
+  </aside>{% endif %}
   <section class="editorial-hero">
     <div class="wrap editorial-hero-inner">
       <div class="hero-story">
@@ -41,6 +45,9 @@
     </div>
   </section>
 
+  {% if banners.get('HOME-01') %}<aside class="wrap sponsor-inline" aria-label="홈 {{ banners['HOME-01'].label }}">
+    {{ banner(banners['HOME-01']) }}
+  </aside>{% endif %}
   {% include '_finder.html' %}
 
   {% if site_settings.home_issue %}<section class="section wrap news-home" id="today">

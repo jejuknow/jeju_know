@@ -96,6 +96,8 @@ def admin_context(request, conn):
         title, active = KINDS.get(key, "장소 카테고리"), "class-" + key
     elif path.startswith("/admin/news") or path in ("/admin/issues", "/admin/user-posts"):
         section, title, active = "콘텐츠 관리", "ISSUE", "issues"
+    elif path.startswith("/admin/ads"):
+        section, title, active = "콘텐츠 관리", "광고 관리", "ads"
     elif path.startswith("/admin/best"):
         section, title, active = "콘텐츠 관리", "BEST", "best"
     elif path.startswith("/admin/users"):
@@ -114,6 +116,8 @@ def admin_context(request, conn):
     detail = "장소 등록" if path == "/admin/places/new" else "장소 수정" if re.fullmatch(r"/admin/places/\d+/edit", path) else "중복 확인" if path.endswith("/merge") else ""
     if path.startswith("/admin/news/"):
         detail = "ISSUE 등록" if path.endswith("/new") else "ISSUE 수정"
+    if path.startswith("/admin/ads/"):
+        detail = "광고 등록" if path.endswith("/new") else "광고 수정"
     return {"admin_account": account, "admin_counts": counters(conn), "admin_active": active,
             "admin_section": section, "admin_title": detail or title, "admin_parent_title": title,
             "admin_is_detail": bool(detail), "classification_kinds": {k: v for k, v in KINDS.items() if k != "cafe_focus"}}

@@ -1,0 +1,17 @@
+{% extends "admin/base.html" %}
+{% from "admin/_ui.html" import pager, public_badge %}
+{% block admin_content %}
+<div class="admin-panel-heading"><p>오늘 날짜에 공개된 광고 중 위치별 우선순위가 가장 높은 1건을 표시합니다.</p>
+  <a class="primary-inline" href="/admin/ads/new">+ 광고 등록</a></div>
+<section class="admin-panel"><h2>광고·제휴 배너 <small>{{ pagination.total }}건</small></h2>
+  <div class="admin-data-wrap"><table class="admin-data-table"><thead><tr>
+    <th>광고명 / 광고주</th><th>유형</th><th>광고 위치</th><th>기간</th><th>일정 상태</th><th>공개 여부</th><th>우선순위</th>
+  </tr></thead><tbody>{% for ad in ads %}<tr>
+    <td data-label="광고명 / 광고주"><a class="admin-title-link" href="/admin/ads/{{ ad.id }}/edit">{{ ad.name }}</a><small>{{ ad.advertiser_name }}</small></td>
+    <td data-label="유형">{{ ad_types[ad.ad_type] }}</td><td data-label="광고 위치">{{ ad.slot }} · {{ slots[ad.slot] }}</td>
+    <td data-label="기간">{{ ad.start_date }} ~ {{ ad.end_date }}</td><td data-label="일정 상태">{{ ad.status }}</td>
+    <td data-label="공개 여부">{{ public_badge(ad.is_public) }}</td><td data-label="우선순위">{{ ad.priority }}</td>
+  </tr>{% else %}<tr><td class="admin-empty" colspan="7">등록된 광고가 없습니다.</td></tr>{% endfor %}</tbody></table></div>
+  {{ pager(pagination) }}
+</section>
+{% endblock %}

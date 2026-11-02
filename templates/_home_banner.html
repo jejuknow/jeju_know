@@ -1,0 +1,11 @@
+{% macro banner(ad) %}
+<a class="sponsor-card" href="{{ ad.target_url }}" target="_blank" rel="noopener noreferrer sponsored">
+  <span class="sponsor-label">{{ ad.label }}</span>
+  <img src="/uploads/{{ ad.image_path }}" width="{{ ad.image_width }}" height="{{ ad.image_height }}"
+       alt="{{ ad.advertiser_name }} · {{ ad.name }}" loading="lazy" decoding="async">
+  {% if ad.title or ad.description %}<div class="sponsor-copy">
+    {% if ad.title %}<strong>{{ ad.title }}</strong>{% endif %}
+    {% if ad.description %}<p>{{ ad.description }}</p>{% endif %}
+  </div>{% endif %}
+</a>
+{% endmacro %}

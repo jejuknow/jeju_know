@@ -49,6 +49,7 @@ from starlette.concurrency import run_in_threadpool
 from analytics import Analytics
 from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES
 from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule
+from ad_banners import active_banners, banner_image, migrate as migrate_ads, register_ad_routes
 from issue_calendar_migration import migrate as migrate_issue_calendar
 from fastapi import HTTPException
 from issue_review import migrate as migrate_issue_review, candidates, submission_error, review_label, has_poster
@@ -330,6 +331,7 @@ def create_app(test_config=None):
         migrate_cafe_photo_spot(app.state.database)
         migrate_issue_calendar(app.state.database)
         migrate_issue_review(app.state.database)
+        migrate_ads(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -338,6 +340,8 @@ def create_app(test_config=None):
 
     @app.get("/uploads/{kind}/{filename}")
     def uploaded_image(request: Request, kind: str, filename: str):
+        if kind == "ads":
+            return banner_image(request, image_store, filename)
         return image_store.response(request, kind, filename)
 
     @app.get("/health")
@@ -659,12 +663,13 @@ def create_app(test_config=None):
         news_rows = conn.execute(
             f"SELECT * FROM news_posts WHERE {where} ORDER BY is_promoted DESC, datetime(created_at) DESC, id DESC LIMIT 5", params
         ).fetchall()
+        banners = active_banners(conn, day)
         collections = [dict(r) for r in conn.execute("SELECT * FROM best_collections WHERE published=1 ORDER BY sort_order,id")]
         conn.close()
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"news_items": [row_to_news(row, day) for row in news_rows], "collections": collections},
+            context={"news_items": [row_to_news(row, day) for row in news_rows], "collections": collections, "banners": banners},
         )
 
     @app.get("/place/{slug}", response_class=HTMLResponse)
@@ -1299,6 +1304,7 @@ def create_app(test_config=None):
         flash(request, f"‘{row['name']}’을(를) 즉시 삭제했습니다.", "success")
         return RedirectResponse(url=admin_return(form), status_code=303)
 
+    register_ad_routes(app, templates, connect_db, admin_guard, require_csrf, flash, image_store)
     register_member_routes(app, templates, connect_db, require_csrf, flash,
                            parse_news_form, row_to_news, admin_guard, list(PUBLIC_CATEGORIES.values()), secret_key, image_store)
     register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,

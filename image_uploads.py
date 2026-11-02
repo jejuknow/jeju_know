@@ -27,7 +27,7 @@ INSPECT_FORMATS = [*MIME_TYPES, "GIF"]
 # Keep libheif/Pillow security limits. Ignore depth/auxiliary images and decode serially.
 register_heif_opener(decode_threads=1, depth_images=False, aux_images=False)
 KINDS = {"places": "place_id", "issues": "issue_id"}
-FILE_PATH = re.compile(r"(?:places|issues)/[0-9a-f]{32}\.webp\Z")
+FILE_PATH = re.compile(r"(?:places|issues|ads)/[0-9a-f]{32}\.webp\Z")
 PROCESS_SLOTS = threading.BoundedSemaphore(1)
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class ImageStore:
     def __init__(self, root, connect_db):
         self.root = Path(root).resolve()
         self.connect_db = connect_db
-        for kind in KINDS:
+        for kind in (*KINDS, "ads"):
             folder = self.root / kind
             if folder.is_symlink():
                 raise RuntimeError("Upload directories must not be symlinks")
@@ -221,6 +221,8 @@ class ImageStore:
             for row in conn.execute("SELECT file_path FROM image_file_gc").fetchall():
                 relative = row[0]
                 if conn.execute("SELECT 1 FROM images WHERE file_path=?", (relative,)).fetchone():
+                    continue
+                if relative.startswith("ads/") and conn.execute("SELECT 1 FROM ads WHERE image_path=?", (relative,)).fetchone():
                     continue
                 # An editor may have reused an uploaded file through the legacy URL field.
                 if any(conn.execute(f"SELECT 1 FROM {table} WHERE instr(image_url,?)>0", ('/uploads/' + relative,)).fetchone()

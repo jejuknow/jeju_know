@@ -1,0 +1,29 @@
+{% extends "admin/base.html" %}
+{% block admin_content %}
+{% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
+<form class="admin-form place-form" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% if item.id %}<input type="hidden" name="revision" value="{{ item.revision }}">{% endif %}
+  <section class="form-card"><h2>광고 정보</h2><div class="form-grid two">
+    <label>광고명 *<input name="name" required maxlength="100" value="{{ item.name }}"></label>
+    <label>광고주명 *<input name="advertiser_name" required maxlength="100" value="{{ item.advertiser_name }}"></label>
+    <label>광고 유형 *<select name="ad_type">{% for key,label in ad_types.items() %}<option value="{{ key }}" {% if item.ad_type==key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>광고 위치 *<select name="slot">{% for key,label in slots.items() %}<option value="{{ key }}" {% if item.slot==key %}selected{% endif %}>{{ key }} · {{ label }}</option>{% endfor %}</select></label>
+  </div></section>
+  <section class="form-card"><h2>배너 콘텐츠</h2><div class="form-grid two">
+    {% if item.image_path %}<div class="span-2"><img class="admin-thumb" src="/uploads/{{ item.image_path }}" alt="현재 광고 이미지"></div>{% endif %}
+    <label class="span-2">광고 이미지 *<input type="file" name="image_0" accept="image/*" {% if not item.image_path %}required{% endif %}>
+      <small>SIDE-01은 세로 320 × 1,000px, HOME-01은 가로 1,180 × 236px를 권장합니다. 이미지 전체가 보이며 JPG·PNG·WebP·HEIC를 사용할 수 있습니다.</small></label>
+    <label class="span-2">제목 (선택)<input name="title" maxlength="120" value="{{ item.title }}"></label>
+    <label class="span-2">설명 (선택)<textarea name="description" rows="2" maxlength="500">{{ item.description }}</textarea></label>
+    <label class="span-2">연결 URL *<input type="url" name="target_url" required maxlength="2048" value="{{ item.target_url }}" placeholder="https://"></label>
+  </div></section>
+  <section class="form-card"><h2>노출 설정</h2><div class="form-grid two">
+    <label>시작일 *<input type="date" name="start_date" required value="{{ item.start_date }}"></label>
+    <label>종료일 *<input type="date" name="end_date" required value="{{ item.end_date }}"></label>
+    <label>노출 우선순위<input type="number" name="priority" min="1" max="9999" required value="{{ item.priority }}"><small>1이 가장 높습니다. 같으면 먼저 등록한 광고를 표시합니다.</small></label>
+    <label class="switch-item"><input type="checkbox" name="is_public" value="1" {% if item.is_public %}checked{% endif %}><span>공개</span></label>
+  </div><p class="form-help">한국 시간으로 시작일부터 종료일 당일까지 표시됩니다.</p></section>
+  <div class="form-actions"><a class="secondary-btn" href="/admin/ads">목록으로</a><button class="primary-inline" type="submit">광고 저장</button></div>
+</form>
+{% endblock %}
