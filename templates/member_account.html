@@ -5,7 +5,7 @@
 <main class="admin-wide admin-main member-account">
   <div class="admin-title-row"><div><p class="kicker">MY JEJU_KNOW</p><h1>{{ member.nickname }}님의 기록</h1><p>직접 전한 장소·제주 소식과 계정을 관리하세요.</p></div><a class="primary-inline" href="/issues/new">+ 제주 이슈 등록</a></div>
   {% include '_flashes.html' %}
-  <nav class="member-section-nav" aria-label="내 활동 메뉴"><a href="/account/places">내 장소·수정 제안</a><a href="#my-posts">내 제주 이슈</a><a href="#profile">프로필</a><a href="#password">비밀번호 변경</a><a href="#withdraw">회원 탈퇴</a>{% if member.role == 'admin' %}<a href="/admin">관리자</a>{% endif %}</nav>
+  <nav class="member-section-nav" aria-label="내 활동 메뉴"><a href="/account/places">내 장소·수정 제안</a><a href="#my-posts">내 제주 이슈</a><a href="#my-inquiries">내 문의</a><a href="#profile">프로필</a><a href="#password">비밀번호 변경</a><a href="#withdraw">회원 탈퇴</a>{% if member.role == 'admin' %}<a href="/admin">관리자</a>{% endif %}</nav>
   <section class="form-card" id="my-posts"><h2>내가 등록한 제주 이슈 <small>{{ posts|length }}</small></h2>
   <div class="member-posts">{% for item in posts %}<article class="member-post"><div>
     <p class="issue-author">{{ item.category_label }} · {{ item.created_at[:10] }} · <strong>{{ item.review_label }}</strong></p>
@@ -13,10 +13,23 @@
     {% if item.approval_status == 'rejected' and item.rejection_reason %}<p>반려 사유: {{ item.rejection_reason }}</p>{% endif %}
   </div><div class="row-actions">{% if item.approval_status == 'pending' %}<a class="mini-btn" href="/issues/{{ item.id }}/edit">수정</a>
     <form method="post" action="/issues/{{ item.id }}/delete" onsubmit="return confirm('ISSUE 등록을 취소할까요?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="mini-btn danger" type="submit">등록 취소</button></form>
-    {% elif item.approval_status == 'approved' and site_settings.instagram_url %}<a class="mini-btn" href="{{ site_settings.instagram_url }}" target="_blank" rel="noopener noreferrer">수정·삭제 문의 (Instagram)</a>{% endif %}</div></article>
+    {% elif item.approval_status == 'approved' %}<a class="mini-btn" href="/contact?issue_id={{ item.id }}">수정·삭제 문의</a>{% endif %}</div></article>
     {% else %}<p class="member-help">아직 등록한 제주 ISSUE가 없습니다. 첫 소식을 나눠보세요.</p>{% endfor %}</div></section>
+  <section class="form-card" id="my-inquiries"><h2>내 문의 <small>{{ inquiry_count }}</small></h2>
+    {% if inquiries %}<div class="member-posts">{% for item in inquiries %}
+      <article class="member-post"><div><p class="issue-author">{{ item.inquiry_type }} · <time>{{ item.created_at[:10] }}</time></p>
+        <h3><a href="/account/inquiries/{{ item.id }}">{{ item.title }}</a></h3></div>
+        <span class="inquiry-status" data-status="{{ item.status }}">{{ inquiry_labels[item.status] }}</span></article>
+    {% endfor %}</div>
+    {% if inquiry_pages>1 %}<nav aria-label="내 문의 페이지" class="row-actions">
+      {% if inquiry_page>1 %}<a href="?inquiry_page={{ inquiry_page-1 }}#my-inquiries">이전</a>{% endif %}<span>{{ inquiry_page }} / {{ inquiry_pages }}</span>
+      {% if inquiry_page<inquiry_pages %}<a href="?inquiry_page={{ inquiry_page+1 }}#my-inquiries">다음</a>{% endif %}
+    </nav>{% endif %}
+    {% else %}<p>아직 등록한 문의가 없습니다.</p><p class="member-help">궁금한 점이나 수정 요청이 있다면 문의를 남겨주세요.</p>{% endif %}
+    <a class="mini-btn" href="/contact">문의하기</a>
+  </section>
   <section class="form-card" id="profile"><h2>프로필</h2><form class="admin-form" method="post" action="/account/profile"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><div class="form-grid two"><label>아이디<input value="{{ member.username }}" readonly></label><label>닉네임<input name="nickname" required minlength="2" maxlength="30" value="{{ member.nickname }}"></label></div><button class="primary-inline" type="submit">프로필 저장</button></form></section>
   <section class="form-card" id="password"><h2>비밀번호 변경</h2><p class="member-help">변경하면 다른 기기의 로그인은 모두 해제됩니다.</p><form class="admin-form" method="post" action="/account/password"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>현재 비밀번호<input type="password" name="current_password" required maxlength="128" autocomplete="current-password"></label><div class="form-grid two"><label>새 비밀번호<input type="password" name="password" required minlength="12" maxlength="128" autocomplete="new-password"></label><label>새 비밀번호 확인<input type="password" name="password_confirm" required minlength="12" maxlength="128" autocomplete="new-password"></label></div><button class="primary-inline" type="submit">비밀번호 변경</button></form></section>
-  <section class="form-card" id="withdraw"><h2>회원 탈퇴</h2><p class="member-help">탈퇴하면 로그인이 해제되고 아이디·닉네임·비밀번호 해시는 계정에서 제거됩니다. 작성한 글은 ‘탈퇴한 사용자’로 유지되며, 등록한 장소와 수정 제안도 보존됩니다. 삭제할 글이 있다면 먼저 내 게시물에서 삭제해주세요.</p><details><summary>탈퇴 진행하기</summary><form class="admin-form" method="post" action="/account/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>현재 비밀번호<input type="password" name="current_password" required maxlength="128" autocomplete="current-password"></label><label class="member-check"><input type="checkbox" name="confirm_delete" value="yes" required>계정은 복구할 수 없으며 작성한 글이 유지되는 것을 확인했습니다.</label><button class="mini-btn danger" type="submit">회원 탈퇴</button></form></details></section>
+  <section class="form-card" id="withdraw"><h2>회원 탈퇴</h2><p class="member-help">탈퇴하면 로그인이 해제되고 아이디·닉네임·비밀번호 해시는 계정에서 제거됩니다. 작성한 글은 ‘탈퇴한 사용자’로 유지되며, 등록한 장소와 수정 제안도 보존됩니다. 승인된 ISSUE의 수정·삭제가 필요하다면 탈퇴 전에 문의해주세요. 탈퇴 후에는 내 문의와 답변을 열 수 없습니다.</p><details><summary>탈퇴 진행하기</summary><form class="admin-form" method="post" action="/account/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>현재 비밀번호<input type="password" name="current_password" required maxlength="128" autocomplete="current-password"></label><label class="member-check"><input type="checkbox" name="confirm_delete" value="yes" required>계정은 복구할 수 없으며 작성한 글이 유지되는 것을 확인했습니다.</label><button class="mini-btn danger" type="submit">회원 탈퇴</button></form></details></section>
 </main>
 {% endblock %}

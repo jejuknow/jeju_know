@@ -50,7 +50,7 @@ from analytics import Analytics
 from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES
 from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule
 from ad_banners import active_banners, banner_image, migrate as migrate_ads, register_ad_routes
-from contact_inquiries import migrate as migrate_contact, register_contact_routes
+from contact_inquiries import migrate as migrate_contact, migrate_member_inquiries, register_contact_routes
 from issue_calendar_migration import migrate as migrate_issue_calendar
 from fastapi import HTTPException
 from issue_review import migrate as migrate_issue_review, candidates, submission_error, review_label, has_poster
@@ -334,6 +334,7 @@ def create_app(test_config=None):
         migrate_issue_review(app.state.database)
         migrate_ads(app.state.database)
         migrate_contact(app.state.database)
+        migrate_member_inquiries(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)

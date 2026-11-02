@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_password, rate_limited, safe_external_url, verify_password
 from community_places import coordinates
 from issue_review import candidates, submission_error, has_poster
+from contact_inquiries import member_inquiries
 from fastapi import HTTPException
 from image_uploads import ImagePlan, ImageError
 
@@ -66,7 +67,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
     def login_destination(value):
         # Only known participation pages; never redirect to an arbitrary host.
         value = str(value or '')
-        return value if len(value) <= 10000 and re.fullmatch(r'/issues/new|/map/register(?:\?[^\s#]*)?|/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places', value) else '/account'
+        return value if len(value) <= 10000 and re.fullmatch(r'/issues/new|/map/register(?:\?[^\s#]*)?|/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places|/account/inquiries/[0-9]+|/contact\?issue_id=[0-9]+', value) else '/account'
 
     def guard(request):
         if not current_user(request):
@@ -176,7 +177,8 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return response
         with closing(connect_db()) as conn:
             posts = conn.execute("SELECT * FROM news_posts WHERE author_id=? AND author_type='user' AND deleted_at IS NULL ORDER BY id DESC", (current_user(request)["id"],)).fetchall()
-        return render(request, "member_account.html", posts=[row_to_news(row) for row in posts])
+            inbox = member_inquiries(conn, current_user(request)["id"], request.query_params.get("inquiry_page"))
+        return render(request, "member_account.html", posts=[row_to_news(row) for row in posts], **inbox)
 
     @app.post("/account/profile")
     async def update_profile(request: Request):

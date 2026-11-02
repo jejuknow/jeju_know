@@ -3,12 +3,22 @@
 <section class="admin-panel admin-editor-body inquiry-detail">
   <div class="admin-panel-heading"><h2>{{ item.title }}</h2>{{ badge(statuses[item.status]) }}</div>
   <p>{{ item.inquiry_type }} · {{ item.created_at }} (한국시간)</p>
-  <dl><dt>이름 또는 닉네임</dt><dd>{{ item.name }}</dd><dt>이메일</dt><dd>{{ item.email }}</dd>
+  <dl><dt>회원</dt><dd>{% if sender and sender.status != 'deleted' %}{{ sender.nickname }} ({{ sender.username }}){% elif sender %}탈퇴한 회원{% else %}연결된 회원 없음{% endif %}</dd>
+    <dt>문의자 이름/닉네임</dt><dd>{{ item.name }}</dd><dt>이메일</dt><dd>{{ item.email }}</dd>
     <dt>연락처</dt><dd>{{ item.phone or '미입력' }}</dd></dl>
   <h3>문의 내용</h3><p class="inquiry-message">{{ item.content }}</p>
+  {% if issue %}<p class="inquiry-related">관련 ISSUE: <strong>{{ issue.title }}</strong>
+    {% if issue.editable %}<a class="secondary-btn" href="/admin/news/{{ issue.id }}/edit">ISSUE 관리화면 열기 →</a>{% else %}<small>현재 관리할 수 없는 ISSUE입니다.</small>{% endif %}</p>{% endif %}
   <form class="admin-form" method="post" action="/admin/inquiries/{{ item.id }}/status">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>처리 상태<select name="status">
       {% for key,label in statuses.items() %}<option value="{{ key }}" {% if key==item.status %}selected{% endif %}>{{ label }}</option>{% endfor %}
     </select></label><div class="row-actions"><button type="submit" class="primary-inline admin-btn-primary">상태 저장</button><a href="/admin/inquiries" class="secondary-btn">문의 목록</a></div>
+  </form>
+  <form class="admin-form" method="post" action="/admin/inquiries/{{ item.id }}/reply">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>관리자 답변<textarea name="admin_reply" rows="5" maxlength="5000" required>{{ item.admin_reply or '' }}</textarea></label>
+    {% if item.replied_at %}<small>마지막 답변: {{ item.replied_at }} (한국시간)</small>{% endif %}
+    <small>{% if sender and sender.status != 'deleted' %}저장하면 회원의 ‘내 문의’에 표시됩니다.{% else %}회원 연결이 없는 경우 저장된 답변은 관리자만 볼 수 있습니다.{% endif %} 이메일은 자동 발송되지 않습니다.</small>
+    <button class="primary-inline admin-btn-primary">답변 저장</button>
   </form>
 </section>{% endblock %}

@@ -25,6 +25,15 @@
 .contact-form button:disabled { opacity:.7 }
 .community-invite-card, .contact-card, .inquiry-message { word-break:keep-all; overflow-wrap:anywhere }
 .inquiry-message { white-space:pre-wrap; line-height:1.7 }
+.inquiry-related, .inquiry-answer { padding:16px; border-radius:14px; background:#f3f6ff; overflow-wrap:anywhere }
+.inquiry-related :is(a,small) { display:block; width:fit-content; margin-top:8px }
+.inquiry-status { display:inline-block; border-radius:999px; padding:4px 10px; background:#eef1f5; color:#36415a; font-size:13px; white-space:nowrap }
+.inquiry-status[data-status=read] { background:#eaf0ff; color:#244ba6 }
+.inquiry-status[data-status=done] { background:#e6f4ed; color:#215b42 }
+.member-inquiry > :is(.kicker,h2,.inquiry-related,.inquiry-answer), #my-inquiries > .mini-btn { margin-top:20px }
+.member-inquiry h2 { font-size:19px }
+.member-inquiry time { font-size:14px }
+#my-inquiries .member-post > div { min-width:0; overflow-wrap:anywhere }
 .inquiry-detail :is(h2, dd) { overflow-wrap:anywhere }
 .inquiry-detail dl { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:8px 18px; margin-block:22px }
 .inquiry-detail dt { font-weight:700 }
