@@ -1,0 +1,31 @@
+.activity-page{max-width:960px;margin-inline:auto;padding-block:36px 64px;word-break:keep-all;overflow-wrap:anywhere}
+.activity-header,.activity-nav,.activity-entry-head,.activity-feed li{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.activity-header h1{font-size:clamp(27px,4vw,38px);line-height:1.25;margin:6px 0}
+.activity-header h1+p,.activity-nav-label{color:var(--muted)}
+.activity-page .row-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.activity-page .row-actions form{margin:0}
+.activity-page :is(.primary-inline,.mini-btn,.member-section-nav a){display:inline-flex;align-items:center;justify-content:center;min-height:44px;white-space:nowrap}
+.activity-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:24px}
+.activity-stats a{padding:18px 20px;background:white;border:1px solid var(--line);border-radius:16px;display:grid;gap:6px;font-size:14px;font-weight:700}
+.activity-stats a:hover,.activity-stats a:focus-visible{border-color:var(--brand)}
+.activity-stats strong{font-size:28px;color:var(--brand);line-height:1.2}
+.activity-nav{align-items:flex-end;flex-wrap:wrap;margin:24px 0}
+.activity-nav-label{font-weight:700;font-size:13px;margin:0 0 8px}
+.activity-nav .member-section-nav{margin:0;gap:6px}
+.activity-nav a[aria-current=page]{background:var(--brand);border-color:var(--brand);color:white}
+.activity-page .activity-panel{margin-top:0}
+.activity-feed{list-style:none;padding:0;margin:0}
+.activity-feed li,.activity-entry{border-top:1px solid var(--line);padding:16px 0}
+.activity-entry{scroll-margin-top:96px}
+.activity-entry h3,.activity-feed h3{font-size:18px;line-height:1.4;margin:0}
+.activity-entry h3 a:hover,.activity-feed h3 a:hover{text-decoration:underline}
+.activity-entry .issue-author,.activity-feed .issue-author{margin:0 0 3px}
+.activity-entry-head>div:first-child,.activity-feed li>div:first-child{min-width:0}
+.activity-entry .row-actions,.activity-entry>.mini-btn{margin-top:8px}
+.activity-badges{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.activity-badge{font-size:12px;font-weight:700;border-radius:999px;padding:4px 9px;white-space:nowrap;line-height:1.5}
+.tone-neutral{background:#edf0f5;color:#49566b}.tone-positive{background:#e4f5ea;color:#216342}.tone-brand{background:#eaf0ff;color:#28499b}.tone-attention{background:#fff0e5;color:#894012}
+.suggestion-diff{display:grid;gap:8px;margin:12px 0}.suggestion-diff div{display:flex;gap:12px}.suggestion-diff dt{font-size:13px;font-weight:700;color:var(--muted)}.suggestion-diff dd,.activity-note{margin:0;white-space:pre-wrap;line-height:1.6}
+.activity-pages,.new-inquiry{margin-top:12px}
+.activity-page .account-withdraw{border-top:2px solid var(--line)}
+@media(max-width:700px){.activity-page{padding-block:24px 48px}.activity-header,.activity-entry-head,.activity-feed li{align-items:flex-start;flex-direction:column;gap:8px}.activity-nav{align-items:flex-start;gap:10px}.activity-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:16px}.activity-stats a{padding:14px}.activity-stats strong{font-size:24px}.activity-entry,.activity-feed li{padding:14px 0}.activity-page .form-grid>*{min-width:0}}

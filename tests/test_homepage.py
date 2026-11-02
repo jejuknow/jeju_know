@@ -84,12 +84,12 @@ class HomepageTest(unittest.TestCase):
         payload.update(region='애월',summary='소개')
         self.client.post('/issues/new',data=payload,files={'image_0':('p.png',picture(),'image/png')})
         self.assertFalse(self.client.get('/').context['news_items'])
-        post=self.client.get('/account').context['posts'][0]
+        post=self.client.get('/account/issues').context['items'][0]
         self.assertFalse(post['is_promoted'])
         self.execute('UPDATE news_posts SET is_promoted=1 WHERE id=?',(post['id'],))
         payload.pop('is_promoted')
         self.client.post(f"/issues/{post['id']}/edit",data=payload)
-        self.assertTrue(self.client.get('/account').context['posts'][0]['is_promoted'])
+        self.assertTrue(self.client.get('/account/issues').context['items'][0]['is_promoted'])
         self.assertEqual(self.client.post(f"/admin/news/{post['id']}/edit",data=payload,follow_redirects=False).status_code,303)
 
     def test_home_structure_hero_links_and_optional_preferences(self):

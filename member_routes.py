@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_password, rate_limited, safe_external_url, verify_password
 from community_places import coordinates
 from issue_review import candidates, submission_error, has_poster
-from contact_inquiries import member_inquiries
+from member_activity import register_activity_routes
 from fastapi import HTTPException
 from image_uploads import ImagePlan, ImageError
 
@@ -67,7 +67,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
     def login_destination(value):
         # Only known participation pages; never redirect to an arbitrary host.
         value = str(value or '')
-        return value if len(value) <= 10000 and re.fullmatch(r'/issues/new|/map/register(?:\?[^\s#]*)?|/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/places|/account/inquiries/[0-9]+|/contact\?issue_id=[0-9]+', value) else '/account'
+        return value if len(value) <= 10000 and re.fullmatch(r'/issues/new|/map/register(?:\?[^\s#]*)?|/places/(?:new(?:\?from=new)?|[0-9]+/(?:edit|suggest))|/account/(?:places|issues|suggestions|inquiries|settings)|/account/inquiries/[0-9]+|/contact\?issue_id=[0-9]+', value) else '/account'
 
     def guard(request):
         if not current_user(request):
@@ -171,14 +171,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         request.scope["rotate_session"] = True
         return redirect("/")
 
-    @app.get("/account", response_class=HTMLResponse)
-    async def account(request: Request):
-        if response := guard(request):
-            return response
-        with closing(connect_db()) as conn:
-            posts = conn.execute("SELECT * FROM news_posts WHERE author_id=? AND author_type='user' AND deleted_at IS NULL ORDER BY id DESC", (current_user(request)["id"],)).fetchall()
-            inbox = member_inquiries(conn, current_user(request)["id"], request.query_params.get("inquiry_page"))
-        return render(request, "member_account.html", posts=[row_to_news(row) for row in posts], **inbox)
+    register_activity_routes(app, templates, connect_db)
 
     @app.post("/account/profile")
     async def update_profile(request: Request):
@@ -194,7 +187,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             with closing(connect_db()) as conn, conn:
                 conn.execute("UPDATE users SET nickname=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='active'", (nickname, current_user(request)["id"]))
             flash(request, "프로필을 저장했습니다.")
-        return redirect("/account#profile")
+        return redirect("/account/settings#profile")
 
     @app.post("/account/password")
     async def change_password(request: Request):
@@ -220,7 +213,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
                 conn.execute("DELETE FROM auth_sessions WHERE user_id=?", (user_id,))
             rotate(request, user_id)
             flash(request, "비밀번호를 변경했습니다. 다른 기기의 로그인은 해제되었습니다.")
-        return redirect("/account#password")
+        return redirect("/account/settings#password")
 
     @app.post("/account/delete")
     async def delete_account(request: Request):
@@ -236,7 +229,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             user = conn.execute("SELECT password_hash FROM users WHERE id=?", (user_id,)).fetchone()
         if form.get("confirm_delete") != "yes" or not await run_in_threadpool(verify_password, str(form.get("current_password", "")), user[0]):
             flash(request, "탈퇴 안내에 동의하고 현재 비밀번호를 확인해주세요.", "error")
-            return redirect("/account#withdraw")
+            return redirect("/account/settings#withdraw")
         with closing(connect_db()) as conn, conn:
             conn.execute("UPDATE users SET username=?,nickname='탈퇴한 사용자',password_hash='',status='deleted',last_login_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?", ("deleted-" + secrets.token_hex(16), user_id))
             conn.execute("DELETE FROM auth_sessions WHERE user_id=?", (user_id,))
@@ -332,7 +325,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return problem(str(exc))
         if post:
             flash(request, "검토 대기 중인 ISSUE를 수정했습니다.")
-            return redirect("/account#my-posts")
+            return redirect("/account/issues")
         return redirect("/issues/submitted")
 
     @app.get("/issues/submitted", response_class=HTMLResponse)
@@ -366,7 +359,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
                 raise HTTPException(409, "이미 검토되었거나 취소된 ISSUE입니다.")
             plan.delete_owner(conn, news_id)
         flash(request, "게시물을 삭제했습니다.")
-        return redirect("/account")
+        return redirect("/account/issues")
 
     @app.get("/admin/users", response_class=HTMLResponse)
     async def admin_users(request: Request):

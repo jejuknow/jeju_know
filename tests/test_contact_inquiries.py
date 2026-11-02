@@ -119,10 +119,10 @@ class ContactTests(unittest.TestCase):
             issue_id = conn.execute("SELECT id FROM news_posts WHERE slug='one'").fetchone()[0]
             other_id = conn.execute("SELECT id FROM news_posts WHERE slug='two'").fetchone()[0]
         url = f"/contact?issue_id={issue_id}"
-        self.assertIn(f'href="{url}"', a.get("/account").text)
+        self.assertIn(f'href="{url}"', a.get("/account/issues").text)
         self.assertEqual(b.get(url).status_code,404)
         self.assertEqual(self.visitor.get(url,follow_redirects=False).status_code,303)
-        self.assertIn("아직 등록한 문의가 없습니다.", a.get("/account").text)
+        self.assertIn("아직 등록한 문의가 없습니다.", a.get("/account/inquiries").text)
         form = a.get(url)
         self.assertEqual(form.context["values"],{"inquiry_type":CONTENT_REQUEST,"title":"[ISSUE 수정·삭제 요청] one","name":"sender"})
         self.assertIn('placeholder="수정하거나 삭제가 필요한 내용을 알려주세요."></textarea>',form.text)
@@ -136,7 +136,7 @@ class ContactTests(unittest.TestCase):
         with closing(sqlite3.connect(self.db)) as conn:
             self.assertEqual(conn.execute("SELECT user_id,related_content_type,related_content_id FROM contact_inquiries").fetchall(),
                              [(aid,"issue",issue_id)])
-        self.assertIn("바꾼 제목",a.get("/account#my-inquiries").text)
+        self.assertIn("바꾼 제목",a.get("/account/inquiries").text)
         self.assertNotIn("바꾼 제목",b.get("/account").text)
         detail = "/account/inquiries/1"
         self.assertEqual(b.get(detail).status_code,404)
@@ -157,7 +157,7 @@ class ContactTests(unittest.TestCase):
         for status,label in (("read","확인중"),("done","처리완료")):
             self.admin.post(admin_path+"/status",data={"status":status,"csrf_token":token})
             self.assertIn(label,a.get(detail).text)
-            self.assertIn(label,a.get("/account").text)
+            self.assertIn(label,a.get("/account/inquiries").text)
         self.admin.post(admin_path+"/reply",data={"admin_reply":reply,"csrf_token":token})
         self.assertIn("&lt;script&gt;private reply&lt;/script&gt;",a.get(detail).text)
         self.assertEqual(b.get(detail).status_code,404)
@@ -174,13 +174,60 @@ class ContactTests(unittest.TestCase):
         a, aid = self.member("sender")
         guest = self.form()
         guest_page=self.visitor.post("/contact",data={**guest,"user_id":aid})
-        self.assertNotIn('href="/account#my-inquiries"',guest_page.text)
+        self.assertNotIn('href="/account/inquiries"',guest_page.text)
         form=a.get("/contact")
         a.post("/contact",data={**guest,"csrf_token":form.context["csrf_token"],"form_token":form.context["form_token"]})
         self.assertEqual(a.get("/account/inquiries/1").status_code,404)
         self.assertEqual(a.get("/account/inquiries/2").status_code,200)
         with closing(sqlite3.connect(self.db)) as conn:
             self.assertEqual(conn.execute("SELECT user_id,related_content_id FROM contact_inquiries ORDER BY id").fetchall(),[(None,None),(aid,None)])
+
+    def test_activity_counts_recent_order_and_private_lists(self):
+        a, aid = self.member("owner")
+        b, bid = self.member("other")
+        with closing(sqlite3.connect(self.db)) as conn, conn:
+            def place(uid, name, public, deleted=None):
+                return conn.execute("""INSERT INTO places(slug,name,region,category,submitted_by_user_id,
+                    source_type,published,deleted_at,updated_at) VALUES(?,?,'애월','카페',?,'user',?,?,'2026-01-01')""",
+                    (name,name,uid,public,deleted)).lastrowid
+            public = place(aid, "a-public", 1)
+            place(aid, "a-private", 0)
+            place(aid, "a-deleted", 1, "2026-01-01")
+            place(bid, "b-private", 0)
+            for n in range(12):
+                conn.execute("""INSERT INTO news_posts(slug,title,category,author_id,author_type,updated_at)
+                    VALUES(?,?,'지역소식',?,'user',?)""", (f"issue-{n}",f"행사 {n}",aid,f"2026-02-{n+1:02d}"))
+            for status in ("pending","accepted","rejected"):
+                conn.execute("""INSERT INTO place_correction_suggestions(place_id,user_id,field,new_value,original_value,
+                    reason,status,created_at,reviewed_at,review_note) VALUES(?,?,'parking_status','가능','불가',
+                    '주차장 정보',?,'2026-01-01',?,?)""", (public,aid,status,
+                    "2026-04-01" if status!="pending" else None,"기록된 반려 사유" if status=="rejected" else ""))
+        form = a.get("/contact")
+        a.post("/contact",data={**self.form(),"csrf_token":form.context["csrf_token"],"form_token":form.context["form_token"]})
+        dashboard = a.get("/account")
+        self.assertEqual(dashboard.context["counts"],dict(places=2,issues=12,suggestions=3,inquiries=1))
+        recent = dashboard.context["recent"]
+        self.assertEqual(len(recent),8)
+        self.assertEqual([r["activity_time"] for r in recent],sorted((r["activity_time"] for r in recent),reverse=True))
+        self.assertEqual([r["kind"] for r in recent[:3]],["문의","수정 제안","수정 제안"])
+        self.assertNotIn('action="/account/delete"',dashboard.text)
+        self.assertIn('action="/account/delete"',a.get("/account/settings").text)
+        places = a.get("/account/places").text
+        self.assertIn('href="/place/a-public"',places)
+        self.assertIn('href="/places/'+str(public)+'/suggest"',places)
+        self.assertNotIn('href="/place/a-private"',places)
+        self.assertNotIn('b-private',places)
+        self.assertNotIn('a-deleted',places)
+        self.assertEqual(len(a.get("/account/issues?page=2").context["items"]),2)
+        suggestions = a.get("/account/suggestions").text
+        for label in ("검토 대기","반영","반려","기록된 반려 사유","불가","가능"):
+            self.assertIn(label,suggestions)
+        self.assertEqual(b.get("/account").context["counts"],dict(places=1,issues=0,suggestions=0,inquiries=0))
+        for section in ("places","issues","suggestions","inquiries","settings"):
+            self.assertEqual(self.visitor.get("/account/"+section,follow_redirects=False).status_code,303)
+            page = b.get("/account/"+section,params={"user_id":aid}).text
+            for private in ("a-private","기록된 반려 사유","행사 11","비공개 제목"):
+                self.assertNotIn(private,page)
 
     def test_additive_upgrade_keeps_original_columns_unchanged(self):
         path=self.db.with_name("legacy.db")

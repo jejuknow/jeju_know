@@ -13,7 +13,7 @@ from fastapi import HTTPException, Path, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from admin_ui import integer, page_rows
+from admin_ui import page_rows
 from auth_security import current_user, rate_limited
 from community_migrations import KST, today
 from issue_discovery import public_where
@@ -81,17 +81,6 @@ def unpack(row, box, *, detail=False):
                        replied_at=kst_time(row["replied_at"]))
     return {**details, "id":row["id"], "status":row["status"], "inquiry_type":row["inquiry_type"],
             "created_at":kst_time(row["created_at"])}
-
-
-def member_inquiries(conn, user_id, page_number):
-    total = conn.execute("SELECT count(*) FROM contact_inquiries WHERE user_id=?", (user_id,)).fetchone()[0]
-    pages = max(1, (total+9)//10)
-    page = integer(page_number, 1, 1, pages)
-    rows = conn.execute("""SELECT * FROM contact_inquiries WHERE user_id=?
-                           ORDER BY id DESC LIMIT 10 OFFSET ?""", (user_id, (page-1)*10)).fetchall()
-    box = cipher() if rows else None
-    return dict(inquiries=[unpack(r, box) for r in rows], inquiry_page=page, inquiry_pages=pages,
-                inquiry_count=total, inquiry_labels=MEMBER_STATUSES)
 
 
 def owned_issue(conn, user_id, issue_id):

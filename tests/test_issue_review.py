@@ -62,7 +62,7 @@ class IssueReviewTest(unittest.TestCase):
         self.assertEqual(self.member.post(edit.replace("/edit","/delete"),data={"csrf_token":self.csrf(self.member)}).status_code,403)
         self.assertIn("승인·공개",self.member.get("/account").text)
         tomorrow=today()+timedelta(days=1)
-        with patch("app.community_today",return_value=tomorrow):
+        with patch("app.community_today",return_value=tomorrow), patch("member_activity.today",return_value=tomorrow):
             self.assertEqual(self.visitor.get("/news").context["map_count"],0)
             self.assertEqual(self.visitor.get(slug_url).status_code,404)
             self.assertIn("종료",self.member.get("/account").text)
@@ -84,8 +84,8 @@ class IssueReviewTest(unittest.TestCase):
         form={"csrf_token":self.csrf(self.admin,"/admin"),"review_version":second["review_version"],"rejection_reason":reason}
         self.assertEqual(self.admin.post(admin_page+"/reject",data={**form,"csrf_token":"wrong"}).status_code,400)
         self.assertEqual(self.admin.post(admin_page+"/reject",data=form,follow_redirects=False).status_code,303)
-        self.assertIn(reason,self.member.get("/account").text)
-        self.assertNotIn(reason,self.other.get("/account").text)
+        self.assertIn(reason,self.member.get("/account/issues").text)
+        self.assertNotIn(reason,self.other.get("/account/issues").text)
         self.assertEqual(self.visitor.get("/news/"+second["slug"]).status_code,404)
         self.assertEqual(self.admin.get("/admin").context["admin_counts"]["issue_pending"],0)
 

@@ -24,7 +24,7 @@ from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, of
 from admin_settings import catalog
 from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
 from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, USAGE_LABELS,
-                                    parse_proposal, queue_proposal, approve_proposal, display_proposal)
+                                    parse_proposal, queue_proposal, approve_proposal)
 
 
 def register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
@@ -264,16 +264,6 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         flash(request, "장소를 삭제했습니다. 공개 화면에서 더 이상 표시되지 않습니다.")
         return redirect("/account/places")
 
-    @app.get("/account/places")
-    async def my_places(request: Request):
-        if response := member_guard(request):
-            return response
-        with closing(connect_db()) as conn:
-            rows = conn.execute("SELECT * FROM places WHERE submitted_by_user_id=? AND deleted_at IS NULL ORDER BY id DESC", (current_user(request)["id"],)).fetchall()
-            suggestions = conn.execute("SELECT s.*,p.name,p.slug FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id WHERE s.user_id=? ORDER BY s.id DESC", (current_user(request)["id"],)).fetchall()
-            suggestions = [{**dict(s), "display_value": display_proposal(conn, s["new_value"]) if s["field"] == DETAIL_FIELD else s["new_value"]} for s in suggestions]
-        return render(request, "member_places.html", places=[{**row_to_place(r),"can_edit":editable(r,current_user(request)["id"])} for r in rows], suggestions=suggestions)
-
     def suggestion_value(conn, field, raw):
         value = raw.strip()
         if field not in SUGGESTION_FIELDS or not value or len(value) > 2000:
@@ -343,7 +333,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 return render(request, "place_suggestion.html", 400, place=dict(place), error=str(exc), **form_options(place["category_id"]))
             conn.execute("INSERT INTO place_correction_suggestions(place_id,user_id,field,new_value,original_value,reason) VALUES (?,?,?,?,?,?)", (place_id,current_user(request)["id"],field,value,original_value(place,field),reason))
         flash(request, "수정 제안을 보냈습니다. 관리자가 확인하기 전에는 원본 정보가 바뀌지 않습니다.")
-        return redirect("/account/places")
+        return redirect("/account/suggestions")
 
     @app.get("/admin/community")
     async def community_admin(request: Request, status: str = "unverified"):

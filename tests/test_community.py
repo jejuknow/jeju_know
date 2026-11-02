@@ -382,7 +382,9 @@ class CommunityTest(unittest.TestCase):
         for path in ('/admin/community','/admin/community?status=duplicates','/admin/picks','/admin/best',f"/admin/places/{p['id']}/merge",f"/admin/places/{p['id']}/edit"):
             self.assertEqual(self.admin.get(path).status_code,200,path)
         html=self.member.get('/account/places').text
-        self.assertIn(p['name'],html);self.assertIn('바뀐 장소 이름',html)
+        self.assertIn(p['name'],html);self.assertNotIn('바뀐 장소 이름',html)
+        self.assertIn('바뀐 장소 이름',self.member.get('/account/suggestions').text)
+        self.assertNotIn('바뀐 장소 이름',self.other.get('/account/suggestions').text)
         self.assertNotIn(p['name'],self.other.get('/account/places').text)
 
     def test_32_login_returns_only_safe_participation_pages(self):

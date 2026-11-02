@@ -1,0 +1,38 @@
+{% macro badges(labels) -%}
+<div class="activity-badges">{% for label in labels %}
+  {% set tone = 'positive' if label in ('공개','승인·공개','진행중','반영','처리완료') else 'brand' if label in ('JEJU_KNOW 확인','승인','확인중','예정') else 'attention' if label in ('반려','보완 필요') else 'neutral' %}
+  <span class="activity-badge tone-{{ tone }}">{{ label }}</span>{% endfor %}</div>
+{%- endmacro %}
+
+{% macro activity_card(i,tab) -%}
+<article class="activity-entry" id="activity-{{ i.id }}">
+  <div class="activity-entry-head"><div>
+    <p class="issue-author">{% if tab=='places' %}{{ region_labels.get(i.region,i.region) }} · {{ i.category_label }}
+      {% elif tab=='issues' %}{{ i.category|replace('•','·') }} · 등록 {{ i.registered }}
+      {% elif tab=='suggestions' %}{{ i.field_label }} · 제안 {{ i.registered }}
+      {% else %}{{ i.inquiry_type }} · {{ i.registered }}{% endif %}</p>
+    <h3>{% if tab=='inquiries' or (tab in ('places','issues') and i.visible) %}<a href="{{ i.href }}">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</h3>
+  </div>{{ badges(i.labels) }}</div>
+  {% if tab=='places' %}
+    {% if i.merged_into_id %}<p class="member-help">중복 장소로 병합되었습니다.</p>{% endif %}
+    {% if i.can_edit or i.visible %}<div class="row-actions">
+      {% if i.visible %}<a class="mini-btn" href="/places/{{ i.id }}/suggest">정보 바로잡기</a>{% endif %}
+      {% if i.can_edit %}<a class="mini-btn" href="/places/{{ i.id }}/edit">수정</a>
+        <form method="post" action="/places/{{ i.id }}/delete" onsubmit="return confirm('내 장소를 공개 목록에서 삭제할까요?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="mini-btn danger">삭제</button></form>{% endif %}
+    </div>{% endif %}
+  {% elif tab=='issues' %}
+    <p class="member-help">행사 기간 · {{ i.date_label }}</p>
+    {% if i.approval_status=='rejected' and i.rejection_reason %}<p class="activity-note">반려 사유 · {{ i.rejection_reason }}</p>{% endif %}
+    {% if i.approval_status=='pending' %}<div class="row-actions"><a class="mini-btn" href="/issues/{{ i.id }}/edit">수정</a>
+      <form method="post" action="/issues/{{ i.id }}/delete" onsubmit="return confirm('ISSUE 등록을 취소할까요?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="mini-btn danger">등록 취소</button></form></div>
+    {% elif i.approval_status=='approved' %}<a class="mini-btn" href="/contact?issue_id={{ i.id }}">수정·삭제 문의</a>{% endif %}
+  {% elif tab=='suggestions' %}
+    <dl class="suggestion-diff">
+      {% if i.before %}<div><dt>기존</dt><dd>{{ i.before }}</dd></div>{% endif %}
+      <div><dt>제안</dt><dd>{{ i.after }}</dd></div>
+    </dl>
+    {% if i.reason %}<p class="activity-note">제안 내용 · {{ i.reason }}</p>{% endif %}
+    {% if i.review_note %}<p class="activity-note"><strong>JEJU_KNOW 검토 결과</strong> · {{ i.review_note }}</p>{% endif %}
+  {% endif %}
+</article>
+{%- endmacro %}

@@ -2,7 +2,7 @@
 {% block title %}내 문의 상세 | JEJU_KNOW{% endblock %}
 {% block body %}
 <main class="wrap contact-page"><article class="contact-card member-inquiry">
-  <a class="text-btn" href="/account#my-inquiries">← 내 문의 목록</a>
+  <a class="text-btn" href="/account/inquiries">← 내 문의 목록</a>
   <p class="kicker">MY JEJU_KNOW</p><h1>{{ item.title }}</h1>
   <p>{{ item.inquiry_type }} · <time>{{ item.created_at }}</time> · <span class="inquiry-status" data-status="{{ item.status }}">{{ inquiry_labels[item.status] }}</span></p>
   {% if issue %}<p class="inquiry-related">관련 ISSUE: <strong>{{ issue.title }}</strong>
