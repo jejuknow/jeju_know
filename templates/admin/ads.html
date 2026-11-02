@@ -1,17 +1,37 @@
 {% extends "admin/base.html" %}
-{% from "admin/_ui.html" import pager, public_badge %}
+{% from "admin/_ui.html" import badge, pager, public_badge %}
+{% block admin_heading %}
+<header class="admin-ads-heading">
+  <div><h1>{{ admin_title }}</h1>
+    <p>홈과 서비스에 노출되는 광고·제휴 배너를 관리합니다.</p>
+    <small>오늘 날짜에 공개된 광고 중 위치별 우선순위가 가장 높은 1건을 표시합니다.</small>
+  </div>
+  <a class="primary-inline admin-btn-primary" href="/admin/ads/new">+ 광고 등록</a>
+</header>
+{% endblock %}
 {% block admin_content %}
-<div class="admin-panel-heading"><p>오늘 날짜에 공개된 광고 중 위치별 우선순위가 가장 높은 1건을 표시합니다.</p>
-  <a class="primary-inline" href="/admin/ads/new">+ 광고 등록</a></div>
-<section class="admin-panel"><h2>광고·제휴 배너 <small>{{ pagination.total }}건</small></h2>
+<section class="admin-panel admin-ads-list">
+  <div class="admin-panel-heading"><h2>광고·제휴 배너 <span>{{ pagination.total }}건</span></h2></div>
+  <form method="get" action="/admin/ads" class="admin-filters admin-ads-filters" aria-label="광고 목록 필터">
+    <div class="admin-search-row">
+      <label>일정 상태<select name="status"><option value="">전체</option>{% for key,label in schedules.items() %}
+        <option value="{{ key }}" {% if filters.status==key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label>광고 위치<select name="slot"><option value="">전체</option>{% for key,label in slots.items() %}
+        <option value="{{ key }}" {% if filters.slot==key %}selected{% endif %}>{{ key }} · {{ label }}</option>{% endfor %}</select></label>
+      <label>공개 여부<select name="public"><option value="">전체</option>{% for key,label in [('1','공개'),('0','비공개')] %}
+        <option value="{{ key }}" {% if filters.public==key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <button type="submit" class="secondary-btn">필터 적용</button><a class="secondary-btn" href="/admin/ads">초기화</a>
+    </div>
+  </form>
   <div class="admin-data-wrap"><table class="admin-data-table"><thead><tr>
     <th>광고명 / 광고주</th><th>유형</th><th>광고 위치</th><th>기간</th><th>일정 상태</th><th>공개 여부</th><th>우선순위</th>
   </tr></thead><tbody>{% for ad in ads %}<tr>
     <td data-label="광고명 / 광고주"><a class="admin-title-link" href="/admin/ads/{{ ad.id }}/edit">{{ ad.name }}</a><small>{{ ad.advertiser_name }}</small></td>
-    <td data-label="유형">{{ ad_types[ad.ad_type] }}</td><td data-label="광고 위치">{{ ad.slot }} · {{ slots[ad.slot] }}</td>
-    <td data-label="기간">{{ ad.start_date }} ~ {{ ad.end_date }}</td><td data-label="일정 상태">{{ ad.status }}</td>
+    <td data-label="유형">{{ ad_types[ad.ad_type] }}</td><td data-label="광고 위치"><strong>{{ ad.slot }}</strong><small>{{ slots[ad.slot] }}</small></td>
+    <td data-label="기간">{{ ad.start_date }} ~ {{ ad.end_date }}</td>
+    <td data-label="일정 상태">{{ badge(ad.status, {'upcoming':'primary','ongoing':'success','ended':'neutral'}[ad.schedule]) }}</td>
     <td data-label="공개 여부">{{ public_badge(ad.is_public) }}</td><td data-label="우선순위">{{ ad.priority }}</td>
-  </tr>{% else %}<tr><td class="admin-empty" colspan="7">등록된 광고가 없습니다.</td></tr>{% endfor %}</tbody></table></div>
+  </tr>{% else %}<tr><td class="admin-empty" colspan="7">{{ '선택한 조건에 맞는 광고가 없습니다.' if filters else '등록된 광고가 없습니다.' }}</td></tr>{% endfor %}</tbody></table></div>
   {{ pager(pagination) }}
 </section>
 {% endblock %}

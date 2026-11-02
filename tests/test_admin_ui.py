@@ -83,6 +83,26 @@ class AdminUITest(unittest.TestCase):
         self.assertIn('조건에 맞는 장소가 없습니다',self.admin.get('/admin/places?category=food').text)
         self.assertEqual(self.admin.get('/admin/places?search_by=name&q=목록+01').text.count('data-row-select'),1)
 
+    def test_private_places_precede_public_across_filtered_pages(self):
+        # Insert in interleaved order with both timestamp formats used by writers.
+        groups = {0: [], 1: []}
+        for i in range(23):
+            published = int(i % 3 == 0)
+            timestamp = f"2026-11-01 {i:02}:00:00" if i % 2 else f"2026-11-01T{i:02}:00:00+00:00"
+            row_id = self.execute("""INSERT INTO places(name,slug,category,category_id,region,published,updated_at)
+                VALUES (?,?,?,?,?,?,?)""", (f"점검 카페 {i}", f"qa-{i}", "카페", self.category["cafe"], "애월", published, timestamp))
+            groups[published].insert(0, row_id)
+        expected = groups[0] + groups[1]
+        filters = {"q":"점검", "search_by":"name", "region":"애월", "category":"cafe", "per_page":"10"}
+        for n in range(3):
+            page = self.admin.get("/admin/places",params={**filters,"page":n+1}).context
+            self.assertEqual([p["id"] for p in page["places"]], expected[n*10:(n+1)*10])
+            self.assertEqual(page["private_count"],15)
+        for published, ids in groups.items():
+            page=self.admin.get("/admin/places",params={**filters,"published":published,"per_page":50}).context
+            self.assertEqual([p["id"] for p in page["places"]],ids)
+            self.assertEqual(page["private_count"],len(ids) if published==0 else 0)
+
     def test_correction_current_original_proposed_and_stale_guard(self):
         p=self.place(name='이전 이름')
         self.post(self.member,f"/places/{p['id']}/suggest",field='name',new_value='제안 이름',reason='직접 확인')

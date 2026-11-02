@@ -14,6 +14,7 @@ from sqlite_migrations import verified_migration
 
 SLOTS = {"SIDE-01": "홈 우측 세로", "HOME-01": "홈 내부 가로"}
 TYPES = {"ad": "광고", "partnership": "제휴"}
+SCHEDULE_LABELS = {"upcoming": "예정", "ongoing": "진행중", "ended": "종료"}
 LIVE = "is_public=1 AND start_date<=:day AND end_date>=:day"
 
 
@@ -62,12 +63,6 @@ def banner_image(request, store, filename):
     return FileResponse(path, media_type="image/webp", headers={"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"})
 
 
-def date_status(banner, day):
-    if banner["start_date"] > day:
-        return "예정"
-    return "종료" if banner["end_date"] < day else "진행중"
-
-
 def validate(values):
     if not values["name"] or not values["advertiser_name"]:
         return "광고명과 광고주명을 입력해주세요."
@@ -109,10 +104,26 @@ def register_ad_routes(app, templates, connect_db, admin_guard, require_csrf, fl
     def ad_list(request: Request):
         if guard := admin_guard(request):
             return guard
-        with closing(connect_db()) as conn:
-            rows, pagination = page_rows(conn, request, "*", "FROM ads", "1=1", [], "slot,priority,id")
         day = today().isoformat()
-        return render(request, "ads.html", ads=[{**dict(r), "status":date_status(r,day)} for r in rows], pagination=pagination)
+        source = """FROM (SELECT ads.*,
+            CASE WHEN start_date > ? THEN 'upcoming' WHEN end_date < ? THEN 'ended'
+                 ELSE 'ongoing' END AS schedule FROM ads) AS inventory"""
+        args = [day, day]
+        filters = {}
+        where = []
+        for key, column, allowed in (("status", "schedule", SCHEDULE_LABELS),
+                                     ("slot", "slot", SLOTS), ("public", "is_public", ("0", "1"))):
+            value = request.query_params.get(key)
+            if value in allowed:
+                filters[key] = value
+                where.append(column + "=?")
+                args.append(value)
+        order = """CASE schedule WHEN 'ongoing' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END,
+                   priority ASC, julianday(updated_at) DESC, id DESC"""
+        with closing(connect_db()) as conn:
+            rows, pagination = page_rows(conn, request, "*", source, " AND ".join(where) or "1=1", args, order)
+        return render(request, "ads.html", ads=[{**dict(r), "status": SCHEDULE_LABELS[r["schedule"]]} for r in rows],
+                      pagination=pagination, filters=filters, schedules=SCHEDULE_LABELS)
 
     @app.get("/admin/ads/new")
     def ad_new(request: Request):

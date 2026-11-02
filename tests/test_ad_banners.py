@@ -68,6 +68,28 @@ class AdBannerTest(unittest.TestCase):
             self.assertEqual(self.admin.get(url).status_code,200)
             self.assertEqual(len(self.admin.get("/admin/ads").context["ads"]),7)
 
+    def test_admin_filters_and_order_across_pages(self):
+        # 11 ongoing, two upcoming, one ended. Higher id is not necessarily the newest edit.
+        with closing(sqlite3.connect(self.database)) as conn, conn:
+            for i in range(1,15):
+                start = "2026-11-03" if i in (12,13) else "2026-11-01"
+                end = "2026-11-01" if i == 14 else "2026-11-03"
+                conn.execute("""INSERT INTO ads (id,name,advertiser_name,slot,ad_type,target_url,image_path,
+                    image_width,image_height,start_date,end_date,priority,is_public,updated_at)
+                    VALUES (?,?, '제주노',?, 'ad','https://example.org',?,160,500,?,?,?,?,?)""",
+                    (i,f"배너 {i}", "SIDE-01" if i%2 else "HOME-01",f"ads/{i}.webp",start,end,
+                     2 if i==1 else 1, i%2, f"2026-11-02 {15-i:02}:00:00"))
+        with patch("ad_banners.today",return_value=self.day):
+            def ids(**params):
+                page = self.admin.get("/admin/ads",params=params).context
+                return [a["id"] for a in page["ads"]]
+            self.assertEqual(ids(),list(range(2,12)))
+            self.assertEqual(ids(page=2),[1,12,13,14])
+            self.assertEqual(ids(status="ongoing",slot="HOME-01",public="0"),[2,4,6,8,10])
+            self.assertEqual(ids(status="upcoming",public="1"),[13])
+            self.assertEqual(ids(status="ended"),[14])
+            self.assertEqual(ids(slot="HOME-01",public="1"),[])
+
     def test_image_replacement_and_invalid_edits(self):
         self.assertEqual(self.save().status_code,303)
         ad=dict(self.admin.get("/admin/ads/1/edit").context["item"])

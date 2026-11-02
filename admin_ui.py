@@ -182,7 +182,12 @@ class AdminUI:
                 args.append(year)
         with closing(self.db()) as conn:
             select = "p.*,u.nickname,(SELECT count(*) FROM place_correction_suggestions s WHERE s.place_id=p.id AND s.status='pending') AS pending_count"
-            rows, page = page_rows(conn, request, select, "FROM places p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN users u ON u.id=p.submitted_by_user_id", " AND ".join(where), args, "p.updated_at DESC,p.id DESC")
+            order = "p.updated_at DESC,p.id DESC"
+            if mode == "all":
+                # Imports use SQLite timestamps; admin edits also use offset-bearing ISO timestamps.
+                order = "p.published ASC, julianday(p.updated_at) DESC, p.id DESC"
+                select += ",COUNT(*) FILTER (WHERE p.published=0) OVER () AS private_count"
+            rows, page = page_rows(conn, request, select, "FROM places p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN users u ON u.id=p.submitted_by_user_id", " AND ".join(where), args, order)
             categories = conn.execute("SELECT name,slug FROM categories WHERE type='place' ORDER BY sort_order,id").fetchall()
             regions = catalog(conn, "region", True)
             years = sorted({today().year, *[r[0] for r in conn.execute("SELECT DISTINCT opened_year FROM places WHERE opened_year IS NOT NULL")]}, reverse=True)
@@ -192,7 +197,8 @@ class AdminUI:
                 for row in conn.execute("SELECT id,place_id,new_value FROM place_correction_suggestions WHERE status='pending' AND field=? AND place_id IN (" + ",".join("?" for _ in ids) + ") ORDER BY id", (DETAIL_FIELD, *ids)):
                     pending.setdefault(row["place_id"], []).append({"id": row["id"], "summary": display_proposal(conn, row["new_value"])})
         items = [{**self.place(row), "nickname": row["nickname"], "pending_count": row["pending_count"], "detail_proposals": pending.get(row["id"], [])} for row in rows]
-        return self.render(request, "places.html", places=items, pagination=page, mode=mode, categories=categories, regions=regions, years=years, selected_year=year)
+        private_count = rows[0]["private_count"] if mode == "all" and rows else 0
+        return self.render(request, "places.html", places=items, pagination=page, mode=mode, categories=categories, regions=regions, years=years, selected_year=year, private_count=private_count)
 
     def suggestions(self, request):
         if response := self.guard(request): return response
