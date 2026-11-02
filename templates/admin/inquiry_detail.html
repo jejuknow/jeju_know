@@ -1,0 +1,14 @@
+{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge %}
+{% block admin_content %}
+<section class="admin-panel admin-editor-body inquiry-detail">
+  <div class="admin-panel-heading"><h2>{{ item.title }}</h2>{{ badge(statuses[item.status]) }}</div>
+  <p>{{ item.inquiry_type }} · {{ item.created_at }} (한국시간)</p>
+  <dl><dt>이름 또는 닉네임</dt><dd>{{ item.name }}</dd><dt>이메일</dt><dd>{{ item.email }}</dd>
+    <dt>연락처</dt><dd>{{ item.phone or '미입력' }}</dd></dl>
+  <h3>문의 내용</h3><p class="inquiry-message">{{ item.content }}</p>
+  <form class="admin-form" method="post" action="/admin/inquiries/{{ item.id }}/status">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>처리 상태<select name="status">
+      {% for key,label in statuses.items() %}<option value="{{ key }}" {% if key==item.status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label><div class="row-actions"><button type="submit" class="primary-inline admin-btn-primary">상태 저장</button><a href="/admin/inquiries" class="secondary-btn">문의 목록</a></div>
+  </form>
+</section>{% endblock %}

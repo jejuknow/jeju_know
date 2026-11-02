@@ -87,7 +87,14 @@
     {% include '_best_collections.html' %}
   </section>{% endif %}
 
+  <section class="wrap community-invite" aria-labelledby="community-title">
+    <div class="community-invite-card">
+      <div><p class="kicker">JEJU_KNOW COMMUNITY</p><h2 id="community-title">같이 제주를 알아가요 🌴</h2>
+        <p>제주에서 궁금한 걸 묻고, 내가 아는 제주를 나눠보세요.<br>
+          맛집·카페·행사부터 동네 이야기까지 함께 알아가는 JEJU_KNOW 이야기방입니다.</p></div>
+      <a class="primary-inline" href="{{ site_settings.openchat_url }}" target="_blank" rel="noopener noreferrer">오픈채팅 참여하기 <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
 </main>
-<footer><div class="wrap footer-inner">{{ brand_logo(variant='footer-brand') }}<p>{{ site_settings.site_description }} · <a href="{{ url_for('admin_dashboard') }}">관리자</a>{% if site_settings.instagram_url %} · <a href="{{ site_settings.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}</p></div></footer>
 {% endblock %}
 {% block scripts %}<script src="/static/place-search.js?v=20261028-public"></script><script src="/static/home-cards.js?v=20261028-public"></script><script src="/static/app.js?v=20261029-analytics"></script>{% endblock %}

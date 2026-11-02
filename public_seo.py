@@ -49,6 +49,9 @@ def page_metadata(request, description):
         result['title'] = '제주 신상 카페·맛집 | JEJU_KNOW'
     elif path == '/news':
         result['title'] = '제주 이슈 | JEJU_KNOW'
+    elif path in ('/contact', '/contact/sent'):
+        result.update(title='문의하기 | JEJU_KNOW', description='JEJU_KNOW 광고·제휴, 협업 및 홈페이지 관련 문의를 남겨주세요.',
+                      robots='noindex,follow', canonical=ORIGIN + '/contact')
     return result
 
 

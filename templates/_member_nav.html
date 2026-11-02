@@ -1,6 +1,9 @@
-<div class="member-bar"><nav class="wrap member-links" aria-label="회원 메뉴">
+{% from '_brand_links.html' import brand_links %}
+<div class="member-bar"><div class="wrap member-links">
+<nav class="utility-brand" aria-label="브랜드 소통">{{ brand_links(site_settings) }}</nav>
+<nav class="utility-account" aria-label="회원 메뉴">
 {% if member %}
   <a href="/account">내 활동</a>
   <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">로그아웃</button></form>
 {% else %}<a href="/login">로그인</a><a href="/signup">회원가입</a>{% endif %}
-</nav></div>
+</nav></div></div>

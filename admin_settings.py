@@ -6,6 +6,7 @@ REGIONS = ["제주시", "애월", "한림", "한경", "구좌", "조천", "성�
 COMPANIONS = ["혼자", "연인", "친구", "부모님", "아이", "반려동물", "단체"]
 FOCUS = [("taste", "맛 중심"), ("space", "공간 중심"), ("experience", "이색 경험")]
 DEFAULTS = {"site_name": "JEJU_KNOW", "instagram_url": "https://www.instagram.com/jeju_know/",
+            "openchat_url": "https://open.kakao.com/o/gLuLBdVi",
             "site_description": "JEJU_KNOW가 기록하는 이유 있는 제주 추천",
             "home_pick": True, "home_new": True, "home_issue": True, "home_best": True}
 

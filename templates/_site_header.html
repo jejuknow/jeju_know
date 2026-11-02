@@ -1,9 +1,11 @@
+{% from '_brand_links.html' import brand_links %}
 <header class="site-header community-header"><div class="wrap header-inner">
   {{ brand_logo('') }}
-  <nav class="nav" id="siteNav" aria-label="주요 메뉴">
+  <div class="nav" id="siteNav"><nav class="primary-nav" aria-label="주요 메뉴">
     {% for label, href in [('FIND','/find'),('NEW','/new'),('ISSUE','/news'),('MAP','/map'),('BEST','/best')] %}
     <a href="{{ href }}" {% if request.url.path == href or (href == '/best' and request.url.path.startswith('/best/')) %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
+  <nav class="mobile-brand-menu" aria-label="브랜드 소통">{{ brand_links(site_settings) }}</nav></div>
   <button class="nav-toggle" id="navToggle" type="button" aria-label="메뉴 열기" aria-controls="siteNav" aria-expanded="false">☰</button>
 </div></header>

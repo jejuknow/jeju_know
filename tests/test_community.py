@@ -94,7 +94,7 @@ class CommunityTest(unittest.TestCase):
         for path in ('/','/find','/new','/news','/map','/best','/login','/signup','/partnership'):
             page=self.visitor.get(path)
             self.assertEqual(page.status_code,200,path)
-            nav=re.search(r'<nav class="nav" id="siteNav".*?</nav>',page.text,re.S)[0]
+            nav=re.search(r'<nav class="primary-nav" aria-label="주요 메뉴".*?</nav>',page.text,re.S)[0]
             self.assertEqual(re.findall(r'>(FIND|NEW|ISSUE|MAP|BEST)</a>',nav),['FIND','NEW','ISSUE','MAP','BEST'])
             self.assertNotIn('PICK',nav);self.assertNotIn('제휴',nav)
         self.assertEqual(self.visitor.get('/pick',follow_redirects=False).headers['location'],'/map?pick=current')

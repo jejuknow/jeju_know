@@ -1,0 +1,47 @@
+.utility-brand, .utility-account, .footer-brand-links { display:flex; align-items:center; gap:16px }
+.utility-brand { padding-right:16px; border-right:1px solid var(--line) }
+.primary-nav { display:flex; align-items:center; gap:28px }
+.mobile-brand-menu { display:none }
+.brand-footer .footer-inner { align-items:center; flex-wrap:wrap }
+.brand-footer .footer-inner p { margin:6px 0 0 }
+.footer-actions { display:grid; justify-items:end; gap:6px }
+.footer-brand-links { flex-wrap:wrap; column-gap:18px; row-gap:0; font-size:14px; font-weight:700 }
+.footer-brand-links a, .footer-secondary a { display:inline-flex; align-items:center; min-height:36px }
+.footer-secondary { display:flex; flex-wrap:wrap; gap:16px; color:var(--muted); font-size:13px }
+.community-invite { padding-block:18px 56px }
+.community-invite-card, .contact-card { border:1px solid var(--line); border-radius:24px }
+.community-invite-card { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:clamp(22px,4vw,46px); background:#f3f6ff }
+.community-invite h2, .contact-card h1 { font-size:clamp(24px,3vw,34px); line-height:1.3; margin:8px 0 12px }
+.community-invite-card p:not(.kicker), .contact-card > p:not(.kicker):not(.member-error) { color:var(--muted); line-height:1.7 }
+.community-invite-card .primary-inline { flex:none }
+.community-invite-card .primary-inline, .contact-card .primary-inline { min-height:44px }
+.contact-page { padding-block:clamp(24px,5vw,60px) }
+.contact-card { max-width:700px; margin:auto; padding:clamp(20px,4vw,42px); background:white }
+.contact-card > .primary-inline, .contact-form { margin-top:24px }
+.contact-form label { display:grid; gap:6px; min-width:0 }
+.contact-form :is(input,textarea,select) { width:100%; min-width:0 }
+.contact-form .contact-privacy { font-size:14px; color:var(--muted); line-height:1.6 }
+.contact-form .primary-inline { justify-self:start }
+.contact-form button:disabled { opacity:.7 }
+.community-invite-card, .contact-card, .inquiry-message { word-break:keep-all; overflow-wrap:anywhere }
+.inquiry-message { white-space:pre-wrap; line-height:1.7 }
+.inquiry-detail :is(h2, dd) { overflow-wrap:anywhere }
+.inquiry-detail dl { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:8px 18px; margin-block:22px }
+.inquiry-detail dt { font-weight:700 }
+.inquiry-detail dd { margin:0 }
+.inquiry-detail .admin-form { margin-top:24px }
+:is(.utility-brand,.mobile-brand-menu,.footer-actions,.community-invite,.contact-card) :is(a,button):focus-visible { outline:3px solid var(--brand); outline-offset:3px }
+@media(max-width:900px) {
+  .utility-brand { display:none }
+  .community-header .nav.is-open { align-items:stretch; gap:0 }
+  .primary-nav, .mobile-brand-menu { display:flex; flex-direction:column; gap:0; align-items:stretch }
+  .mobile-brand-menu { border-top:1px solid var(--line); margin-top:6px; padding-top:6px }
+  .community-header .nav nav a { display:flex; align-items:center; min-height:44px; padding:8px 0 }
+}
+@media(max-width:700px) {
+  .contact-form :is(input,textarea,select) { font-size:16px }
+  .community-invite-card { flex-direction:column; align-items:flex-start; gap:18px }
+  .community-invite { padding-block:12px 32px }
+  .brand-footer .footer-inner, .footer-actions { align-items:flex-start; justify-items:start }
+  .footer-brand-links a { min-height:44px }
+}

@@ -71,6 +71,7 @@ def counters(conn):
     return dict(total=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE),
                 unverified=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE + " AND source_type='user' AND verification_status='unverified'"),
                 issue_pending=scalar("SELECT count(*) FROM news_posts WHERE author_type='user' AND approval_status='pending' AND deleted_at IS NULL"),
+                unread_inquiries=scalar("SELECT count(*) FROM contact_inquiries WHERE status='unread'"),
                 suggestions=scalar("SELECT count(*) FROM place_correction_suggestions WHERE status='pending'"),
                 new=scalar("SELECT count(*) FROM places p JOIN categories c ON c.id=p.category_id WHERE " + ACTIVE + " AND " + new_sql, new_args),
                 picks=scalar("SELECT count(*) FROM place_pick_periods k JOIN places p ON p.id=k.place_id WHERE " + ACTIVE + " AND k.year=? AND k.month=? AND k.is_active=1", (now.year, now.month)))
@@ -98,6 +99,8 @@ def admin_context(request, conn):
         section, title, active = "콘텐츠 관리", "ISSUE", "issues"
     elif path.startswith("/admin/ads"):
         section, title, active = "콘텐츠 관리", "광고 관리", "ads"
+    elif path.startswith("/admin/inquiries"):
+        section, title, active = "콘텐츠 관리", "문의 관리", "inquiries"
     elif path.startswith("/admin/best"):
         section, title, active = "콘텐츠 관리", "BEST", "best"
     elif path.startswith("/admin/users"):
@@ -118,6 +121,8 @@ def admin_context(request, conn):
         detail = "ISSUE 등록" if path.endswith("/new") else "ISSUE 수정"
     if path.startswith("/admin/ads/"):
         detail = "광고 등록" if path.endswith("/new") else "광고 수정"
+    if path.startswith("/admin/inquiries/"):
+        detail = "문의 상세"
     return {"admin_account": account, "admin_counts": counters(conn), "admin_active": active,
             "admin_section": section, "admin_title": detail or title, "admin_parent_title": title,
             "admin_is_detail": bool(detail), "classification_kinds": {k: v for k, v in KINDS.items() if k != "cafe_focus"}}

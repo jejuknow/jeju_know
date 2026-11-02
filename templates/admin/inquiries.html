@@ -1,0 +1,14 @@
+{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge, pager %}
+{% block admin_content %}
+<section class="admin-panel"><div class="admin-panel-heading"><h2>접수된 문의 <span>{{ pagination.total }}건</span></h2></div>
+  <form method="get" class="admin-filters"><div class="admin-search-row"><label>처리 상태<select name="status"><option value="">전체</option>
+    {% for key,label in statuses.items() %}<option value="{{ key }}" {% if key==current_status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></label><button type="submit" class="secondary-btn">필터 적용</button></div></form>
+  <div class="admin-data-wrap"><table class="admin-data-table"><thead><tr><th>문의 유형</th><th>제목</th><th>이름/닉네임</th><th>이메일</th><th>등록일</th><th>상태</th></tr></thead>
+    <tbody>{% for item in items %}<tr><td data-label="문의 유형">{{ item.inquiry_type }}</td>
+      <td data-label="제목"><a class="admin-title-link" href="/admin/inquiries/{{ item.id }}">{{ item.title }}</a></td>
+      <td data-label="이름/닉네임">{{ item.name }}</td><td data-label="이메일">{{ item.email }}</td>
+      <td data-label="등록일">{{ item.created_at[:10] }}</td><td data-label="상태">{{ badge(statuses[item.status], {'unread':'warning','done':'success'}.get(item.status,'neutral')) }}</td></tr>
+    {% else %}<tr><td colspan="6" class="admin-empty">이 상태의 문의가 없습니다.</td></tr>{% endfor %}</tbody>
+  </table></div>{{ pager(pagination) }}
+</section>{% endblock %}

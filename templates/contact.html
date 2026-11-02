@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body %}
+<main class="wrap contact-page"><section class="contact-card">
+  <p class="kicker">CONTACT</p>
+  {% if sent %}
+    <h1>문의가 등록되었습니다.</h1><p>확인 후 필요한 경우 연락드리겠습니다.</p>
+    <a href="/" class="primary-inline">홈으로 돌아가기 →</a>
+  {% else %}
+    <h1>문의하기</h1><p>광고·제휴, 행사·공간 협업, 홈페이지에 관한 문의나 그 밖의 이야기를 남겨주세요.</p>
+    {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
+    <form class="admin-form contact-form" method="post" action="/contact">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="form_token" value="{{ form_token }}">
+      <label>문의 유형 (필수)<select name="inquiry_type" required><option value="">선택해주세요</option>
+        {% for kind in types %}<option {% if values.inquiry_type == kind %}selected{% endif %}>{{ kind }}</option>{% endfor %}</select></label>
+      <label>이름 또는 닉네임 (필수)<input name="name" required maxlength="{{ limits.name }}" value="{{ values.name }}"></label>
+      <label>이메일 (필수)<input type="email" name="email" required autocomplete="email" maxlength="{{ limits.email }}" value="{{ values.email }}"></label>
+      <label>연락처 (선택)<input type="tel" name="phone" autocomplete="tel" maxlength="{{ limits.phone }}" value="{{ values.phone }}"></label>
+      <label>제목 (필수)<input name="title" required maxlength="{{ limits.title }}" value="{{ values.title }}"></label>
+      <label>문의 내용 (필수)<textarea name="content" required rows="6" maxlength="{{ limits.content }}">{{ values.content }}</textarea></label>
+      <p class="contact-privacy">입력한 내용은 공개되지 않으며, 담당자가 문의를 확인하고 답변하는 데 사용합니다.</p>
+      <button class="primary-inline" type="submit">문의 등록하기</button>
+    </form>
+  {% endif %}
+</section></main>
+{% endblock %}
+{% block scripts %}{% if not sent %}<script src="/static/contact.js" defer></script>{% endif %}{% endblock %}
