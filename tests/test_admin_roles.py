@@ -74,6 +74,8 @@ class AdminRoleTests(unittest.TestCase):
             response=self.sub.get(path,follow_redirects=False)
             self.assertEqual(response.status_code,200,path)
             self.assertNotIn('href="/admin/admins"',response.text)
+        self.assertNotIn('href="/admin/categories"',self.sub.get("/admin/places/new").text)
+        self.assertIn('href="/admin/categories"',self.owner.get("/admin/places/new").text)
         for path in ("/admin/admins","/admin/admins/new",f"/admin/admins/{self.target}/edit","/admin/admin-logs",
                      "/admin/settings/general","/admin/classifications/region","/admin/imports"):
             self.assertEqual(self.sub.get(path,follow_redirects=False).status_code,403,path)

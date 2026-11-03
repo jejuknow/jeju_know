@@ -71,7 +71,7 @@ def register_admin_accounts(app, templates, db, csrf, flash, secret):
     def authorized(request: Request):
         denied = require_admin(request)
         if denied:
-            raise HTTPException(denied.status_code, "관리자 권한이 필요합니다.",
+            raise HTTPException(denied.status_code, "이 기능은 슈퍼관리자만 사용할 수 있습니다." if denied.status_code == 403 else "관리자 로그인이 필요합니다.",
                                 headers={"Location":denied.headers["location"]} if "location" in denied.headers else None)
 
     router = APIRouter(prefix="/admin", dependencies=[Depends(authorized)])
