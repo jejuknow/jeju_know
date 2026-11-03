@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 from auth_security import safe_external_url
 from community_migrations import today
 from place_details import BASIC_INFO_LIMITS, validate_detail_value
+from user_status import place_review
 
 FACT_LIMITS = {"name": 120, "region": 40, "address": 300, "one_line": 600,
                "map_url": 2000, "website_url": 2000, **BASIC_INFO_LIMITS}
@@ -115,7 +116,8 @@ def decorate_facts(conn, place):
     place["is_pick"] = bool(period)
     place["pick_note"] = period["pick_note"] if period else ""
     place["pick_order"] = period["sort_order"] if period else 0
-    place["status_label"] = ("사용자 등록 · " if place["source_type"] == "user" else "JEJU_KNOW 등록 · ") + VERIFICATION_LABELS.get(place["verification_status"], "미확인")
+    status = place_review(place["source_type"], place["verification_status"])
+    place["status_label"], place["status_tone"] = status
     place["opening_label"] = (f'{place["opened_year"]}년' + (f' {place["opened_month"]}월' if place["opened_month"] else "") + " 오픈") if place["opened_year"] else ""
     return place
 

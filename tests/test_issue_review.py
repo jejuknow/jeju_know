@@ -43,6 +43,7 @@ class IssueReviewTest(unittest.TestCase):
         for url in (slug_url,poster):
             self.assertEqual(self.visitor.get(url).status_code,404)
         self.assertIn("검토 대기",self.member.get("/account").text)
+        self.assertIn('>검토 대기</span>',self.member.get("/issues/submitted").text)
         admin_dash=self.admin.get("/admin")
         self.assertEqual(admin_dash.context["admin_counts"]["issue_pending"],1)
         self.assertIn(row["title"],self.admin.get("/admin/issues?status=pending").text)
@@ -55,6 +56,9 @@ class IssueReviewTest(unittest.TestCase):
         page=self.visitor.get("/news",params={"period":"today","region":"애월","category":"exhibitions","q":"검토한"})
         self.assertEqual(page.context["map_count"],1)
         self.assertIn("검토한 전시",page.text)
+        self.assertIn('data-badge>진행중 · 오늘까지</span>', page.text)
+        self.assertIn('data-badge>진행중 · 오늘까지</span>', self.visitor.get(slug_url).text)
+        self.assertNotIn("승인·공개",page.text)
         self.assertIn(slug_url,self.visitor.get("/sitemap.xml").text)
         self.assertIn("검토한 전시",self.visitor.get("/").text)
         self.assertEqual(self.visitor.get(poster).status_code,200)

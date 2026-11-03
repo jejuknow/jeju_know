@@ -143,6 +143,7 @@ class ContactTests(unittest.TestCase):
         self.assertEqual(b.get(detail).content,b.get("/account/inquiries/987654").content)
         self.assertEqual(self.visitor.get(detail,follow_redirects=False).status_code,303)
         before=a.get(detail).text
+        self.assertIn('>접수</span>', before)
         self.assertNotIn("JEJU_KNOW 답변",before)
         self.assertIn('href="/news/one"',before)
         self.login()
@@ -169,6 +170,15 @@ class ContactTests(unittest.TestCase):
         self.assertIn("종료",a.get("/account").text)
         self.assertEqual(a.get(url).status_code,200)
         self.assertNotIn('href="/news/one"',a.get(detail).text)
+        # Simulate a historical value without weakening the production constraint.
+        with closing(sqlite3.connect(self.db)) as conn, conn:
+            conn.execute('PRAGMA ignore_check_constraints=ON')
+            conn.execute("UPDATE contact_inquiries SET status='legacy_unknown' WHERE id=1")
+        for path in (detail, '/account/inquiries', '/account'):
+            page = a.get(path)
+            self.assertEqual(page.status_code, 200)
+            self.assertIn('>상태 확인 필요</span>', page.text)
+            self.assertNotIn('legacy_unknown', page.text)
 
     def test_guest_and_generic_member_ownership(self):
         a, aid = self.member("sender")

@@ -1,0 +1,7 @@
+{% macro badge(value) -%}
+<span class="user-badge tone-{{ value.tone }}">{{ value.label }}</span>
+{%- endmacro %}
+
+{% macro schedule_badge(item) -%}
+<span class="user-badge tone-{{ user_status.SCHEDULE[item.schedule_key].tone }}" data-badge>{{ item.event_status }}{% if item.date_badge != item.event_status %} · {{ item.date_badge }}{% endif %}</span>
+{%- endmacro %}

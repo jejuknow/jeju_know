@@ -3,7 +3,7 @@
 {% block title %}제주 이슈 {{ '수정' if item and item.id else '등록' }} | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
-<main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>{{ '검토 대기 ISSUE 수정' if item and item.id else '제주 ISSUE 알려주기' }}</h1><p>제주에서 열리는 행사·축제·전시·팝업·체험 또는 지역소식을 알려주세요. 등록된 내용은 JEJU_KNOW 확인 후 공개됩니다.</p></div></div>
+<main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>{{ user_status.WAITING.label ~ ' ISSUE 수정' if item and item.id else '제주 ISSUE 알려주기' }}</h1><p>제주에서 열리는 행사·축제·전시·팝업·체험 또는 지역소식을 알려주세요. 등록된 내용은 JEJU_KNOW 확인 후 공개됩니다.</p></div></div>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
 {% if duplicates %}<aside class="form-card duplicate-warning"><strong>비슷한 ISSUE가 이미 등록되어 있습니다.</strong>{% for d in duplicates %}<p><a href="/news/{{ d.slug }}" target="_blank" rel="noopener">{{ d.title }} · {{ d.event_start }} ~ {{ d.event_end }}</a></p>{% endfor %}</aside>{% endif %}
 <form class="admin-form place-form" data-member-issue-form method="post" enctype="multipart/form-data" action="{{ '/issues/' ~ item.id ~ '/edit' if item and item.id else '/issues/new' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -24,4 +24,4 @@
 </form></main>
 {% endblock %}
 
-{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/admin-location.js"></script><script src="/static/issue-schedule.js?v=review"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/admin-location.js"></script><script src="/static/issue-schedule.js?v=20261103-labels"></script>{% endblock %}

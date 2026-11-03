@@ -14,6 +14,7 @@ from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_passwo
 from community_places import coordinates
 from issue_review import candidates, submission_error, has_poster
 from member_activity import register_activity_routes
+from user_status import WAITING
 from fastapi import HTTPException
 from image_uploads import ImagePlan, ImageError
 
@@ -247,7 +248,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         if post["author_type"] != "user" or post["author_id"] != current_user(request)["id"]:
             return None, HTMLResponse("본인의 게시물만 관리할 수 있습니다.", status_code=403)
         if post["approval_status"] != "pending":
-            return None, HTMLResponse("검토 대기 중인 ISSUE만 수정하거나 취소할 수 있습니다.", status_code=403)
+            return None, HTMLResponse(f"{WAITING.label} 중인 ISSUE만 수정하거나 취소할 수 있습니다.", status_code=403)
         return post, None
 
     @app.get("/issues/new", response_class=HTMLResponse)
@@ -325,7 +326,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         except ImageError as exc:
             return problem(str(exc))
         if post:
-            flash(request, "검토 대기 중인 ISSUE를 수정했습니다.")
+            flash(request, f"{WAITING.label} 중인 ISSUE를 수정했습니다.")
             return redirect("/account/issues")
         return redirect("/issues/submitted")
 

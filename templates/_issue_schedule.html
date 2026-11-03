@@ -7,7 +7,7 @@
     <label>종료시간 <small>선택</small><input type="time" name="end_time" value="{{ p.get('end_time','') }}"></label>
   </div>
   <p class="form-help">하루 행사라면 같은 날짜를 선택하세요. 종료일 당일까지 탐색 목록에 표시됩니다.</p>
-  <p role="status" id="issueScheduleStatus" data-today="{{ issue_today }}">현재 상태 · {{ p.get('event_status','일정 미등록') }}</p>
+  <p role="status" id="issueScheduleStatus" data-today="{{ issue_today }}" {% for key,value in user_status.SCHEDULE.items() %}data-{{ key }}="{{ value.label }}"{% endfor %}>현재 상태 · {{ p.get('event_status',user_status.SCHEDULE.undated.label) }}</p>
 </section>
 <section class="form-card"><h2>위치</h2><div class="form-grid two">
   <label>지역{{ " *" if member_form else "" }}<select name="region" {% if member_form %}required{% endif %}><option value="">{{ "지역 선택" if member_form else "지역 미지정" }}</option>{% for value in active_regions %}<option value="{{ value }}" {% if p.get('region')==value %}selected{% endif %}>{{ region_labels.get(value,value) }}</option>{% endfor %}{% if p.get('region') and p.region not in active_regions %}<option selected>{{ p.region }}</option>{% endif %}</select></label>

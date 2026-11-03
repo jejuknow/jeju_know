@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from community_migrations import today
+from user_status import SCHEDULE
 
 # Preserve the stored labels and accept both separators in old links and records.
 LABELS = {"events": "행사•축제", "exhibitions": "전시•팝업", "activities": "체험•교육",
@@ -50,19 +51,20 @@ def schedule(item, day):
         if end < start:
             raise ValueError
     except (ValueError, TypeError):
-        return {"event_status": "일정 미등록", "date_badge": "일정 미등록", "date_label": "일정 미등록"}
+        missing = SCHEDULE["undated"].label
+        return {"schedule_key": "undated", "event_status": missing, "date_badge": missing, "date_label": missing}
     fmt = "%Y.%m.%d" if start.year != end.year or start.year != day.year else "%m.%d"
     label = start.strftime(fmt)
     if start != end:
         label += " - " + end.strftime(fmt)
     if day < start:
-        status, badge = "예정", f"D-{(start-day).days}"
+        key, badge = "upcoming", f"D-{(start-day).days}"
     elif day > end:
-        status = badge = "종료"
+        key, badge = "ended", SCHEDULE["ended"].label
     else:
-        status = "진행중"
-        badge = "오늘까지" if end == day else "오늘 시작" if start == day else status
-    return {"event_status": status, "date_badge": badge, "date_label": label}
+        key = "ongoing"
+        badge = "오늘까지" if end == day else "오늘 시작" if start == day else SCHEDULE[key].label
+    return {"schedule_key": key, "event_status": SCHEDULE[key].label, "date_badge": badge, "date_label": label}
 
 
 def browse(conn, query, day):

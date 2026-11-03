@@ -4,6 +4,7 @@
 {% block body_class %}place-detail-body{% endblock %}
 {% block body %}
 <main class="detail-page wrap">
+  {% include '_flashes.html' %}
   <a class="text-btn" href="/find">← FIND에서 장소 찾기</a>
   <article class="detail-shell">
     <div class="detail-media">
@@ -14,7 +15,7 @@
     <div class="detail-content">
       <p class="compact-place-meta">{{ region_labels.get(place.region,place.region) }} · {{ place.category }}{% if place.restaurant_label %} · {{ place.restaurant_label }}{% endif %}</p>
       <h1 class="detail-title">{{ place.name }}</h1>
-      <div class="meta-row"><span class="badge {{ 'primary' if place.verification_status == 'jejuno_verified' else '' }}">{{ 'JEJU_KNOW 확인' if place.verification_status == 'jejuno_verified' else place.status_label }}</span>{% if place.is_new %}<span class="badge">NEW</span>{% endif %}{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
+      <div class="meta-row"><span class="user-badge tone-{{ place.status_tone }}">{{ place.status_label }}</span>{% if place.is_new %}<span class="badge">NEW</span>{% endif %}{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
       {% if place.one_line %}<p class="detail-lead">{{ place.one_line }}</p>{% endif %}
       {% if place.detail_features or place.companions %}<section class="detail-section detail-highlights" aria-label="핵심 특징">

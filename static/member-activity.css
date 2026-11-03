@@ -23,8 +23,6 @@
 .activity-entry-head>div:first-child,.activity-feed li>div:first-child{min-width:0}
 .activity-entry .row-actions,.activity-entry>.mini-btn{margin-top:8px}
 .activity-badges{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
-.activity-badge{font-size:12px;font-weight:700;border-radius:999px;padding:4px 9px;white-space:nowrap;line-height:1.5}
-.tone-neutral{background:#edf0f5;color:#49566b}.tone-positive{background:#e4f5ea;color:#216342}.tone-brand{background:#eaf0ff;color:#28499b}.tone-attention{background:#fff0e5;color:#894012}
 .suggestion-diff{display:grid;gap:8px;margin:12px 0}.suggestion-diff div{display:flex;gap:12px}.suggestion-diff dt{font-size:13px;font-weight:700;color:var(--muted)}.suggestion-diff dd,.activity-note{margin:0;white-space:pre-wrap;line-height:1.6}
 .activity-pages,.new-inquiry{margin-top:12px}
 .activity-page .account-withdraw{border-top:2px solid var(--line)}

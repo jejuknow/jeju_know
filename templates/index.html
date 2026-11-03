@@ -2,6 +2,7 @@
 {% from "_home_banner.html" import banner %}
 {% block title %}JEJU_KNOW | 제주를 아는 사람의 제주 기록{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/home.css?v=20261102-banners">{% endblock %}
+{% from '_user_status.html' import schedule_badge %}
 {% block body %}
 <main id="top">
   {% if banners.get('SIDE-01') %}<aside class="sponsor-rail" aria-label="홈 우측 {{ banners['SIDE-01'].label }}">
@@ -62,7 +63,7 @@
         <a href="{{ url_for('news_detail', slug=item.slug) }}" class="news-card-link">
           <div class="news-thumb {% if item.image_url %}has-image{% endif %}" {% if item.image_url %}style="background-image:url('{{ item.image_url }}')"{% endif %}>
             {% if not item.image_url %}<span>{{ '🎪' if item.category == news_category_labels.events else '📰' }}</span>{% endif %}
-            <div class="news-overlay-badges"><span class="news-category">{{ item.category_label }}</span>{% if item.is_promoted %}<span class="sponsor-badge">홍보·제휴</span>{% elif item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div>
+            <div class="news-overlay-badges">{{ schedule_badge(item) }}<span class="news-category">{{ item.category_label }}</span>{% if item.is_promoted %}<span class="sponsor-badge">홍보·제휴</span>{% elif item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div>
           </div>
           <div class="news-card-body">
             <p class="issue-author">{{ item.author_label }} · {{ item.author_name }}</p><div class="news-date">{{ item.date_label if item.event_start else '등록 ' ~ item.created_at[:10] }}{% if item.venue %} · {{ item.venue }}{% endif %}</div>
@@ -97,4 +98,4 @@
   </section>
 </main>
 {% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261028-public"></script><script src="/static/home-cards.js?v=20261028-public"></script><script src="/static/app.js?v=20261029-analytics"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261028-public"></script><script src="/static/home-cards.js?v=20261103-labels"></script><script src="/static/app.js?v=20261029-analytics"></script>{% endblock %}

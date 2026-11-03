@@ -13,8 +13,9 @@
     end.setCustomValidity(invalid ? '종료일은 시작일 이후 날짜를 선택해주세요.' : expired ? '이미 종료된 ISSUE는 등록할 수 없습니다.' : '');
     end.min = memberDatesRequired && (!a || a < today) ? today : a || '';
     const days = a && Math.round((Date.parse(a) - Date.parse(today)) / 86400000);
-    const label = invalid ? end.validationMessage : !a || !b ? '일정 미등록'
-      : today < a ? '예정 D-' + days : today > b ? '종료' : '진행중';
+    const labels = status.dataset;
+    const label = invalid ? end.validationMessage : !a || !b ? labels.undated
+      : today < a ? labels.upcoming + ' D-' + days : today > b ? labels.ended : labels.ongoing;
     status.textContent = '현재 상태 · ' + label;
   }
   form.addEventListener('input', update);

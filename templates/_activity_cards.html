@@ -1,7 +1,6 @@
+{% from '_user_status.html' import badge %}
 {% macro badges(labels) -%}
-<div class="activity-badges">{% for label in labels %}
-  {% set tone = 'positive' if label in ('공개','승인·공개','진행중','반영','처리완료') else 'brand' if label in ('JEJU_KNOW 확인','승인','확인중','예정') else 'attention' if label in ('반려','보완 필요') else 'neutral' %}
-  <span class="activity-badge tone-{{ tone }}">{{ label }}</span>{% endfor %}</div>
+<div class="activity-badges">{% for value in labels %}{{ badge(value) }}{% endfor %}</div>
 {%- endmacro %}
 
 {% macro activity_card(i,tab) -%}

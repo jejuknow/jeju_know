@@ -17,6 +17,7 @@ from public_seo import page_metadata, place_metadata, issue_metadata, sitemap, p
 from new_visibility import new_clause
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
+import user_status
 from place_migrations import backup_before_migration, migrate_place_categories
 from place_detail_migrations import backup_before_place_detail_migration, migrate_place_details
 from place_details import parse_details, validate_details, save_details, decorate_details, COFFEE_OPTIONS, WAITING_OPTIONS
@@ -200,6 +201,7 @@ def create_app(test_config=None):
         }
 
     templates = Jinja2Templates(directory=BASE_DIR / "templates", context_processors=[context_processor])
+    templates.env.globals["user_status"] = user_status
 
     def connect_db():
         conn = sqlite3.connect(app.state.database, timeout=30)

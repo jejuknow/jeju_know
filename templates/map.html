@@ -16,7 +16,7 @@
     <section class="map-canvas-panel" aria-label="제주 장소 지도">
       <div id="kakaoMap" aria-label="장소 위치 지도"></div>
       <div class="map-canvas-actions"><button id="mapFit" class="map-fit" type="button" disabled>장소 전체 범위</button><a id="mapRegisterLink" class="primary-inline" href="/map/register">+ 장소 알려주기</a>
-        <details class="map-legend" id="mapLegend"><summary>마커 안내</summary><ul aria-label="지도 마커 상태 안내"><li><span class="map-legend-symbol map-status--unverified" aria-hidden="true"><span class="map-pin-shape">●</span></span>일반 등록 · 확인 전</li><li><span class="map-legend-symbol map-status--verified" aria-hidden="true"><span class="map-pin-shape">✓</span></span>JEJU_KNOW 확인</li><li><span class="map-legend-symbol map-status--pick" aria-hidden="true"><span class="map-pin-shape">★</span></span>JEJU_KNOW PICK</li></ul></details>
+        <details class="map-legend" id="mapLegend"><summary>마커 안내</summary><ul aria-label="지도 마커 상태 안내"><li><span class="map-legend-symbol map-status--unverified" aria-hidden="true"><span class="map-pin-shape">●</span></span>{{ user_status.EDITORIAL.label }} / {{ user_status.WAITING.label }}</li><li><span class="map-legend-symbol map-status--verified" aria-hidden="true"><span class="map-pin-shape">✓</span></span>{{ user_status.VERIFIED.label }}</li><li><span class="map-legend-symbol map-status--pick" aria-hidden="true"><span class="map-pin-shape">★</span></span>JEJU_KNOW PICK</li></ul></details>
       </div>
       <p id="mapNotice" class="map-notice" role="status">지도를 불러오고 있어요.</p>
       <aside id="mapSelected" class="map-selected" aria-label="선택한 장소" hidden></aside>
@@ -26,4 +26,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/map.js?v=20261028-public"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/map.js?v=20261103-labels"></script>{% endblock %}

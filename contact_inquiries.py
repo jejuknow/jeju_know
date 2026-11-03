@@ -23,7 +23,6 @@ from sqlite_migrations import verified_migration
 CONTENT_REQUEST = "콘텐츠 수정·삭제"
 TYPES = ("광고·제휴", "행사·공간 협업", "홈페이지 관련", CONTENT_REQUEST, "기타")
 STATUSES = {"unread": "미확인", "read": "확인", "done": "처리완료"}
-MEMBER_STATUSES = {"unread": "접수", "read": "확인중", "done": "처리완료"}
 LIMITS = {"name": 60, "email": 254, "phone": 40, "title": 160, "content": 5000}
 InquiryID = Annotated[int, Path(ge=1, le=2**63-1)]
 
@@ -203,7 +202,7 @@ def register_contact_routes(app, templates, connect_db, guard, csrf, flash, secr
                 raise HTTPException(404, "문의를 찾을 수 없습니다.")
             item = unpack(row, cipher(), detail=True)
             issue = related_issue(conn, row, item)
-        return render(request, "member_inquiry.html", item=item, issue=issue, inquiry_labels=MEMBER_STATUSES)
+        return render(request, "member_inquiry.html", item=item, issue=issue)
 
     @app.get("/admin/inquiries")
     def inquiry_list(request: Request):

@@ -23,7 +23,9 @@
     box.append(close);
     for (const [tag, selector] of [['small','[data-category]'],['strong','h3'],['span','[data-dates]'],['small','[data-badge]']]) {
       const element = document.createElement(tag);
-      element.textContent = card.querySelector(selector).textContent;
+      const source = card.querySelector(selector);
+      element.textContent = source.textContent;
+      if (selector === '[data-badge]') element.className = source.className;
       box.append(element);
     }
     const link = document.createElement('a');

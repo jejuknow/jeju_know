@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
+{% from '_user_status.html' import badge %}
 {% block title %}내 문의 상세 | JEJU_KNOW{% endblock %}
 {% block body %}
 <main class="wrap contact-page"><article class="contact-card member-inquiry">
   <a class="text-btn" href="/account/inquiries">← 내 문의 목록</a>
   <p class="kicker">MY JEJU_KNOW</p><h1>{{ item.title }}</h1>
-  <p>{{ item.inquiry_type }} · <time>{{ item.created_at }}</time> · <span class="inquiry-status" data-status="{{ item.status }}">{{ inquiry_labels[item.status] }}</span></p>
+  <p>{{ item.inquiry_type }} · <time>{{ item.created_at }}</time> · {{ badge(user_status.INQUIRY.get(item.status, user_status.UNKNOWN)) }}</p>
   {% if issue %}<p class="inquiry-related">관련 ISSUE: <strong>{{ issue.title }}</strong>
     {% if issue.slug %}<a class="text-btn" href="/news/{{ issue.slug }}">ISSUE 보기 →</a>{% else %}<small>현재 공개 페이지에서 볼 수 없는 ISSUE입니다.</small>{% endif %}</p>{% endif %}
   <h2>문의 내용</h2><p class="inquiry-message">{{ item.content }}</p>

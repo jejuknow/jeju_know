@@ -9,10 +9,9 @@
   // Only explicit editorial verification earns a blue marker, regardless of author.
   function placeStatus(place) {
     if(place.is_pick===true||place.is_pick===1)return {key:'pick',symbol:'★',label:'JEJU_KNOW PICK'};
-    if(place.verification_status==='jejuno_verified')return {key:'verified',symbol:'✓',label:'JEJU_KNOW 확인'};
-    const source=place.source_type==='user'?'사용자 등록':'JEJU_KNOW 등록';
-    const verification='미확인';
-    return {key:'unverified',symbol:'●',label:`${source} · ${verification}`};
+    const label=place.status_label || '상태 확인 필요';
+    if(place.verification_status==='jejuno_verified')return {key:'verified',symbol:'✓',label};
+    return {key:'unverified',symbol:'●',label};
   }
   function makeStatusBadge(place,doc) {
     const status=placeStatus(place),badge=doc.createElement('span');

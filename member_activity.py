@@ -10,7 +10,8 @@ from admin_ui import integer
 from auth_security import current_user
 from community_migrations import today
 from community_places import SUGGESTION_FIELDS, editable
-from contact_inquiries import MEMBER_STATUSES, cipher, kst_time, unpack
+from contact_inquiries import cipher, kst_time, unpack
+import user_status as status
 from issue_discovery import public_where, schedule
 from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal
 
@@ -27,7 +28,6 @@ SCOPES = {
 TABS = {"all": "전체 활동", "places": "내 장소", "issues": "내 ISSUE", "suggestions": "수정 제안", "inquiries": "내 문의"}
 CARDS = {"places": "등록 장소", "issues": "제주 ISSUE", "suggestions": "수정 제안", "inquiries": "내 문의"}
 KINDS = {"places": "장소 등록", "issues": "ISSUE 등록", "suggestions": "수정 제안", "inquiries": "문의"}
-SUGGESTION_STATUS = {"pending": "검토 대기", "accepted": "반영", "rejected": "반려"}
 PAGE_SIZE = 10
 RECENT_LIMIT = 8
 
@@ -79,28 +79,25 @@ def activity_rows(conn, section, uid, day: date, limit, offset=0, *, recent=Fals
         if section == "places":
             shown = bool(r["published"] and not r["merged_into_id"])
             title = r["name"]
-            labels = ["JEJU_KNOW 확인" if r["verification_status"] == "jejuno_verified" else "검토 대기",
-                      "공개" if shown else "비공개"]
+            labels = [status.place_review(r["source_type"], r["verification_status"]), status.VISIBILITY[shown]]
             item.update(visible=shown, can_edit=editable(r, uid))
             if shown:
                 link = "/place/" + r["slug"]
         elif section == "issues":
             item.update(schedule(item, day))
             title = r["title"]
-            approval = {"pending": "검토 대기", "rejected": "반려", "approved": (
-                "승인·공개" if r["visible"] else "승인" if item["event_status"] == "종료" else "승인·비공개")}
-            labels = [approval[r["approval_status"]], item["event_status"]]
+            labels = [status.issue_approval(r["approval_status"], r["visible"]), status.SCHEDULE[item["schedule_key"]]]
             if r["visible"]:
                 link = "/news/" + r["slug"]
         elif section == "suggestions":
-            title, labels = r["place_name"], [SUGGESTION_STATUS[r["status"]]]
+            title, labels = r["place_name"], [status.CORRECTION.get(r["status"], status.UNKNOWN)]
             if not recent:
                 item.update(field_label=DETAIL_LABEL if r["field"] == DETAIL_FIELD else SUGGESTION_FIELDS.get(r["field"],"기타"),
                             before=suggestion_value(conn,r["field"],r["original_value"]),
                             after=suggestion_value(conn,r["field"],r["new_value"]))
         else:
             # Only decrypt after SQL has checked ownership; never expose the body in the feed.
-            title, labels = unpack(r, box)["title"], [MEMBER_STATUSES[r["status"]]]
+            title, labels = unpack(r, box)["title"], [status.INQUIRY.get(r["status"], status.UNKNOWN)]
             link = f"/account/inquiries/{r['id']}"
         result.append(dict(item, title=title, labels=labels, kind=KINDS[section], href=link,
                            activity_date=kst_time(r["activity_time"]), registered=kst_time(r["created_at"])[:10]))

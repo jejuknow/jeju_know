@@ -112,7 +112,10 @@ class CommunityTest(unittest.TestCase):
     def test_03_create_immediate_public_unverified_not_recommended(self):
         p=self.place()
         result=self.api()[0]
-        self.assertEqual(result['status_label'],'사용자 등록 · 미확인')
+        self.assertEqual(result['status_label'],'검토 대기')
+        mine=self.member.get('/place/'+p['slug']).text
+        self.assertIn('현재 상태: 검토 대기',mine)
+        self.assertIn('>검토 대기</span>',mine)
         self.assertFalse(result['is_pick']);self.assertEqual(p['reason'],'')
         self.assertEqual(self.rows('SELECT * FROM best_collection_places'),[])
         for key in ('parking_status','pet_status','child_status','accessible_status'): self.assertEqual(p[key],'미확인')
@@ -471,7 +474,7 @@ class CommunityTest(unittest.TestCase):
         for query in ('?category=food&region=애월&detail=food-western','?new=current&category=food'):
             results=self.api(query)
             self.assertEqual([item['id'] for item in results],[p['id']])
-            self.assertEqual(results[0]['status_label'],'사용자 등록 · 미확인')
+            self.assertEqual(results[0]['status_label'],'검토 대기')
             self.assertEqual(results[0]['latitude'],33.45)
             self.assertFalse(results[0]['is_pick'])
         self.assertEqual(self.visitor.get('/place/'+p['slug']).status_code,200)

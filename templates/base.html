@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="/static/navigation-icons.css?v=20261027-3d-icons">
   <link rel="stylesheet" href="/static/public-ux.css?v=20261028">
   <link rel="stylesheet" href="/static/brand-contact.css?v=20261102-my-inquiries">
+  {% if not request.url.path.startswith('/admin') %}<link rel="stylesheet" href="/static/user-status.css?v=1">{% endif %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% include '_site_header.html' %}{% endif %}

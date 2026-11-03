@@ -16,6 +16,7 @@ from community_migrations import today
 from place_details import validate_detail_value
 from public_seo import collection_metadata
 from cafe_features import FIELDS as CAFE_FIELDS, parse_member_features, combine_proposals
+from user_status import WAITING
 from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
                               duplicates, editable, facts, merge_places, opening)
 from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
@@ -161,7 +162,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if not place:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         if not editable(place, current_user(request)["id"]):
-            return HTMLResponse("본인이 등록한 미확인 장소만 수정할 수 있습니다. 확인된 장소는 수정 제안을 이용해주세요.", status_code=403)
+            return HTMLResponse(f"직접 등록한 ‘{WAITING.label}’ 장소만 수정할 수 있습니다. 확인된 장소는 정보 바로잡기를 이용해주세요.", status_code=403)
         return place_form(request, {**row_to_place(place), "term_ids": [], "approved_term_ids": term_ids, "cafe_feature_ids": []})
 
     async def save_submission(request, place_id=None):
@@ -181,7 +182,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         with closing(connect_db()) as conn:
             existing = get_place(conn, place_id) if place_id else None
             if place_id and (not existing or not editable(existing, user_id)):
-                return HTMLResponse("본인의 미확인 장소만 수정할 수 있습니다.", status_code=403)
+                return HTMLResponse(f"직접 등록한 ‘{WAITING.label}’ 장소만 수정할 수 있습니다.", status_code=403)
             try:
                 normalized = normalize_controls(form)
                 allowed_regions = [i['value'] for i in catalog(conn, 'region')]
@@ -237,7 +238,8 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 save_links(conn, place_id, restaurant_ids)
             queue_proposal(conn, get_place(conn, place_id), user_id, proposal)
             plan.apply(conn, place_id)
-        flash(request, "장소를 저장했습니다. 사용자 등록 · 미확인으로 표시됩니다." + (" 세부 정보는 관리자 확인을 기다리고 있습니다." if proposal else ""))
+        message = "장소 수정사항을 저장했습니다." if fresh else "장소가 등록되어 공개되었습니다."
+        flash(request, f"{message} 현재 상태: {WAITING.label}." + (" 세부 정보는 관리자 확인 후 반영됩니다." if proposal else ""))
         return redirect("/place/" + slug)
 
     @app.post("/map/register")
@@ -259,7 +261,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             conn.execute("BEGIN IMMEDIATE")
             place = get_place(conn, place_id)
             if not place or not editable(place, current_user(request)["id"]):
-                return HTMLResponse("본인의 미확인 장소만 삭제할 수 있습니다.", status_code=403)
+                return HTMLResponse(f"직접 등록한 ‘{WAITING.label}’ 장소만 삭제할 수 있습니다.", status_code=403)
             # Soft delete retains history/photos/relations for administrator recovery.
             conn.execute("UPDATE places SET published=0,deleted_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?", (place_id,))
         flash(request, "장소를 삭제했습니다. 공개 화면에서 더 이상 표시되지 않습니다.")

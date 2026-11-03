@@ -1,0 +1,6 @@
+/* Shared by member activity, public cards, and registration receipts. */
+.user-badge{display:inline-block;align-self:start;justify-self:start;width:max-content;max-width:100%;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:700;line-height:1.5;white-space:nowrap}
+.user-badge.tone-neutral{background:#edf0f5;color:#49566b}
+.user-badge.tone-positive{background:#e4f5ea;color:#216342}
+.user-badge.tone-brand{background:#eaf0ff;color:#28499b}
+.user-badge.tone-attention{background:#fff0e5;color:#894012}
