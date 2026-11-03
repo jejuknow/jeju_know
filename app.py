@@ -522,7 +522,7 @@ def create_app(test_config=None):
             "address": str(form.get("address", "")).strip(),
             "map_url": str(form.get("map_url", "")).strip(),
             "info_source": str(form.get("info_source", "")).strip(),
-            "checked_at": str(form.get("checked_at", "")).strip(),
+            "checked_at": existing["checked_at"] if existing else str(form.get("checked_at", "")).strip(),
             "is_example": 1 if form.get("is_example") == "1" else 0,
             "published": 1 if form.get("published") == "1" else 0,
             "opened_year": form.get("opened_year", existing["opened_year"] if existing else None),
@@ -1238,7 +1238,7 @@ def create_app(test_config=None):
         error = validate_place(data, existing)
         if error:
             flash(request, error, "error")
-            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": data, "mode": "edit", **form_options(existing["category_id"])}, status_code=400)
+            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": place_id}, "mode": "edit", **form_options(existing["category_id"])}, status_code=400)
         try:
             plan = await image_store.prepare(form, "places")
         except ImageError as exc:
@@ -1251,7 +1251,7 @@ def create_app(test_config=None):
                     slug=?, name=?, region=?, category=?, emoji=?, image_url=?, is_pick=?,
                     companions=?, features=?, parking_status=?, pet_status=?, child_status=?,
                     accessible_status=?, one_line=?, note=?, address=?, map_url=?,
-                    info_source=?, checked_at=?, is_example=?, published=?, updated_at=?, category_id=?, latitude=?, longitude=?
+                    info_source=?, is_example=?, published=?, updated_at=?, category_id=?, latitude=?, longitude=?
                 WHERE id=?
                 """,
                 (
@@ -1259,7 +1259,7 @@ def create_app(test_config=None):
                     data["is_pick"], json.dumps(data["companions"], ensure_ascii=False),
                     json.dumps(data["features"], ensure_ascii=False), data["parking_status"], data["pet_status"],
                     data["child_status"], data["accessible_status"], data["one_line"], data["note"],
-                    data["address"], data["map_url"], data["info_source"], data["checked_at"], data["is_example"],
+                    data["address"], data["map_url"], data["info_source"], data["is_example"],
                     data["published"], datetime.now(timezone.utc).isoformat(timespec="seconds"), data["category_id"], data["latitude"], data["longitude"], place_id,
                 ),
             )

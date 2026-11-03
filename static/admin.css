@@ -41,3 +41,9 @@
 }
 .admin-account .admin-self-link{display:inline-block;color:var(--brand);font-size:12px;font-weight:700;margin-top:4px}
 .admin-account strong,.admin-account small{overflow-wrap:anywhere}
+
+/* Keep the two review queues equal, including below the admin sidebar breakpoint. */
+.admin-freshness-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.admin-freshness-summary .admin-summary-card{display:flex;grid-column:auto}
+#freshness .admin-editor-body>p:first-child{margin-top:0}
+#confirmInformation{display:flex;align-items:center;gap:10px;flex-wrap:wrap}

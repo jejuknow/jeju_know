@@ -8,11 +8,12 @@ from contextlib import closing
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from issue_discovery import VALID_DATES
 from admin_settings import catalog, catalog_usage, read_settings, write_setting, DEFAULTS
 from auth_security import current_user, safe_external_url
 from community_migrations import today
+from place_freshness import CHECK_DATE, NEVER, STALE, freshness_counts, six_month_cutoff
 from new_visibility import new_clause
 from community_places import SUGGESTION_FIELDS
 from admin_roles import ROLE_LABELS, SUPER, audit, identity
@@ -117,7 +118,7 @@ def admin_context(request, conn):
     else:
         section = "장소 관리"
         title, active = {"/admin/community": ("사용자 등록", "community"), "/admin/suggestions": ("정보 바로잡기", "suggestions"),
-                         "/admin/new": ("신상 장소", "new"), "/admin/picks": ("JEJU_KNOW PICK", "picks")}.get(path, ("전체 장소", "places"))
+                         "/admin/places/stale": ("오래된 정보", "stale"), "/admin/new": ("신상 장소", "new"), "/admin/picks": ("JEJU_KNOW PICK", "picks")}.get(path, ("전체 장소", "places"))
     detail = "장소 등록" if path == "/admin/places/new" else "장소 수정" if re.fullmatch(r"/admin/places/\d+/edit", path) else "중복 확인" if path.endswith("/merge") else ""
     if path.startswith("/admin/news/"):
         detail = "ISSUE 등록" if path.endswith("/new") else "ISSUE 수정"
@@ -152,9 +153,35 @@ class AdminUI:
         with closing(self.db()) as conn:
             from analytics import report
             stats = report(conn, {'period':'30d'})
+            freshness = freshness_counts(conn, ACTIVE, six_month_cutoff(today()).isoformat())
             places = conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE " + ACTIVE + " AND p.source_type='user' AND p.verification_status='unverified' ORDER BY p.id DESC LIMIT 5").fetchall()
             suggestions = conn.execute("SELECT s.*,p.name FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id WHERE s.status='pending' ORDER BY s.id DESC LIMIT 5").fetchall()
-        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS, analytics=stats)
+        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS, analytics=stats, freshness=freshness)
+
+    def stale_places(self, request):
+        if response := self.guard(request):
+            return response
+        day = today()
+        cutoff = six_month_cutoff(day).isoformat()
+        mode = request.query_params.get("filter", "all")
+        if mode not in ("all", "never", "stale"):
+            mode = "all"
+        predicate = {"all": f"({NEVER} OR {STALE})", "never": NEVER, "stale": STALE}[mode]
+        where = [ACTIVE, predicate]
+        args = [] if mode == "never" else [cutoff]
+        q = request.query_params.get("q", "").strip()[:200]
+        if q:
+            where.append("instr(lower(p.name), lower(?)) > 0")
+            args.append(q)
+        with closing(self.db()) as conn:
+            counts = freshness_counts(conn, ACTIVE, cutoff)
+            rows, page = page_rows(conn, request,
+                                   "p.id,p.name,p.region,p.category,p.published,p.checked_at,"
+                                   "CAST(julianday(as_of) - julianday(p.checked_at) AS INTEGER) AS elapsed_days",
+                                   "FROM places p CROSS JOIN (SELECT ? AS as_of)", " AND ".join(where),
+                                   [day.isoformat(), *args], f"{CHECK_DATE} ASC, p.id ASC")
+        return self.render(request, "stale_places.html", places=rows, pagination=page, freshness=counts,
+                           selected=mode, q=q)
 
     def places(self, request, mode="all"):
         if response := self.guard(request):
@@ -325,6 +352,32 @@ class AdminUI:
         app = self.app
         @app.get("/admin/places")
         async def admin_places_list(request: Request): return self.places(request)
+        @app.get("/admin/places/stale")
+        async def admin_stale_places(request: Request):
+            return self.stale_places(request)
+
+        @app.post("/admin/places/{place_id}/confirm-information")
+        async def confirm_information(request: Request, place_id: int):
+            if response := self.guard(request):
+                return response
+            if await self.checked(request) is None:
+                return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
+            stamp = today().isoformat()
+            with closing(self.db()) as conn, conn:
+                conn.execute("BEGIN IMMEDIATE")
+                row = conn.execute("SELECT name,checked_at FROM places p WHERE p.id=? AND " + ACTIVE,
+                                   (place_id,)).fetchone()
+                if row is None:
+                    return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
+                if row["checked_at"] != stamp:
+                    conn.execute("UPDATE places SET checked_at=? WHERE id=?", (stamp, place_id))
+                    audit(conn, request, "장소 정보 확인 완료", "장소", place_id, row["name"])
+            message = "정보 확인일이 업데이트되었습니다." if row["checked_at"] != stamp else "오늘 이미 정보를 확인했습니다."
+            if "application/json" in request.headers.get("accept", ""):
+                return JSONResponse({"checked_at": stamp, "message": message})
+            self.flash(request, message, "success")
+            return RedirectResponse(f"/admin/places/{place_id}/edit#freshness", status_code=303)
+
         @app.get("/admin/new")
         async def admin_new_list(request: Request): return self.places(request, "new")
         @app.get("/admin/suggestions")

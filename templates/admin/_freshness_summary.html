@@ -1,0 +1,5 @@
+<section class="admin-freshness-summary" aria-label="정보 최신성 요약">
+  {% for key, label in [('stale','6개월 이상 미확인'),('never','확인일 없음')] %}
+  <a class="admin-summary-card" href="/admin/places/stale?filter={{ key }}"><span>{{ label }}</span><strong>{{ freshness[key] }}<small>곳</small></strong><span class="admin-summary-link">목록 확인 →</span></a>
+  {% endfor %}
+</section>
