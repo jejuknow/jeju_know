@@ -53,6 +53,9 @@ class PreviewStore:
         return stage
 
 
+from admin_roles import audit
+
+
 def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
     store = PreviewStore(app.state.database)
     root = Path(app.state.database).parent / 'uploads'
@@ -231,7 +234,9 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
             choices = {str(row['line']): (form.get('action_' + str(row['line']), 'skip'), form.get('target_' + str(row['line']), '')) for row in stage['rows']}
             if not any(action != 'skip' for action, _ in choices.values()):
                 raise ValueError('등록 또는 업데이트할 행을 선택해주세요.')
-            await run_in_threadpool(save_rows, app.state.database, connect_db, stage, choices, actor(request))
+            def log_place(conn, action, place_id, name):
+                audit(conn,request,"CSV 장소 등록" if action=="create" else "CSV 장소 수정","장소",place_id,name)
+            await run_in_threadpool(save_rows, app.state.database, connect_db, stage, choices, actor(request), log_place)
         except ValueError as error:
             flash(request, str(error), 'error')
         except Exception:

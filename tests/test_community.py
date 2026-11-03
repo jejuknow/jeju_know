@@ -36,7 +36,7 @@ class CommunityTest(unittest.TestCase):
         self.member,self.other,self.admin,self.visitor = self.clients
         for username in ('member','other'):
             self.execute('INSERT INTO users(username,password_hash,nickname) VALUES (?,?,?)',(username,self.password_hash,username))
-        self.execute('INSERT INTO admins(username,password_hash) VALUES (?,?)',('admin',self.password_hash))
+        self.execute("INSERT INTO admins(username,password_hash,role) VALUES (?,?,'super_admin')",('admin',self.password_hash))
         for client,username,url in [(self.member,'member','/login'),(self.other,'other','/login'),(self.admin,'admin','/admin/login')]:
             r=client.post(url,data={'csrf_token':self.csrf(client,url),'username':username,'password':'community-test-secret'},follow_redirects=False)
             self.assertEqual(r.status_code,303)

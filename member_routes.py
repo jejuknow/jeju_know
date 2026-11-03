@@ -9,6 +9,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
+from admin_roles import audit
 from auth_security import DUMMY_HASH, PASSWORD_HASHER, current_user, hash_password, rate_limited, safe_external_url, verify_password
 from community_places import coordinates
 from issue_review import candidates, submission_error, has_poster
@@ -378,7 +379,10 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         if current_user(request) and current_user(request)["id"] == user_id:
             return HTMLResponse("현재 로그인한 관리자의 상태는 변경할 수 없습니다.", status_code=400)
         with closing(connect_db()) as conn, conn:
-            conn.execute("UPDATE users SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status<>'deleted'", (status, user_id))
+            changed = conn.execute("UPDATE users SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status<>'deleted'", (status, user_id))
+            if not changed.rowcount:
+                return HTMLResponse("회원을 찾을 수 없습니다.",status_code=404)
+            audit(conn,request,"회원 이용 제한" if status=="blocked" else "회원 이용 제한 해제","회원",user_id)
             if status == "blocked":
                 conn.execute("DELETE FROM auth_sessions WHERE user_id=?", (user_id,))
         flash(request, "사용자 상태를 변경했습니다. 차단 시 모든 로그인이 해제됩니다.")

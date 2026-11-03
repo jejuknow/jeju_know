@@ -15,6 +15,7 @@ from auth_security import current_user, safe_external_url
 from community_migrations import today
 from new_visibility import new_clause
 from community_places import SUGGESTION_FIELDS
+from admin_roles import ROLE_LABELS, SUPER, audit, identity
 from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal, snapshot
 SUGGESTION_LABELS = {**SUGGESTION_FIELDS, DETAIL_FIELD: DETAIL_LABEL}
 from taxonomy_migrations import TYPES
@@ -78,16 +79,11 @@ def counters(conn):
 
 
 def admin_context(request, conn):
-    member = current_user(request)
-    account = None
-    if request.session.get("admin_id"):
-        row = conn.execute("SELECT username FROM admins WHERE id=?", (request.session["admin_id"],)).fetchone()
-        if row:
-            account = {"username": row[0], "name": "JEJU_KNOW 관리자", "role": "관리자"}
-    elif member and member["role"] == "admin":
-        account = {"username": member["username"], "name": member["nickname"], "role": "관리자"}
-    if not account:
+    actor = identity(request)
+    if not actor:
         return {}
+    account = {"username":actor["username"], "name":actor["display_name"] or actor["username"],
+               "role":ROLE_LABELS[actor["role"]], "dedicated":bool(actor.get("id"))}
     path = request.url.path
     if path.startswith('/admin/imports'):
         section, title, active = '장소 관리', 'CSV 일괄 등록', 'imports'
@@ -107,6 +103,12 @@ def admin_context(request, conn):
         section, title, active = "회원 관리", "회원 목록", "users"
     elif path == '/admin/analytics':
         section, title, active = '통계', '방문·FIND 통계', 'analytics'
+    elif path.startswith("/admin/admins"):
+        section, title, active = "관리자 관리", "관리자 목록", "operators"
+    elif path == "/admin/admin-logs":
+        section, title, active = "관리자 관리", "관리자 활동 기록", "admin-logs"
+    elif path.startswith("/admin/account"):
+        section, title, active = "내 계정", "내 관리자 계정", "operator-self"
     elif path.startswith("/admin/settings"):
         section, active = "운영 설정", path.rsplit("/", 1)[-1]
         title = "홈 화면" if active == "home" else "기본 설정"
@@ -123,7 +125,9 @@ def admin_context(request, conn):
         detail = "광고 등록" if path.endswith("/new") else "광고 수정"
     if path.startswith("/admin/inquiries/"):
         detail = "문의 상세"
-    return {"admin_account": account, "admin_counts": counters(conn), "admin_active": active,
+    if path.startswith("/admin/admins/"):
+        detail = "서브관리자 추가" if path.endswith("/new") else "서브관리자 수정"
+    return {"is_super": actor["role"] == SUPER, "admin_account": account, "admin_counts": counters(conn), "admin_active": active,
             "admin_section": section, "admin_title": detail or title, "admin_parent_title": title,
             "admin_is_detail": bool(detail), "classification_kinds": {k: v for k, v in KINDS.items() if k != "cafe_focus"}}
 
@@ -359,6 +363,7 @@ class AdminUI:
                     if old: items[items.index(old)] = item
                     else: items.append(item)
                 write_setting(conn, "taxonomy:" + kind, items)
+                audit(conn,request,"분류 변경","분류",None,kind)
             self.flash(request, "분류를 저장했습니다. 기존 장소의 값과 공유 URL은 유지됩니다.")
             return RedirectResponse("/admin/classifications/" + kind, 303)
 
@@ -381,6 +386,7 @@ class AdminUI:
             else: return HTMLResponse("설정을 찾을 수 없습니다.", status_code=404)
             with closing(self.db()) as conn, conn:
                 for key, value in values.items(): write_setting(conn, key, value)
+                audit(conn,request,"운영 설정 변경","운영 설정",None,section)
             self.flash(request, "운영 설정을 저장했습니다.")
             return RedirectResponse("/admin/settings/" + section, 303)
 
@@ -411,11 +417,13 @@ class AdminUI:
                 return HTMLResponse("제목·소개·이미지 URL·순서를 확인해주세요.", status_code=400)
             with closing(self.db()) as conn, conn:
                 values = (title, description, image, order, int(form.get("published")=="1"))
+                creating = not collection_id
                 if collection_id:
                     if not conn.execute("SELECT 1 FROM best_collections WHERE id=? AND deleted_at IS NULL", (collection_id,)).fetchone(): return HTMLResponse("모음을 찾을 수 없습니다.", status_code=404)
                     conn.execute("UPDATE best_collections SET title=?,description=?,image_url=?,sort_order=?,published=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (*values, collection_id))
                 else:
                     collection_id = conn.execute("INSERT INTO best_collections(title,description,image_url,sort_order,published,slug,updated_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)", (*values, "collection-"+uuid.uuid4().hex[:12])).lastrowid
+                audit(conn,request,"BEST 등록" if creating else "BEST 수정","BEST",collection_id,title)
             self.flash(request, "BEST를 저장했습니다.")
             return RedirectResponse(f"/admin/best/{collection_id}/edit", 303)
 
@@ -434,5 +442,6 @@ class AdminUI:
                     conn.execute("INSERT INTO best_collection_places SELECT ?,place_id,sort_order FROM best_collection_places WHERE collection_id=?", (new_id, collection_id))
                 elif action == "toggle": conn.execute("UPDATE best_collections SET published=1-published,updated_at=CURRENT_TIMESTAMP WHERE id=?", (collection_id,))
                 else: conn.execute("UPDATE best_collections SET published=0,deleted_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?", (collection_id,))
+                audit(conn,request,{"copy":"BEST 복사","toggle":"BEST 공개 상태 변경","delete":"BEST 삭제"}[action],"BEST",new_id if action=="copy" else collection_id,c["title"])
             self.flash(request, "BEST를 복사했습니다. 비공개 상태로 저장됩니다." if action=="copy" else "BEST 상태를 변경했습니다. 연결된 장소는 유지됩니다.")
             return RedirectResponse("/admin/best", 303)

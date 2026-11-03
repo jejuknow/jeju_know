@@ -76,7 +76,7 @@ class MembersTest(unittest.TestCase):
 
     def admin(self):
         admin = self.new_client()
-        self.execute('INSERT INTO admins(username,password_hash) VALUES (?,?)', ('admin', hash_password('admin-only-secret')))
+        self.execute("INSERT INTO admins(username,password_hash,role) VALUES (?,?,'super_admin')", ('admin', hash_password('admin-only-secret')))
         token = self.csrf(admin, '/admin/login')
         response = admin.post('/admin/login?next=https://evil.example', data={'csrf_token':token, 'username':'admin', 'password':'admin-only-secret'}, follow_redirects=False)
         self.assertEqual(response.headers['location'], '/admin')
@@ -303,7 +303,8 @@ class MembersTest(unittest.TestCase):
         cookie=self.client.cookies.get(COOKIE_NAME)
         key=hashlib.sha256(cookie.encode()).hexdigest()
         middleware=ServerSessionMiddleware(self.app,self.database,False)
-        data,_,expiry=middleware.load(key,0)
+        data,_,expiry,admin=middleware.load(key,0)
+        self.assertIsNone(admin)
         self.execute('DELETE FROM auth_sessions WHERE token_hash=?',(key,))
         data['flashes']=[{'message':'in flight','category':'success'}]
         middleware.save(key,data,expiry,False)

@@ -302,7 +302,7 @@ def preview_rows(conn, rows, kind, root):
     return result
 
 
-def save_rows(database, connect_db, stage, choices, actor):
+def save_rows(database, connect_db, stage, choices, actor, log_place=None):
     root = Path(database).parent / 'uploads'
     with closing(connect_db()) as conn:
         receipt = conn.execute('SELECT result FROM csv_import_runs WHERE token=? AND actor=?', (stage['token'], actor)).fetchone()
@@ -356,6 +356,8 @@ def save_rows(database, connect_db, stage, choices, actor):
                         (place_id,meta['file_path'],meta['width'],meta['height'],meta['byte_size'],photo['slot']))
                 else:
                     conn.execute('INSERT INTO place_image_references(place_id,sort_order,url) VALUES (?,?,?)', (place_id,photo['slot'],photo['url']))
+            if log_place:
+                log_place(conn,action,place_id,data.get('name',''))
             result['created' if action == 'create' else 'updated'].append(place_id)
         conn.execute('INSERT INTO csv_import_runs(token,actor,kind,result) VALUES (?,?,?,?)', (stage['token'],actor,stage['kind'],json.dumps(result)))
     return result

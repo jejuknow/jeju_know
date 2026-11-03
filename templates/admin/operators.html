@@ -1,0 +1,8 @@
+{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge,pager %}
+{% block admin_content %}
+<div class="admin-section-heading"><p>관리자별 권한과 최근 로그인 기록을 확인하세요.</p><a class="primary-inline" href="/admin/admins/new">+ 서브관리자 추가</a></div>
+<section class="admin-panel"><div class="admin-data-wrap"><table class="admin-data-table"><thead><tr>{% for label in ('아이디','관리자명','권한','상태','최근 로그인','등록일','관리') %}<th>{{ label }}</th>{% endfor %}</tr></thead>
+<tbody>{% for item in items %}<tr><td data-label="아이디">{{ item.username }}</td><td data-label="관리자명">{{ item.display_name or item.username }}</td>
+<td data-label="권한">{{ badge(roles[item.role],'primary' if item.role=='super_admin' else 'neutral') }}</td><td data-label="상태">{{ badge('활성' if item.is_active else '비활성','success' if item.is_active else 'neutral') }}</td>
+<td data-label="최근 로그인">{{ item.last_login_at|admin_kst }}</td><td data-label="등록일">{{ item.created_at|admin_kst }}</td>
+<td data-label="관리">{% if item.role=='sub_admin' %}<a class="mini-btn" href="/admin/admins/{{ item.id }}/edit">수정</a>{% elif item.id==request.session.get('admin_id') %}<a class="mini-btn" href="/admin/account">내 관리자 계정</a>{% endif %}</td></tr>{% endfor %}</tbody></table></div>{{ pager(pagination) }}</section>{% endblock %}

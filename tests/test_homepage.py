@@ -35,7 +35,7 @@ class HomepageTest(unittest.TestCase):
         return self.execute("INSERT INTO news_posts(slug,title,category,created_at,event_start,event_end,is_promoted,published,is_featured,deleted_at) VALUES (?,?,'지역소식',?,'2099-12-31','2099-12-31',?,?,?,?)", (slug,slug,created,promoted,published,featured,deleted))
 
     def login_admin(self):
-        self.execute('INSERT INTO admins(username,password_hash) VALUES (?,?)',('admin',hash_password('test-admin-password')))
+        self.execute("INSERT INTO admins(username,password_hash,role) VALUES (?,?,'super_admin')",('admin',hash_password('test-admin-password')))
         self.client.post('/admin/login',data={'csrf_token':self.token('/admin/login'),'username':'admin','password':'test-admin-password'})
 
     def test_promoted_first_latest_creation_order_limit_and_visibility(self):

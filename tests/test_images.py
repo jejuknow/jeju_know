@@ -37,7 +37,7 @@ class ImageUploadTest(unittest.TestCase):
         self.visitor = TestClient(self.app)
         with closing(sqlite3.connect(self.database)) as conn, conn:
             conn.execute('INSERT INTO users(username,password_hash,nickname) VALUES (?,?,?)', ('uploader',hash_password('test-image-secret'),'사진 회원'))
-            conn.execute('INSERT INTO admins(username,password_hash) VALUES (?,?)', ('admin',hash_password('test-image-secret')))
+            conn.execute("INSERT INTO admins(username,password_hash,role) VALUES (?,?,'super_admin')", ('admin',hash_password('test-image-secret')))
         self.client.post('/login', data={'csrf_token': self.csrf(self.client, '/login'), 'username':'uploader','password':'test-image-secret'})
         self.admin.post('/admin/login', data={'csrf_token': self.csrf(self.admin, '/admin/login'), 'username':'admin','password':'test-image-secret'})
 

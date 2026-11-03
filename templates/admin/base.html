@@ -2,7 +2,7 @@
 {% from 'admin/_ui.html' import icon %}
 {% block title %}{{ admin_title }} | JEJU_KNOW ADMIN{% endblock %}
 {% block body_class %}admin-body admin-shell{% endblock %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin.css?v=20261102-admin-lists"><link rel="stylesheet" href="/static/analytics.css?v=20261029">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin.css?v=20261103-admin-roles"><link rel="stylesheet" href="/static/analytics.css?v=20261029">{% endblock %}
 {% block body %}
 <a class="admin-skip" href="#adminContent">본문으로 건너뛰기</a>
 <div class="admin-drawer-shade" id="adminDrawerShade" hidden></div>
@@ -17,15 +17,16 @@
       ('분류 관리','classification',[]),
       ('콘텐츠 관리','content',[('issues','ISSUE','/admin/issues'),('best','BEST','/admin/best'),('ads','광고 관리','/admin/ads'),('inquiries','문의 관리','/admin/inquiries')]),
       ('회원 관리','user',[('users','회원 목록','/admin/users')]),
+      ('관리자 관리','user',[('operators','관리자 목록','/admin/admins'),('admin-logs','관리자 활동 기록','/admin/admin-logs')]),
       ('통계','dashboard',[('analytics','방문·FIND 통계','/admin/analytics')]),
       ('운영 설정','settings',[('home','홈 화면','/admin/settings/home'),('general','기본 설정','/admin/settings/general')])
-    ] %}
+    ] if is_super or group not in ("분류 관리","운영 설정","관리자 관리") %}
     <details class="admin-nav-group" {% if admin_section==group %}open{% endif %}><summary>{{ icon(symbol) }}{{ group }}<span class="admin-chevron" aria-hidden="true">⌄</span></summary>
       {% if group=='분류 관리' %}{% for key,label in classification_kinds.items() %}<a href="/admin/classifications/{{ key }}" {% if admin_active=='class-'~key %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
-      {% else %}{% for key,label,href in links %}<a href="{{ href }}" {% if admin_active==key %}aria-current="page"{% endif %}>{{ label }}{% if key=='community' %}<span class="admin-count" aria-label="미확인 {{ admin_counts.unverified }}건">{{ admin_counts.unverified }}</span>{% elif key=='suggestions' %}<span class="admin-count" aria-label="대기 {{ admin_counts.suggestions }}건">{{ admin_counts.suggestions }}</span>{% endif %}</a>{% endfor %}{% endif %}
+      {% else %}{% for key,label,href in links if is_super or key!="imports" %}<a href="{{ href }}" {% if admin_active==key %}aria-current="page"{% endif %}>{{ label }}{% if key=='community' %}<span class="admin-count" aria-label="미확인 {{ admin_counts.unverified }}건">{{ admin_counts.unverified }}</span>{% elif key=='suggestions' %}<span class="admin-count" aria-label="대기 {{ admin_counts.suggestions }}건">{{ admin_counts.suggestions }}</span>{% endif %}</a>{% endfor %}{% endif %}
     </details>{% endfor %}
   </nav>
-  <div class="admin-account"><span class="admin-avatar" aria-hidden="true">{{ icon('user') }}</span><div><strong>{{ admin_account.name }}</strong><small>{{ admin_account.username }} · {{ admin_account.role }}</small></div><form method="post" action="/admin/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="admin-logout">로그아웃</button></form></div>
+  <div class="admin-account"><span class="admin-avatar" aria-hidden="true">{{ icon('user') }}</span><div><strong>{{ admin_account.name }}</strong><small>{{ admin_account.username }} · {{ admin_account.role }}</small>{% if admin_account.dedicated %}<a class="admin-self-link" href="/admin/account">내 관리자 계정</a>{% endif %}</div><form method="post" action="/admin/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="admin-logout">로그아웃</button></form></div>
 </aside>
 <div class="admin-workspace">
   <header class="admin-topbar"><button type="button" class="admin-menu-toggle" id="adminMenuToggle" aria-controls="adminSidebar" aria-expanded="false" aria-label="관리자 메뉴 열기">{{ icon('menu') }}</button><span>JEJU_KNOW <small>ADMIN</small></span><a href="/" target="_blank" rel="noopener">사이트 보기 ↗</a></header>

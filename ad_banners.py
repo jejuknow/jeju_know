@@ -10,6 +10,7 @@ from auth_security import current_user, safe_external_url
 from community_migrations import today
 from image_limits import FORM_BYTES
 from image_uploads import ImageError
+from admin_roles import audit
 from sqlite_migrations import verified_migration
 
 SLOTS = {"SIDE-01": "홈 우측 세로", "HOME-01": "홈 내부 가로"}
@@ -175,7 +176,10 @@ def register_ad_routes(app, templates, connect_db, admin_guard, require_csrf, fl
                         conn.execute("INSERT OR IGNORE INTO image_file_gc(file_path) VALUES (?)", (existing["image_path"],))
                 else:
                     marks = ",".join("?" for _ in values)
-                    conn.execute(f"INSERT INTO ads ({','.join(values)}) VALUES ({marks})", tuple(values.values()))
+                    ad_id = conn.execute(f"INSERT INTO ads ({','.join(values)}) VALUES ({marks})", tuple(values.values())).lastrowid
+                audit(conn,request,"광고 수정" if existing else "광고 등록","광고",ad_id,values["name"])
+                if existing and existing["is_public"] != values["is_public"]:
+                    audit(conn,request,"광고 공개" if values["is_public"] else "광고 숨김","광고",ad_id,values["name"])
         except ImageError as exc:
             return invalid(str(exc))
         flash(request, "광고를 저장했습니다.")

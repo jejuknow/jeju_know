@@ -13,6 +13,7 @@ from fastapi import HTTPException, Path, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
+from admin_roles import audit
 from admin_ui import page_rows
 from auth_security import current_user, rate_limited
 from community_migrations import KST, today
@@ -245,6 +246,7 @@ def register_contact_routes(app, templates, connect_db, guard, csrf, flash, secr
             message = encrypt(cipher(), reply, "reply:"+row["submission_id"])
             conn.execute("""UPDATE contact_inquiries SET admin_reply=?,replied_at=CURRENT_TIMESTAMP,
                             updated_at=CURRENT_TIMESTAMP WHERE id=?""", (message,inquiry_id))
+            audit(conn,request,"문의 답변","문의",inquiry_id)
         flash(request, "답변을 저장했습니다.")
         return RedirectResponse(f"/admin/inquiries/{inquiry_id}", status_code=303)
 
@@ -262,5 +264,6 @@ def register_contact_routes(app, templates, connect_db, guard, csrf, flash, secr
             updated = conn.execute("UPDATE contact_inquiries SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (status, inquiry_id))
             if not updated.rowcount:
                 raise HTTPException(404, "문의를 찾을 수 없습니다.")
+            audit(conn,request,"문의 상태 변경","문의",inquiry_id)
         flash(request, "문의 상태를 변경했습니다.")
         return RedirectResponse(f"/admin/inquiries/{inquiry_id}", status_code=303)

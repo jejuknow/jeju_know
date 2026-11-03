@@ -39,3 +39,5 @@
   .admin-ads-heading { flex-direction: column; align-items: stretch; gap: 12px; }
   .admin-ads-heading .admin-btn-primary { width: 100%; }
 }
+.admin-account .admin-self-link{display:inline-block;color:var(--brand);font-size:12px;font-weight:700;margin-top:4px}
+.admin-account strong,.admin-account small{overflow-wrap:anywhere}

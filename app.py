@@ -47,6 +47,8 @@ from admin_place_cleanup_migrations import backup_before_admin_place_cleanup, mi
 from submission_fields import normalize_controls, controls, TIME_OPTIONS, WEEKDAYS, CONTROL_FIELDS
 from starlette.concurrency import run_in_threadpool
 from analytics import Analytics
+from admin_roles import SUPER, audit, migrate as migrate_admin_roles, require_admin
+from admin_accounts import register_admin_accounts, password_error, valid_username
 from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES
 from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule
 from ad_banners import active_banners, banner_image, migrate as migrate_ads, register_ad_routes
@@ -335,6 +337,7 @@ def create_app(test_config=None):
         migrate_ads(app.state.database)
         migrate_contact(app.state.database)
         migrate_member_inquiries(app.state.database)
+        migrate_admin_roles(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -652,11 +655,7 @@ def create_app(test_config=None):
             "admin_weekdays": WEEKDAYS,
         }
 
-    def admin_guard(request: Request):
-        member = current_user(request)
-        if not request.session.get("admin_id") and not (member and member["role"] == "admin"):
-            return RedirectResponse(url=f"/admin/login?next={request.url.path}", status_code=303)
-        return None
+    admin_guard = require_admin
 
     @app.get("/", response_class=HTMLResponse)
     async def home(request: Request):
@@ -788,18 +787,19 @@ def create_app(test_config=None):
         username = str(form.get("username", "")).strip()
         password = str(form.get("password", ""))
         password_confirm = str(form.get("password_confirm", ""))
-        if len(username) < 3:
-            flash(request, "아이디는 3자 이상 입력해주세요.", "error")
-        elif not 8 <= len(password) <= 128:
-            flash(request, "비밀번호는 8자 이상 입력해주세요.", "error")
-        elif password != password_confirm:
-            flash(request, "비밀번호 확인이 일치하지 않습니다.", "error")
+        if not valid_username(username):
+            flash(request, "관리자 아이디는 공백 없이 3~64자로 입력해주세요.", "error")
+        elif error := password_error(password, password_confirm):
+            flash(request, error, "error")
         else:
             conn = connect_db()
             password_hash = await run_in_threadpool(hash_password, password)
-            conn.execute("INSERT INTO admins(username, password_hash) VALUES (?, ?)", (username, password_hash))
-            conn.commit()
-            conn.close()
+            with closing(conn), conn:
+                conn.execute("BEGIN IMMEDIATE")
+                if conn.execute("SELECT 1 FROM admins LIMIT 1").fetchone():
+                    return RedirectResponse("/admin/login", 303)
+                conn.execute("""INSERT INTO admins(username,password_hash,display_name,role,updated_at)
+                    VALUES(?,?,?,?,CURRENT_TIMESTAMP)""", (username,password_hash,username,SUPER))
             flash(request, "관리자 계정을 만들었습니다. 로그인해주세요.", "success")
             return RedirectResponse(url="/admin/login", status_code=303)
         return RedirectResponse(url="/admin/setup", status_code=303)
@@ -827,14 +827,20 @@ def create_app(test_config=None):
         admin = conn.execute("SELECT * FROM admins WHERE username=?", (username,)).fetchone()
         conn.close()
         valid = await run_in_threadpool(verify_password, password, admin["password_hash"] if admin else DUMMY_HASH)
-        if admin and valid:
+        if admin and valid and admin["is_active"]:
+            replacement = None
             if not admin["password_hash"].startswith("$argon2id$"):
                 replacement = await run_in_threadpool(hash_password, password)
-                conn = connect_db()
-                conn.execute("UPDATE admins SET password_hash=? WHERE id=?", (replacement, admin["id"]))
-                conn.commit()
-                conn.close()
+            with closing(connect_db()) as conn, conn:
+                changed = conn.execute("""UPDATE admins SET last_login_at=CURRENT_TIMESTAMP,
+                    password_hash=COALESCE(?,password_hash)
+                    WHERE id=? AND password_hash=? AND is_active=1 AND auth_version=?""",
+                    (replacement,admin["id"],admin["password_hash"],admin["auth_version"]))
+                if not changed.rowcount:
+                    return RedirectResponse("/admin/login", 303)
+                audit(conn, request, "관리자 로그인", "관리자", admin["id"], admin["username"], actor=dict(admin))
             request.session.clear()
+            request.session["admin_version"] = admin["auth_version"]
             request.session["admin_id"] = admin["id"]
             request.session["csrf_token"] = secrets.token_urlsafe(32)
             request.scope["rotate_session"] = True
@@ -898,6 +904,7 @@ def create_app(test_config=None):
             placeholders = ",".join("?" for _ in values)
             cursor = conn.execute(f"INSERT INTO news_posts ({columns}) VALUES ({placeholders})", tuple(values.values()))
             plan.apply(conn, cursor.lastrowid)
+            audit(conn,request,"ISSUE 등록","ISSUE",cursor.lastrowid,data["title"])
         flash(request, "제주 소식을 저장했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
@@ -974,6 +981,7 @@ def create_app(test_config=None):
                 if not conn.execute(f"UPDATE news_posts SET {assignments} WHERE {condition}", (*values.values(), *args)).rowcount:
                     raise HTTPException(409, "내용이나 검토 상태가 변경되었습니다. 화면을 새로 열고 다시 검토해주세요.")
                 plan.apply(conn, news_id)
+                audit(conn,request,"ISSUE 승인" if approve else "ISSUE 수정","ISSUE",news_id,data["title"])
         except ImageError as exc:
             return review_screen(request, existing, data=data, error=str(exc))
         flash(request, "ISSUE를 승인했습니다." if approve else "제주 소식을 수정했습니다.", "success")
@@ -996,6 +1004,7 @@ def create_app(test_config=None):
                 AND deleted_at IS NULL AND review_version=?""", (reason, reviewer(request), news_id, form.get("review_version")))
             if not changed.rowcount:
                 return HTMLResponse("내용이나 검토 상태가 변경되었습니다. 다시 확인해주세요.", status_code=409)
+            audit(conn,request,"ISSUE 반려","ISSUE",news_id)
         flash(request, "ISSUE를 반려했습니다.")
         return RedirectResponse("/admin/issues?status=pending", status_code=303)
 
@@ -1008,7 +1017,7 @@ def create_app(test_config=None):
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         conn = connect_db()
-        row = conn.execute("SELECT published,approval_status FROM news_posts WHERE id=? AND deleted_at IS NULL", (news_id,)).fetchone()
+        row = conn.execute("SELECT title,published,approval_status FROM news_posts WHERE id=? AND deleted_at IS NULL", (news_id,)).fetchone()
         if not row:
             conn.close()
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
@@ -1020,6 +1029,7 @@ def create_app(test_config=None):
             "UPDATE news_posts SET published=?, updated_at=?,review_version=review_version+1 WHERE id=? AND approval_status='approved' AND deleted_at IS NULL",
             (new_value, datetime.now(timezone.utc).isoformat(timespec="seconds"), news_id),
         )
+        audit(conn,request,"ISSUE 공개" if new_value else "ISSUE 숨김","ISSUE",news_id,row["title"])
         conn.commit()
         conn.close()
         flash(request, f"소식을 {'공개' if new_value else '비공개'}로 변경했습니다.", "success")
@@ -1043,6 +1053,7 @@ def create_app(test_config=None):
         with plan.transaction() as conn:
             plan.delete_owner(conn, news_id)
             conn.execute("DELETE FROM news_posts WHERE id=?", (news_id,))
+            audit(conn,request,"ISSUE 삭제","ISSUE",news_id,row["title"])
         flash(request, f"‘{row['title']}’ 소식을 삭제했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
@@ -1189,6 +1200,7 @@ def create_app(test_config=None):
             save_times(conn, cursor.lastrowid, data)
             plan.apply(conn, cursor.lastrowid)
             save_admin_facts(conn, cursor.lastrowid, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
+            audit(conn,request,"장소 등록","장소",cursor.lastrowid,data["name"])
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
         return RedirectResponse(url=admin_return(form), status_code=303)
 
@@ -1257,6 +1269,11 @@ def create_app(test_config=None):
             save_times(conn, place_id, data)
             plan.apply(conn, place_id)
             save_admin_facts(conn, place_id, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
+            audit(conn,request,"장소 수정","장소",place_id,data["name"])
+            if existing["verification_status"] != data["verification_status"]:
+                audit(conn,request,"장소 확인" if data["verification_status"]=="jejuno_verified" else "장소 확인 해제","장소",place_id,data["name"])
+            if bool(existing["published"]) != bool(data["published"]):
+                audit(conn,request,"장소 공개" if data["published"] else "장소 숨김","장소",place_id,data["name"])
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")
         return RedirectResponse(url=admin_return(form), status_code=303)
 
@@ -1269,12 +1286,13 @@ def create_app(test_config=None):
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         conn = connect_db()
-        row = conn.execute("SELECT published FROM places WHERE id=? AND deleted_at IS NULL AND merged_into_id IS NULL", (place_id,)).fetchone()
+        row = conn.execute("SELECT published,name FROM places WHERE id=? AND deleted_at IS NULL AND merged_into_id IS NULL", (place_id,)).fetchone()
         if not row:
             conn.close()
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         new_value = 0 if row["published"] else 1
         conn.execute("UPDATE places SET published=?, updated_at=? WHERE id=?", (new_value, datetime.now(timezone.utc).isoformat(timespec="seconds"), place_id))
+        audit(conn,request,"장소 공개" if new_value else "장소 숨김","장소",place_id,row["name"])
         conn.commit()
         conn.close()
         flash(request, f"{'공개' if new_value else '비공개'} 상태로 즉시 변경했습니다.", "success")
@@ -1304,9 +1322,11 @@ def create_app(test_config=None):
             else:
                 plan.delete_owner(conn, place_id)
                 conn.execute("DELETE FROM places WHERE id=?", (place_id,))
+            audit(conn,request,"장소 삭제","장소",place_id,row["name"])
         flash(request, f"‘{row['name']}’을(를) 즉시 삭제했습니다.", "success")
         return RedirectResponse(url=admin_return(form), status_code=303)
 
+    register_admin_accounts(app, templates, connect_db, require_csrf, flash, secret_key)
     register_ad_routes(app, templates, connect_db, admin_guard, require_csrf, flash, image_store)
     register_contact_routes(app, templates, connect_db, admin_guard, require_csrf, flash, secret_key)
     register_member_routes(app, templates, connect_db, require_csrf, flash,

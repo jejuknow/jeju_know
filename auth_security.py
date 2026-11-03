@@ -85,16 +85,28 @@ class ServerSessionMiddleware:
         with closing(self.connect()) as conn, conn:
             row = conn.execute("SELECT * FROM auth_sessions WHERE token_hash=? AND expires_at>?", (token_hash, now)).fetchone()
             if not row:
-                return {}, None, None
+                return {}, None, None, None
             member = None
             if row["user_id"]:
                 member = conn.execute("SELECT id,username,nickname,role,status,created_at FROM users WHERE id=? AND status='active'", (row["user_id"],)).fetchone()
                 if not member:
                     conn.execute("DELETE FROM auth_sessions WHERE token_hash=?", (token_hash,))
-                    return {}, None, None
-            if row["admin_id"] and not conn.execute("SELECT 1 FROM admins WHERE id=?", (row["admin_id"],)).fetchone():
-                return {}, None, None
-            return json.loads(row["data"]), dict(member) if member else None, row["expires_at"]
+                    return {}, None, None, None
+            data = json.loads(row["data"])
+            admin = None
+            if row["admin_id"]:
+                admin = conn.execute("""SELECT id,username,display_name,role,auth_version FROM admins
+                    WHERE id=? AND is_active=1 AND auth_version=?""",
+                    (row["admin_id"], data.get("admin_version", 1))).fetchone()
+                if not admin:
+                    conn.execute("DELETE FROM auth_sessions WHERE token_hash=?", (token_hash,))
+                    return {}, None, None, None
+                admin = dict(admin)
+            elif member and member["role"] == "admin":
+                # Compatibility for pre-existing operator members, never a dedicated super administrator.
+                admin = dict(member_id=member["id"], username=member["username"],
+                             display_name=member["nickname"], role="sub_admin")
+            return data, dict(member) if member else None, row["expires_at"], admin
 
     def save(self, old_hash, data, expiry, rotate):
         now = int(time.time())
@@ -106,6 +118,11 @@ class ServerSessionMiddleware:
                 return "", 0
             user_id, admin_id = data.get("user_id"), data.get("admin_id")
             if user_id and not conn.execute("SELECT 1 FROM users WHERE id=? AND status='active'", (user_id,)).fetchone():
+                return "", 0
+            if admin_id and not conn.execute(
+                "SELECT 1 FROM admins WHERE id=? AND is_active=1 AND auth_version=?",
+                (admin_id, data.get("admin_version", 1))
+            ).fetchone():
                 return "", 0
             if rotate or not expiry:
                 token = secrets.token_urlsafe(32)
@@ -121,8 +138,8 @@ class ServerSessionMiddleware:
         connection = HTTPConnection(scope)
         token = connection.cookies.get(COOKIE_NAME, "")
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        data, member, expiry = await run_in_threadpool(self.load, token_hash, int(time.time()))
-        scope["session"], scope["member"] = data, member
+        data, member, expiry, admin = await run_in_threadpool(self.load, token_hash, int(time.time()))
+        scope["session"], scope["member"], scope["admin_identity"] = data, member, admin
         original = json.dumps(data, sort_keys=True)
         # Stream multipart files to Starlette's spooled files, never buffer a whole request.
         if scope["method"] in ("POST", "PUT", "PATCH", "DELETE"):

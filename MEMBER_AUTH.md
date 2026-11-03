@@ -26,7 +26,7 @@
 - ISSUE 등록은 기존 /issues/new, 검토 목록은 /admin/issues?status=pending, 작성자 내역은 /account/issues 에서 확인한다. 승인과 공개, 유효한 일정이 모두 충족되어야 지도·목록·홈·상세에 노출된다. 반려 사유는 작성자의 내 활동에 표시한다. 승인한 글의 수정·삭제는 운영자에게 문의한다.
 - 20261102_issue_review migration은 기존 ISSUE의 작성자·공개 상태를 유지하며 검토 상태만 기본 approved로 읽는다. 적용 전 /data/backups/jejuno-before-user-issue-submission-*.db 백업의 무결성을 검증한다. 신규 등록은 계정당 1분에 2건까지다.
 - 회원 수정은 필드 allowlist를 사용하고 작성자/관리자 노출 옵션/공개 여부를 받지 않는다. 관리자가 숨긴 글은 작성자가 수정해도 숨김 유지.
-- `/admin/users`, `/admin/user-posts`는 기존 관리자 및 active인 role=admin 회원만 접근 가능. 웹에서 회원을 admin으로 승격하는 기능은 없다.
+- `/admin/users`, `/admin/user-posts`는 기존 관리자 및 active인 role=admin 회원만 접근 가능. 기존 role=admin 회원은 콘텐츠 운영 범위로만 호환된다. 웹에서 회원을 admin으로 승격하는 기능은 없다.
 - 회원의 게시물 삭제는 `deleted_at` 기록 및 비공개 처리. 관리자는 기존 뉴스 CRUD에서 모든 글 수정/숨김/영구 삭제 가능.
 - 탈퇴는 현재 비밀번호와 확인 동의를 요구한다. status=deleted, 임의 식별자로 username 교체, nickname=탈퇴한 사용자, password_hash 제거, last_login_at 제거 및 모든 세션 폐기. 글과 내부 작성자 연결은 유지한다. 차단은 기존 글을 자동으로 지우지 않는다.
 - 현재 DB에서는 회원 식별 정보를 제거하지만 이전 백업에는 이전 시점 정보가 남을 수 있다. 운영자의 백업 보존/폐기 정책 적용이 필요하다.
@@ -44,3 +44,11 @@
 임시 DB 환경변수를 지정한 뒤 `python -m unittest discover -s tests -p 'test_*.py' -v`를 실행한다. app 모듈 import가 DB를 열기 때문에 실제 DB를 가리킨 상태로 테스트를 시작하지 않는다.
 
 마이페이지 홈(/account)은 로그인 회원의 등록 장소·ISSUE·수정 제안·문의 수와 최근 활동 8건을 기존 테이블에서 조회한다. 개별 활동 목록은 /account/places, /account/issues, /account/suggestions, /account/inquiries를 사용하고 프로필·비밀번호·탈퇴는 /account/settings에서 관리한다. 기존 마이페이지 앵커 북마크는 새로운 화면으로 연결한다.
+
+## 관리자 운영
+
+- 전용 관리자 로그인은 `/admin/login`을 사용한다. 20261103_admin_roles 마이그레이션은 백업 후 기존 admins 계정을 슈퍼관리자로 승계한다. 서버가 매 요청마다 DB에서 역할과 활성 상태를 확인한다.
+- 슈퍼관리자는 `/admin/admins`에서 서브관리자를 추가·수정·비활성화하거나 비밀번호를 재설정한다. 계정을 삭제하거나 UI에서 역할을 변경할 수 없다. 마지막 활성 슈퍼관리자는 SQLite에서도 보호한다.
+- 서브관리자는 대시보드, 장소·PICK·ISSUE·BEST·광고·문의 운영, 회원 목록과 통계를 사용한다. 운영 설정·분류·CSV·장소 삭제/병합·회원 상태 변경·관리자 관리는 슈퍼관리자 전용이다.
+- `/admin/account`에서 전용 관리자는 본인 표시 이름과 비밀번호를, 슈퍼관리자는 본인 아이디도 바꿀 수 있다. 아이디와 비밀번호 변경은 현재 비밀번호를 확인하며 해당 관리자의 모든 세션을 종료한다. 새 비밀번호는 10~128자이며 Argon2id로 저장한다.
+- `/admin/admin-logs`는 슈퍼관리자 전용이다. 작업·대상·당시 관리자 이름/아이디를 변경과 같은 트랜잭션에 보관한다. 조회는 한국시간을 사용한다. 비밀번호, 해시, 세션 토큰, 문의 본문·답변은 기록하지 않는다.

@@ -1,0 +1,7 @@
+{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import pager %}
+{% block admin_content %}<form class="admin-filters" method="get"><label>관리자<select name="actor"><option value="">전체</option>{% for op in operators %}<option value="{{ op.id }}" {% if filters.get('actor')==op.id|string %}selected{% endif %}>{{ op.username }}</option>{% endfor %}</select></label>
+<label>작업 유형<select name="action"><option value="">전체</option>{% for name in actions %}<option {% if filters.get('action')==name %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+<label>시작일<input type="date" name="start" value="{{ filters.get('start','') }}"></label><label>종료일<input type="date" name="end" value="{{ filters.get('end','') }}"></label>
+<button class="primary-inline">조회</button><a class="secondary-btn" href="/admin/admin-logs">초기화</a></form>
+<section class="admin-panel"><div class="admin-data-wrap"><table class="admin-data-table"><thead><tr><th>작업일시 (한국시간)</th><th>관리자</th><th>작업</th><th>대상</th></tr></thead><tbody>
+{% for item in items %}<tr><td data-label="한국시간">{{ item.local_time }}</td><td data-label="관리자">{{ item.actor_name }} <small>{{ item.actor_username }}</small></td><td data-label="작업">{{ item.action }}</td><td data-label="대상">{{ item.target_type }} #{{ item.target_id }} {{ item.target_name }}</td></tr>{% else %}<tr><td colspan="4" class="admin-empty">해당 조건의 활동 기록이 없습니다.</td></tr>{% endfor %}</tbody></table></div>{{ pager(pagination) }}</section>{% endblock %}

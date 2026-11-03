@@ -1,0 +1,10 @@
+{% extends 'admin/base.html' %}{% from 'admin/_operator_inputs.html' import token,password_fields %}
+{% block admin_content %}
+<section class="admin-panel admin-editor-body"><form method="post" class="admin-form">{{ token(csrf_token) }}
+<label>관리자 아이디<input name="username" value="{{ item.username if item else '' }}" {% if item %}readonly{% else %}required minlength="3" maxlength="64" autocomplete="off"{% endif %}></label>
+<label>관리자명<input name="display_name" required maxlength="60" value="{{ item.display_name if item else '' }}"></label>
+<p>권한 · 서브관리자</p><label>상태<select name="is_active"><option value="1">활성</option><option value="0" {% if item and not item.is_active %}selected{% endif %}>비활성</option></select></label>
+{% if not item %}{{ password_fields() }}{% endif %}
+<div class="row-actions"><button class="primary-inline">{{ '변경 사항 저장' if item else '서브관리자 생성' }}</button><a class="secondary-btn" href="/admin/admins">목록</a></div></form></section>
+{% if item %}<section class="admin-panel admin-editor-body"><h2>비밀번호 재설정</h2><p>저장하면 이 관리자의 기존 로그인이 모두 해제됩니다.</p><form method="post" action="/admin/admins/{{ item.id }}/password" class="admin-form">{{ token(csrf_token) }}{{ password_fields() }}<button class="primary-inline">비밀번호 재설정</button></form></section>{% endif %}
+{% endblock %}

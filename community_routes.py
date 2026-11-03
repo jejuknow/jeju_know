@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
+from admin_roles import audit
 from auth_security import current_user, rate_limited, safe_external_url
 from community_migrations import today
 from place_details import validate_detail_value
@@ -390,6 +391,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                         conn.execute("UPDATE places SET category=(SELECT name FROM categories WHERE id=?) WHERE id=?", (value,place["id"]))
                         conn.execute("DELETE FROM place_category_links WHERE place_id=?", (place["id"],))
             conn.execute("UPDATE place_correction_suggestions SET status=?,reviewed_at=CURRENT_TIMESTAMP,reviewed_by=?,review_note=? WHERE id=?", ("accepted" if action == "accept" else "rejected",actor(request),note,suggestion_id))
+            audit(conn,request,"수정 제안 반영" if action=="accept" else "수정 제안 반려","수정 제안",suggestion_id,place["name"])
         flash(request, "제안을 반영했습니다." if action == "accept" else "제안을 거절했습니다.")
         return redirect("/admin/community" if form.get("next") == "/admin/community" else "/admin/suggestions")
 
@@ -419,6 +421,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             with closing(connect_db()) as conn, conn:
                 conn.execute("BEGIN IMMEDIATE")
                 merge_places(conn, place_id, target_id, actor(request))
+                audit(conn,request,"장소 병합","장소",place_id)
         except (ValueError, sqlite3.IntegrityError) as exc:
             return HTMLResponse("병합할 장소를 다시 확인해주세요." if isinstance(exc,sqlite3.IntegrityError) else str(exc), status_code=400)
         flash(request, "장소를 병합했습니다. 이전 링크·사진·제안·PICK 기록과 추천 모음 연결은 보존됩니다.")
@@ -451,6 +454,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 ON CONFLICT(place_id,year,month) DO UPDATE SET sort_order=excluded.sort_order,pick_note=excluded.pick_note,is_active=excluded.is_active""", (place_id,year,month,order,note,active))
             if (year,month) == (today().year,today().month):
                 conn.execute("UPDATE places SET is_pick=? WHERE id=?", (active,place_id))
+            audit(conn,request,"PICK 수정","장소",place_id)
         flash(request, "월별 PICK을 저장했습니다. 과거 기록은 유지됩니다.")
         return redirect(f"/admin/picks?year={year}&month={month}")
 
@@ -480,5 +484,6 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             else:
                 conn.execute("INSERT INTO best_collection_places VALUES (?,?,?) ON CONFLICT(collection_id,place_id) DO UPDATE SET sort_order=excluded.sort_order", (collection_id,place_id,order))
             conn.execute("UPDATE best_collections SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (collection_id,))
+            audit(conn,request,"BEST 구성 수정","BEST",collection_id)
         flash(request, "추천 모음 구성을 저장했습니다.")
         return redirect(f"/admin/best/{collection_id}/edit")
