@@ -4,3 +4,15 @@
 .user-badge.tone-positive{background:#e4f5ea;color:#216342}
 .user-badge.tone-brand{background:#eaf0ff;color:#28499b}
 .user-badge.tone-attention{background:#fff0e5;color:#894012}
+/* Place cards share a content-sized status row across Jinja and JS rendering. */
+.place-card-badges{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 8px;min-width:0}
+.place-card-badges:empty{display:none}
+.place-card-badges>.user-badge{display:inline-flex;align-items:center;flex:0 0 auto;width:max-content;max-width:100%;padding:4px 6px;font-size:11px;font-weight:600;line-height:1.5;border-radius:999px;white-space:nowrap;letter-spacing:0}
+.place-card-badges>.badge-new{background:#f2edff;color:#6945a8}
+.place-card-badges>.badge-pick{background:#fff3e9;color:#a94c16}
+.place-card-opening{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 5px;word-break:keep-all;overflow-wrap:break-word}
+.place-card-badges+.place-card-opening{margin-top:0}
+.compact-place-body .compact-place-meta,.map-card-body .map-meta{margin:0 0 8px}
+.compact-place-body h3+.tag-row{margin:4px 0 10px}
+.pick-body>.pick-meta{margin:0 0 8px}
+.pick-body>.pick-meta+h3{margin:0 0 12px}

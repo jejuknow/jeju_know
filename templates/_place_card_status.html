@@ -1,0 +1,11 @@
+{# Presentation only: the server owns is_new, is_pick and verification. #}
+{% macro card_status(p) -%}
+{% if p.is_pick or p.status_label or p.is_new %}
+<div class="place-card-badges">
+  {% if p.is_pick %}<span class="user-badge badge-pick">JEJU_KNOW PICK</span>{% endif %}
+  {% if p.status_label %}<span class="user-badge tone-{{ p.status_tone }}">{{ p.status_label }}</span>{% endif %}
+  {% if p.is_new %}<span class="user-badge badge-new">NEW</span>{% endif %}
+</div>
+{% endif %}
+{% if p.opening_label %}<p class="place-card-opening">{{ p.opening_label }}</p>{% endif %}
+{%- endmacro %}

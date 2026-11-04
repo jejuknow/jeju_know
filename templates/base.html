@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="/static/navigation-icons.css?v=20261027-3d-icons">
   <link rel="stylesheet" href="/static/public-ux.css?v=20261028">
   <link rel="stylesheet" href="/static/brand-contact.css?v=20261102-my-inquiries">
-  {% if not request.url.path.startswith('/admin') %}<link rel="stylesheet" href="/static/user-status.css?v=1">{% endif %}
+  {% if not request.url.path.startswith('/admin') %}<link rel="stylesheet" href="/static/user-status.css?v=20261104-cards">{% endif %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   {% if not request.url.path.startswith('/admin') %}{% include '_member_nav.html' %}{% include '_site_header.html' %}{% endif %}
@@ -47,6 +47,7 @@
   {% if analytics_token %}<script src="/static/analytics.js?v=20261029"></script>{% endif %}
   <script src="/static/site-nav.js?v=20261008-home"></script>
   <script src="/static/image-uploads.js?v=20261102-review" defer></script>
+  {% if not request.url.path.startswith('/admin') %}<script src="/static/place-card-status.js?v=20261104"></script>{% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>
