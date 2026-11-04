@@ -208,7 +208,7 @@
       content.append(menu);
     }
     if(!hasCoordinates(place)) content.append(element('p','map-location-missing','지도 위치 미등록'));
-    const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
+    const link=element('a','detail-link','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;link.setAttribute('aria-label',`${place.name} 상세보기`);
     const correction=element('a','detail-link','정보 바로잡기');correction.href=`/places/${encodeURIComponent(place.id)}/suggest`;
     const actions=element('div','map-selected-actions');actions.append(link,correction);
     body.append(content,actions);selected.append(close,body);selected.hidden=false;
@@ -265,7 +265,7 @@
       if (locationState.active) body.append(element('span', 'nearby-distance', nearby.formatDistance(place.distance)));
       if(!hasCoordinates(place)) body.append(element('span','map-location-missing','지도 위치 미등록'));
       button.append(thumbnail(place),body);button.addEventListener('click',()=>selectPlace(place.id));
-      const link=element('a','map-card-detail','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;
+      const link=element('a','map-card-detail','상세보기 →');link.href=`/place/${encodeURIComponent(place.slug)}`;link.setAttribute('aria-label',`${place.name} 상세보기`);
       card.append(button,link);list.append(card);
     });
     if(view) view.render(places, locationState, centerOnLocation);

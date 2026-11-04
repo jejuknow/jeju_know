@@ -86,14 +86,14 @@ class PublicDiscoveryTest(unittest.TestCase):
         self.assertIn('/news/public-issue',xml.text)
         self.assertNotIn('hidden-issue',xml.text)
         self.assertEqual(self.visitor.get('/news/hidden-issue').status_code,404)
-        self.assertIn('og:title" content="공개 이슈 | JEJU_KNOW',self.visitor.get('/news/public-issue').text)
+        self.assertIn('og:title" content="공개 이슈 - 제주 지역소식 | JEJU_KNOW',self.visitor.get('/news/public-issue').text)
         for path in ('/admin','/login','/signup','/account','/map/register',f"/places/{p['id']}/suggest"):
             response=self.visitor.get(path,follow_redirects=False)
             self.assertIn('noindex',response.headers['x-robots-tag'])
         for path in ('/find','/map','/places'):
             html=self.visitor.get(path+'?region=조천&category=cafe').text
             self.assertIn(f'rel="canonical" href="https://www.jeju-know.com{path}"',html)
-            self.assertNotIn('noindex',html)
+            self.assertIn('name="robots" content="noindex,follow"',html)
         self.assertIn('https://www.jeju-know.com/sitemap.xml',self.visitor.get('/robots.txt').text)
 
     def test_relaxation_counts_reuse_exact_search_and_keep_original_empty(self):

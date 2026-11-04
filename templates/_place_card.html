@@ -1,6 +1,6 @@
 {% from '_place_card_status.html' import card_status %}
 <article class="compact-place-card">
-  <div class="compact-place-visual">{% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }}" loading="lazy" width="480" height="320">{% else %}<span>{{ p.emoji }}</span>{% endif %}</div>
+  <div class="compact-place-visual">{% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }} 대표 이미지" loading="lazy" width="480" height="320">{% else %}<span>{{ p.emoji }}</span>{% endif %}</div>
   <div class="compact-place-body">
     {{ card_status(p) }}
     <p class="compact-place-meta">{{ region_labels.get(p.region,p.region) }} · {{ p.category }}</p>
@@ -8,6 +8,6 @@
     {% if p.detail_features %}<div class="tag-row">{% for tag in p.detail_features[:3] %}<span class="tag">{{ tag }}</span>{% endfor %}</div>{% endif %}
     {% if p.signature_menu %}<p class="card-menu">{{ p.signature_menu.splitlines()[0] }}</p>{% endif %}
     <p class="compact-place-reason">{{ p.one_line }}</p>
-    <div class="card-actions"><a class="detail-link" href="/place/{{ p.slug }}">상세보기 →</a><a class="detail-link" href="/map?place={{ p.slug|urlencode }}">지도에서 보기</a></div>
+    <div class="card-actions"><a class="detail-link" href="/place/{{ p.slug|urlencode }}" aria-label="{{ p.name }} 상세보기">상세보기 →</a><a class="detail-link" href="/map?place={{ p.slug|urlencode }}" aria-label="{{ p.name }} 지도에서 보기">지도에서 보기</a></div>
   </div>
 </article>

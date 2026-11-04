@@ -61,8 +61,8 @@
       {% for item in news_items %}
       <article class="news-card {% if item.is_promoted %}promoted{% endif %}">
         <a href="{{ url_for('news_detail', slug=item.slug) }}" class="news-card-link">
-          <div class="news-thumb {% if item.image_url %}has-image{% endif %}" {% if item.image_url %}style="background-image:url('{{ item.image_url }}')"{% endif %}>
-            {% if not item.image_url %}<span>{{ '🎪' if item.category == news_category_labels.events else '📰' }}</span>{% endif %}
+          <div class="news-thumb {% if item.image_url %}has-image{% endif %}">
+            {% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.title }} 대표 포스터" loading="lazy" width="480" height="320" style="width:100%;height:100%;object-fit:cover">{% else %}<span>{{ '🎪' if item.category == news_category_labels.events else '📰' }}</span>{% endif %}
             <div class="news-overlay-badges">{{ schedule_badge(item) }}<span class="news-category">{{ item.category_label }}</span>{% if item.is_promoted %}<span class="sponsor-badge">홍보·제휴</span>{% elif item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div>
           </div>
           <div class="news-card-body">
@@ -98,4 +98,4 @@
   </section>
 </main>
 {% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261028-public"></script><script src="/static/home-cards.js?v=20261104-badges"></script><script src="/static/app.js?v=20261029-analytics"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-search.js?v=20261028-public"></script><script src="/static/home-cards.js?v=20261104-seo"></script><script src="/static/app.js?v=20261029-analytics"></script>{% endblock %}

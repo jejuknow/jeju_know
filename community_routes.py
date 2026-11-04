@@ -14,7 +14,7 @@ from admin_roles import audit
 from auth_security import current_user, rate_limited, safe_external_url
 from community_migrations import today
 from place_details import validate_detail_value
-from public_seo import collection_metadata
+from public_seo import collection_metadata, initial_places
 from cafe_features import FIELDS as CAFE_FIELDS, parse_member_features, combine_proposals
 from user_status import WAITING
 from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
@@ -69,11 +69,15 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
 
     @app.get("/find")
     async def find_page(request: Request):
-        return render(request, "find.html")
+        with closing(connect_db()) as conn:
+            initial = initial_places(conn, request.query_params, row_to_place, limit=5)
+        return render(request, "find.html", **initial)
 
     @app.get("/new")
     async def new_page(request: Request, category: str = ""):
-        return render(request, "new_places.html", selected_category=category if category in ("cafe","food") else "")
+        with closing(connect_db()) as conn:
+            initial = initial_places(conn, request.query_params, row_to_place, new='current')
+        return render(request, "new_places.html", selected_category=category if category in ("cafe","food") else "", **initial)
 
     @app.get("/pick")
     @app.get("/picks")

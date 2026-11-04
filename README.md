@@ -118,3 +118,20 @@ python -m unittest discover -s tests -v
 추가 migration은 기존 장소를 재작성하지 않고 `csv_import_runs`, `place_image_references`, `places.admin_import_note`만 추가합니다. 기존 이미지 메타데이터와 파일은 보존됩니다. 외부 이미지 참조도 기존 갤러리·수동 교체·삭제·병합 흐름에 연결됩니다. 운영 DB나 볼륨을 seed 데이터로 교체하지 않습니다.
 
 테스트 양식: `tests/fixtures/cafe-import.csv`, `tests/fixtures/restaurant-import.csv` (각 정상 2행·파일 내 중복 1행·분류 오류 1행). 운영 데이터에 남기지 않는 개발용 예제입니다. Python 검증은 `python -m unittest discover -s tests -p test_csv_import.py`, 프론트 회귀 검증은 `node --test tests/*.test.cjs`로 실행합니다.
+
+## Google / 네이버 SEO 운영
+
+공통 메타데이터는 `public_seo.py`와 `templates/base.html`에서 관리합니다. 기준 주소는 `https://www.jeju-know.com`입니다. Home/FIND/MAP/NEW/ISSUE/BEST와 공개 상세 페이지는 고유 제목·설명, canonical, Open Graph, Twitter Card를 제공합니다. FIND/MAP 등 목록에 query가 있는 경우 기본 경로를 canonical로 표시하고 `noindex,follow`를 적용합니다. 관리자·회원 활동·로그인·가입·등록/수정 폼은 `noindex,nofollow`, 문의 페이지는 `noindex,follow`입니다. 인증과 공개 여부 검사는 SEO와 별개로 계속 서버에서 처리합니다.
+
+`/sitemap.xml`은 현재 공개된 실제 장소(예시·병합·삭제 제외), 공개 BEST, 공개 정책을 충족한 승인 ISSUE와 주요 6개 페이지를 조회합니다. ISSUE의 기존 일정/종료 정책은 변경하지 않습니다. `lastmod`는 저장된 `updated_at`만 사용합니다. `/robots.txt`는 관리자·계정·API 크롤링을 제한하고 공개 페이지와 CSS/JS/업로드 이미지는 허용합니다. DB schema나 운영 Volume 변경은 필요 없습니다.
+
+소유 확인은 Railway 서비스 Variables에 실제 발급된 토큰의 **content 값만** 입력하고 배포합니다. 빈 값은 head에 출력하지 않습니다. 저장소에 토큰을 넣지 마세요.
+
+- `GOOGLE_SITE_VERIFICATION`: Google Search Console의 URL 접두어 속성 `https://www.jeju-know.com/` → 소유권 확인 → HTML 태그에서 발급받습니다. 반영 후 소유권 확인, `sitemap.xml` 제출, 홈/장소 상세 URL 검사를 진행합니다. 도메인 속성을 선택한다면 별도 DNS TXT 확인이 필요합니다.
+- `NAVER_SITE_VERIFICATION`: 네이버 서치어드바이저 웹마스터 도구에 `https://www.jeju-know.com`을 등록하고 HTML 태그를 선택합니다. 반영 후 소유 확인 → robots.txt 수집 확인 → 사이트맵 제출 → 웹페이지 수집 요청/사이트 진단을 진행합니다.
+
+www 없는 호스트가 앱에 도달하면 GET/HEAD는 경로와 query를 보존해 www HTTPS로 301 이동합니다. DNS 및 Railway의 도메인/TLS 연결은 별도 설정이며 이 코드가 DNS를 생성하지 않습니다. HTTP→HTTPS는 Railway edge의 전환도 확인해야 합니다.
+
+JSON-LD에는 실제 저장 정보만 사용합니다. 장소는 Restaurant/CafeOrCoffeeShop/TouristAttraction/Place, 날짜·행사장명·주소가 모두 있는 행사/전시/체험 ISSUE는 Event로 표시합니다. 시간이 없으면 날짜만 표시하며, 임의 별점·리뷰·가격·주최자는 만들지 않습니다. 검색 노출이나 리치 결과는 검색엔진의 판단이며, 소유 확인/색인 완료와 코드 배포 완료는 별개입니다.
+
+검증: `python -m unittest discover -s tests -p test_seo.py` (app import 전 `JEJUNO_DATA_DIR`를 테스트 전용 경로로 지정). [Google robots 규칙](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag), [Google Event 규칙](https://developers.google.com/search/docs/appearance/structured-data/event), [네이버 SEO 기본 가이드](https://searchadvisor.naver.com/guide/seo-basic-intro).

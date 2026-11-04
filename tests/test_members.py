@@ -205,7 +205,10 @@ class MembersTest(unittest.TestCase):
         visitor = self.new_client()
         detail = visitor.get('/news/'+item['slug'])
         self.assertEqual(detail.status_code,404)
-        self.assertNotIn('제주 행사', visitor.get('/').text)
+        # Generic SEO descriptions can mention events; the pending post itself must not appear.
+        home = visitor.get('/').text
+        self.assertNotIn('/news/' + item['slug'], home)
+        self.assertNotIn('<h3>' + item['title'] + '</h3>', home)
         stranger = self.new_client()
         self.member(stranger, 'another')
         for method in ('get','post'):

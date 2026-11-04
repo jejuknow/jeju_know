@@ -1,6 +1,6 @@
   <section class="finder-section" id="finder">
     <div class="wrap finder-layout">
-      <div class="finder-intro"><p class="kicker">PLACE FINDER</p><h2>오늘 제주 어디가지?</h2><p>어디로, 누구와 떠나나요?<br>지역·장소 종류·동행만 골라도 좋아요.</p><div class="finder-note">TIP · 원하는 조건만 선택해도 좋아요.<br>함께 모은 장소 정보에서 찾아보세요.</div></div>
+      <div class="finder-intro"><p class="kicker">PLACE FINDER</p>{% if request.url.path == '/find' %}<h1>오늘 제주 어디가지?</h1>{% else %}<h2>오늘 제주 어디가지?</h2>{% endif %}<p>어디로, 누구와 떠나나요?<br>지역·장소 종류·동행만 골라도 좋아요.</p><div class="finder-note">TIP · 원하는 조건만 선택해도 좋아요.<br>함께 모은 장소 정보에서 찾아보세요.</div></div>
       <div class="finder-card compact-finder">
         <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">1</span>어디로 갈까요?</legend><div class="chips" data-filter="region" id="regionChips"></div></fieldset>
         <fieldset class="filter-group"><legend class="filter-label"><span class="filter-step">2</span>무엇을 찾나요?</legend><div class="chips" data-filter="category" id="categoryChips"></div></fieldset>

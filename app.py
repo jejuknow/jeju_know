@@ -13,7 +13,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, PlainTextResponse
-from public_seo import page_metadata, place_metadata, issue_metadata, sitemap, private_page
+from public_seo import (page_metadata, place_metadata, issue_metadata, sitemap,
+                        robots_policy, verification_meta, initial_places)
 from new_visibility import new_clause
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
@@ -171,9 +172,13 @@ def create_app(test_config=None):
 
     @app.middleware('http')
     async def indexing_policy(request, call_next):
+        # Only the known alternate host redirects. Local/Railway health hosts keep working.
+        if request.method in ('GET', 'HEAD') and request.url.hostname == 'jeju-know.com':
+            return RedirectResponse(str(request.url.replace(scheme='https', netloc='www.jeju-know.com')), status_code=301)
         response = await call_next(request)
-        if private_page(request.url.path) or response.status_code >= 400:
-            response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+        policy = 'noindex,nofollow' if response.status_code >= 400 else robots_policy(request)
+        if policy.startswith('noindex'):
+            response.headers['X-Robots-Tag'] = policy
         return response
 
     def context_processor(request: Request):
@@ -189,7 +194,8 @@ def create_app(test_config=None):
             active_companions = [i['value'] for i in catalog(conn, 'companion')]
         return {
             "analytics_token": app.state.analytics.context(request),
-            "default_seo": page_metadata(request, settings['site_description']),
+            "default_seo": page_metadata(request, settings['site_description'], settings),
+            "verification_meta": verification_meta(),
             "site_settings": settings, "region_labels": region_labels, "companion_labels": companion_labels, **admin_data,
             "active_regions": active_regions, "active_companions": active_companions,
             "csrf_token": request.session["csrf_token"], "flashes": flashes,
@@ -677,12 +683,13 @@ def create_app(test_config=None):
             f"SELECT * FROM news_posts WHERE {where} ORDER BY is_promoted DESC, datetime(created_at) DESC, id DESC LIMIT 5", params
         ).fetchall()
         banners = active_banners(conn, day)
-        collections = [dict(r) for r in conn.execute("SELECT * FROM best_collections WHERE published=1 ORDER BY sort_order,id")]
+        collections = [dict(r) for r in conn.execute("SELECT * FROM best_collections WHERE published=1 AND deleted_at IS NULL ORDER BY sort_order,id")]
+        initial = initial_places(conn, request.query_params, row_to_place, limit=5)
         conn.close()
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"news_items": [row_to_news(row, day) for row in news_rows], "collections": collections, "banners": banners},
+            context={"news_items": [row_to_news(row, day) for row in news_rows], "collections": collections, "banners": banners, **initial},
         )
 
     @app.get("/place/{slug}", response_class=HTMLResponse)
@@ -741,7 +748,9 @@ def create_app(test_config=None):
 
     @app.get("/places", response_class=HTMLResponse)
     async def place_list(request: Request):
-        return templates.TemplateResponse(request=request, name="place_list.html", context={})
+        with closing(connect_db()) as conn:
+            initial = initial_places(conn, request.query_params, row_to_place)
+        return templates.TemplateResponse(request=request, name="place_list.html", context=initial)
 
     @app.get("/api/categories")
     async def api_categories():
@@ -751,8 +760,11 @@ def create_app(test_config=None):
     async def map_page(request: Request):
         if request.query_params.get("register") == "1":
             return RedirectResponse("/map/register?" + str(request.query_params), status_code=303)
+        with closing(connect_db()) as conn:
+            initial = initial_places(conn, request.query_params, row_to_place)
         return templates.TemplateResponse(request=request, name="map.html", context={
             "categories": navigation_order(place_categories()), "taxonomy": get_taxonomy(), "kakao_map_key": app.state.kakao_map_key,
+            **initial,
         })
 
     @app.get("/news", response_class=HTMLResponse)

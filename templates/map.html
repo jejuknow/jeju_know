@@ -26,7 +26,7 @@
   <section class="map-results" aria-label="장소 결과">
     <div class="map-sheet-bar"><button class="map-sheet-toggle" id="mapSheetToggle" type="button" aria-expanded="false" aria-controls="mapResultsList">목록 펼치기 ↑</button><button class="map-mobile text-btn" id="mapSheetClose" type="button" hidden>목록 접기 ↓</button></div>
     <div class="map-result-heading"><h2 id="mapResultCount" aria-live="polite">장소를 불러오고 있어요.</h2><p id="mapCoordinateCount"></p><button type="button" id="mapEditEmpty" class="map-mobile text-btn" hidden>상세필터 수정</button></div>
-    <div id="mapResultsList" class="map-results-list" aria-busy="true"></div><noscript><p>지도와 검색을 이용하려면 JavaScript를 켜 주세요.</p><a href="/">장소 목록으로</a></noscript>
+    <div id="mapResultsList" class="map-results-list" aria-busy="true">{% for p in initial_places %}<article class="map-place-card"><div class="map-card-body"><p class="map-meta">{{ p.region_label }} · {{ p.category }}</p><h3>{{ p.name }}</h3><p class="map-recommendation">{{ p.one_line }}</p></div><a class="map-card-detail" href="/place/{{ p.slug|urlencode }}" aria-label="{{ p.name }} 상세보기">상세보기 →</a></article>{% endfor %}</div><noscript><p>지도와 검색을 이용하려면 JavaScript를 켜 주세요. 현재 조건의 장소 {{ initial_total }}곳을 목록에서 확인할 수 있습니다.</p><a href="/places{% if request.url.query %}?{{ request.url.query }}{% endif %}">전체 장소 목록으로</a></noscript>
   </section>
   <dialog id="mapFilterSheet" aria-labelledby="mapFilterTitle">
     <header><h2 id="mapFilterTitle">상세필터</h2><button type="button" id="mapFilterClose" aria-label="필터 닫기" autofocus>×</button></header>
@@ -41,4 +41,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/map-mobile.js?v=1"></script><script src="/static/map-quick-filters.js?v=20261104-quick"></script><script src="/static/map.js?v=20261104-public-status"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/map-mobile.js?v=1"></script><script src="/static/map-quick-filters.js?v=20261104-quick"></script><script src="/static/map.js?v=20261104-seo"></script>{% endblock %}

@@ -10,26 +10,29 @@
   {% set page_seo = seo|default(default_seo) %}
   <meta name="description" content="{{ page_seo.description }}" />
   <title>{% if page_seo.title %}{{ page_seo.title }}{% else %}{% block title %}JEJU_KNOW{% endblock %}{% endif %}</title>
-  <meta name="robots" content="{{ page_seo.robots }}">
+  <meta name="robots" content="{{ default_seo.robots if default_seo.robots.startswith('noindex') else page_seo.robots }}">
+  {% for name, token in verification_meta.items() %}<meta name="{{ name }}" content="{{ token }}">{% endfor %}
   {% if page_seo.canonical %}<link rel="canonical" href="{{ page_seo.canonical }}">{% endif %}
   <meta property="og:site_name" content="{{ site_settings.site_name }}" />
-  <meta property="og:title" content="{{ page_seo.share_title|default(page_seo.title or self.title()|striptags|trim) }}" />
+  <meta property="og:title" content="{{ page_seo.title or self.title()|striptags|trim }}" />
+  <meta property="og:locale" content="ko_KR" />
   <meta property="og:description" content="{{ page_seo.description }}" />
   {% if page_seo.canonical %}<meta property="og:url" content="{{ page_seo.canonical }}">{% endif %}
   <meta property="og:type" content="website" />
   <meta property="og:image" content="{{ page_seo.image }}" />
   <meta property="og:image:alt" content="JEJU_KNOW" />
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{{ page_seo.share_title|default(page_seo.title or self.title()|striptags|trim) }}">
+  <meta name="twitter:title" content="{{ page_seo.title or self.title()|striptags|trim }}">
   <meta name="twitter:description" content="{{ page_seo.description }}">
   <meta name="twitter:image" content="{{ page_seo.image }}">
   {% if page_seo.json_ld %}<script type="application/ld+json">{{ page_seo.json_ld|tojson }}</script>{% endif %}
+  {% if page_seo.breadcrumbs %}<script type="application/ld+json">{{ page_seo.breadcrumbs|tojson }}</script>{% endif %}
   <link rel="icon" type="image/x-icon" href="/static/images/brand/favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/images/brand/favicon-32.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/static/images/brand/apple-touch-icon.png" />
   <link rel="preload" href="/static/fonts/paperlogy/Paperlogy-4Regular.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/static/fonts.css?v=20261027-paperlogy" />
-  <link rel="stylesheet" href="/static/styles.css?v=20261027-paperlogy" />
+  <link rel="stylesheet" href="/static/styles.css?v=20261104-seo" />
   <link rel="stylesheet" href="/static/members.css?v=20261011-wrap" />
   <link rel="stylesheet" href="/static/images.css?v=20261014-upload" />
   {% block head %}{% endblock %}

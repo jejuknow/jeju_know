@@ -23,7 +23,7 @@
     <section class="issue-results" id="issueResults" aria-label="ISSUE 목록">
       <div class="issue-results-heading"><h2><b data-results-title>제주 ISSUE</b> <span>{{ news_items|length }}건</span></h2><small data-map-count>지도 위치 {{ map_count }}곳</small></div>
       {% for item in news_items %}<article class="issue-card" data-issue-id="{{ item.id }}" {% if item.mappable %}data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}"{% endif %}>
-        <a href="{{ url_for('news_detail',slug=item.slug) }}"><div class="issue-poster">{% if item.image_url %}<img src="{{ item.image_url }}" alt="" loading="lazy">{% else %}{{ navigation_icon('issue') }}{% endif %}</div>
+        <a href="{{ url_for('news_detail',slug=item.slug) }}"><div class="issue-poster">{% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.title }} 대표 포스터" loading="lazy" width="480" height="640">{% else %}{{ navigation_icon('issue') }}{% endif %}</div>
           <div class="issue-copy"><div class="issue-tags"><span data-category>{{ item.category_label }}</span>{{ schedule_badge(item) }}{% if item.is_promoted or item.is_sponsored %}<span>{{ '홍보·제휴' if item.is_promoted else '광고·협찬' }}</span>{% endif %}</div><h3>{{ item.title }}</h3>
           {% if item.region or item.venue %}<p>{{ region_labels.get(item.region,item.region) }}{% if item.region and item.venue %} · {% endif %}{{ item.venue }}</p>{% endif %}
           <p data-dates>{{ item.date_label }}</p><span class="nearby-distance" data-distance hidden></span><small>{% if item.author_type == 'user' %}사용자 등록 · {% endif %}{{ item.author_name }}</small></div></a>
