@@ -55,7 +55,7 @@
  .map-body .map-legend{position:relative;top:auto;right:auto;order:0;flex-shrink:0}
  .map-body .map-legend summary{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;list-style:none;font-size:18px}
  .map-body summary::-webkit-details-marker{display:none}
- .map-body .map-legend ul{position:absolute;top:52px;left:0;width:max-content;max-width:calc(100vw - 24px);background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
+ .map-body .map-legend ul{position:absolute;top:52px;left:0;width:max-content;max-width:calc(100vw - 24px);max-height:min(210px,calc(50dvh - 62px));background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
  .map-body .map-geo{position:absolute;z-index:6;top:64px;right:10px;display:flex;align-items:flex-end;flex-direction:column;gap:6px}
  .map-body #mapGeoDock .nearby-controls{padding:0}
  .map-body [data-locate]{width:44px;height:44px;padding:0;font-size:0;box-shadow:var(--shadow)}

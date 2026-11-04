@@ -1,6 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {hasCoordinates,placeStatus,makeStatusBadge,makeStatusPin,createMapView}=require('../static/map.js');
+const {hasCoordinates,placeStatus,cardPresentation,legendStatuses,makeStatusBadge,makeStatusPin,createMapView}=require('../static/map.js');
+const cardStatus=require('../static/place-card-status.js');
 function fixture(){
  const calls={bounds:[],pans:[],overlays:[],centers:[],levels:[]};
  const sdk={
@@ -43,18 +44,47 @@ test('current monthly PICK takes priority over explicit verification, independen
   assert.equal(placeStatus({category,is_pick:false,verification_status:'jejuno_verified'}).key,'verified');
  }
  assert.equal(placeStatus({is_pick:1}).key,'pick');
- assert.equal(placeStatus({is_pick:0,source_type:'user'}).key,'unverified');
+ assert.equal(placeStatus({is_pick:0,source_type:'user'}).key,'user_submitted');
 });
 
 test('authorship, missing status and community confirmation never imply editorial verification',()=>{
- for(const source_type of ['admin','user',undefined]){
+ for(const source_type of ['admin','jejuno','user',undefined]){
   for(const verification_status of ['unverified','community_confirmed','unknown',undefined]){
-   assert.equal(placeStatus({source_type,verification_status}).key,'unverified');
+   assert.equal(placeStatus({source_type,verification_status}).style,'unverified');
   }
  }
- assert.equal(placeStatus({source_type:'user',status_label:'검토 대기'}).label,'검토 대기');
+ assert.equal(placeStatus({source_type:'user',status_label:'검토 대기'}).label,'사용자 등록');
  assert.equal(placeStatus({source_type:'jejuno',status_label:'JEJU_KNOW 등록'}).label,'JEJU_KNOW 등록');
  assert.equal(placeStatus({verification_status:'unknown'}).label,'상태 확인 필요');
+ for(const place of [{},{source_type:''},{source_type:'admin'},{submitted_by_user_id:10},{status_label:'사용자 등록'}]){
+  assert.notEqual(placeStatus(place).label,'사용자 등록','missing provenance must never imply user submission');
+ }
+});
+
+test('six provenance/priority cases agree across marker and MAP card without changing review workflow',()=>{
+ const cases=[
+  [{source_type:'user',verification_status:'unverified',status_label:'검토 대기'},'user_submitted','사용자 등록'],
+  [{source_type:'user',verification_status:'jejuno_verified'},'verified','JEJU_KNOW 확인'],
+  [{source_type:'user',verification_status:'jejuno_verified',is_pick:true},'pick','JEJU_KNOW PICK'],
+  [{source_type:'jejuno',verification_status:'jejuno_verified'},'verified','JEJU_KNOW 확인'],
+  [{source_type:'jejuno',verification_status:'unverified'},'editorial','JEJU_KNOW 등록'],
+  [{verification_status:'unverified'},'default','상태 확인 필요']
+ ];
+ for(const [place,key,label]of cases){
+  const original=JSON.stringify(place),marker=placeStatus(place);
+  assert.equal(marker.key,key);assert.equal(marker.label,label);
+  const view=cardPresentation({...place,is_new:true,opening_label:'2026년 11월 오픈'});
+  assert.deepEqual(cardStatus.entries(view).map(s=>s.label),[label,'NEW']);
+  assert.equal(view.opening_label,'2026년 11월 오픈');
+  assert.equal(JSON.stringify(place),original,'presentation must not alter source/workflow data');
+ }
+});
+
+test('legend explains real mapped fallback origins and uses the same status definitions',()=>{
+ const places=[{...cafe,source_type:'jejuno'},{...food},{id:3,source_type:'user'}];
+ assert.deepEqual(legendStatuses(places).map(s=>s.label),['사용자 등록','JEJU_KNOW 등록','상태 확인 필요','JEJU_KNOW 확인','JEJU_KNOW PICK']);
+ assert.deepEqual(legendStatuses([{source_type:'jejuno'}]).map(s=>s.key),['user_submitted','verified','pick']);
+ assert.equal(legendStatuses(places)[1],placeStatus(places[0]));
 });
 
 test('marker and card share status, with accessible text and a distinct symbol for each status',()=>{
@@ -63,8 +93,9 @@ test('marker and card share status, with accessible text and a distinct symbol f
   const place={name:'<img onerror=alert(1)>',...data},status=placeStatus(place);
   let clicks=0;
   const pin=makeStatusPin(place,()=>clicks++,doc),badge=makeStatusBadge(place,doc);
-  assert.ok(pin.className.includes(`map-status--${status.key}`));
-  assert.ok(badge.className.includes(`map-status--${status.key}`));
+  assert.ok(pin.className.includes(`map-status--${status.style}`));
+  assert.ok(badge.className.includes(`map-status--${status.style}`));
+  assert.equal(pin.attributes['data-marker-type'],status.key);
   assert.equal(pin.children[0].textContent,status.symbol);
   assert.equal(pin.children[0].attributes['aria-hidden'],'true');
   assert.doesNotMatch(pin.children[0].textContent,/\d/);

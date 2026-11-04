@@ -34,7 +34,7 @@
 .map-status{display:inline-block;max-width:100%;padding:4px 8px;border-radius:8px;background:var(--status-soft);color:var(--status-text);font-size:11px;font-weight:700;line-height:1.6;word-break:keep-all;overflow-wrap:break-word}
 .map-legend{position:absolute;top:52px;right:0;z-index:6;width:max-content;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:var(--shadow);font-size:11px}
 .map-legend summary{padding:10px 12px;min-height:44px;cursor:pointer;font-weight:700;white-space:nowrap}
-.map-legend ul{list-style:none;padding:0 12px 10px;margin:0;display:grid;gap:7px;max-height:130px;overflow:auto}
+.map-legend ul{list-style:none;padding:0 12px 10px;margin:0;display:grid;gap:7px;max-height:210px;overflow:auto}
 .map-legend li{display:flex;align-items:center;gap:6px;white-space:nowrap}.map-legend small{font-size:10px;color:var(--muted)}
 .map-legend-symbol{display:inline-grid;place-items:center;flex-shrink:0}
 .map-legend summary:focus-visible{outline:3px solid var(--brand);outline-offset:2px}

@@ -2,23 +2,42 @@
   'use strict';
   const nearby = typeof module !== 'undefined' && module.exports ? require('./nearby.js') : root.JejuNearby;
   const {hasCoordinates} = nearby;
-  // is_pick is supplied by the API's current monthly PICK lookup, not a category.
-  // Only explicit editorial verification earns a blue marker, regardless of author.
+  // Map presentation is separate from the member's review workflow. The API's
+  // is_pick already represents the current month; never infer who registered a
+  // place from lack of verification, a submitter name, or a legacy default.
+  const markerStates={
+    pick:{key:'pick',style:'pick',symbol:'★',label:'JEJU_KNOW PICK'},
+    verified:{key:'verified',style:'verified',symbol:'✓',label:'JEJU_KNOW 확인'},
+    user_submitted:{key:'user_submitted',style:'unverified',symbol:'●',label:'사용자 등록'},
+    editorial:{key:'editorial',style:'unverified',symbol:'●',label:'JEJU_KNOW 등록'},
+    default:{key:'default',style:'unverified',symbol:'●',label:'상태 확인 필요'}
+  };
   function placeStatus(place) {
-    if(place.is_pick===true||place.is_pick===1)return {key:'pick',symbol:'★',label:'JEJU_KNOW PICK'};
-    const label=place.status_label || '상태 확인 필요';
-    if(place.verification_status==='jejuno_verified')return {key:'verified',symbol:'✓',label};
-    return {key:'unverified',symbol:'●',label};
+    if(place.is_pick===true||place.is_pick===1)return markerStates.pick;
+    if(place.verification_status==='jejuno_verified')return markerStates.verified;
+    if(place.source_type==='user')return markerStates.user_submitted;
+    if(place.source_type==='jejuno')return markerStates.editorial;
+    return markerStates.default;
+  }
+  function cardPresentation(place){
+    const status=placeStatus(place);
+    return {...place,is_pick:status.key==='pick',status_label:status.key==='pick'?'':status.label,
+      status_tone:status.key==='verified'?'brand':'neutral'};
+  }
+  function legendStatuses(places){
+    const shown=new Set(places.filter(hasCoordinates).map(p=>placeStatus(p).key));
+    return [markerStates.user_submitted,...['editorial','default'].filter(k=>shown.has(k)).map(k=>markerStates[k]),markerStates.verified,markerStates.pick];
   }
   function makeStatusBadge(place,doc) {
     const status=placeStatus(place),badge=doc.createElement('span');
-    badge.className=`map-status map-status--${status.key}`;
+    badge.className=`map-status map-status--${status.style}`;
     badge.textContent=`${status.symbol} ${status.label}`;
     return badge;
   }
   function makeStatusPin(place,select,doc) {
     const status=placeStatus(place),pin=doc.createElement('button');
-    pin.className=`map-pin map-status--${status.key}`;pin.type='button';
+    pin.className=`map-pin map-status--${status.style}`;pin.type='button';
+    pin.setAttribute('data-marker-type',status.key);
     const shape=doc.createElement('span');shape.className='map-pin-shape';
     shape.textContent=status.symbol;shape.setAttribute('aria-hidden','true');pin.append(shape);
     pin.setAttribute('aria-label',`${place.name} 지도 마커 · ${status.label}`);
@@ -74,7 +93,7 @@
       fit
     };
   }
-  if (typeof module !== 'undefined' && module.exports) { module.exports={hasCoordinates,placeStatus,makeStatusBadge,makeStatusPin,createMapView}; return; }
+  if (typeof module !== 'undefined' && module.exports) { module.exports={hasCoordinates,placeStatus,cardPresentation,legendStatuses,makeStatusBadge,makeStatusPin,createMapView}; return; }
 
   const workspace=document.getElementById('mapWorkspace');
   if (!workspace) return;
@@ -176,7 +195,7 @@
     const header=element('div','map-selected-header'),intro=element('div','map-selected-intro');
     intro.append(element('h3','',place.name),element('p','map-meta',`${(place.region_label||regionLabel(place.region))} · ${place.category}`));
     header.append(thumbnail(place),intro);
-    cardStatus.append(content,place);
+    cardStatus.append(content,cardPresentation(place));
     content.append(header,element('p','map-recommendation',place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
     const attributes=filters.discoveryAttributes(place,taxonomy),discovery=element('dl','map-discovery');
     for(const [label,value] of [['① 어디',attributes.region],['② 무엇',attributes.what],['③ 누구랑',attributes.companions]]){
@@ -216,6 +235,13 @@
     updateFilterSummary();
     const name=categoryName();
     const places = locationState.active ? nearby.within(state.places, locationState.point, locationState.radius) : state.places;
+    const legend=document.getElementById('mapLegendItems');
+    legend.replaceChildren();
+    for(const status of legendStatuses(places)){
+      const item=element('li'),icon=element('span',`map-legend-symbol map-status--${status.style}`);
+      icon.setAttribute('aria-hidden','true');icon.append(element('span','map-pin-shape',status.symbol));
+      item.dataset.markerType=status.key;item.append(icon,element('span','',status.label));legend.append(item);
+    }
     count.textContent = (locationState.active ? '내 주변 ' + locationState.radius + 'km · ' : '') + `${name} · 총 ${places.length}곳`;
     if (!places.length && mobile.media.matches) count.textContent='조건에 맞는 장소가 없습니다.';
     mobile.finished(places.length);
@@ -237,7 +263,7 @@
       const card=element('article','map-place-card');card.dataset.placeId=place.id;
       const button=element('button','map-place-select');button.type='button';button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',`${place.name} 위치 보기`);
       const body=element('div','map-card-body');
-      cardStatus.append(body,place);
+      cardStatus.append(body,cardPresentation(place));
       body.append(element('p','map-meta',`${(place.region_label||regionLabel(place.region))} · ${place.category}`),element('h3','',place.name),element('p','map-recommendation',(state.pick?place.pick_note||place.reason:'')||place.one_line||'상세 페이지에서 장소 정보를 확인하세요.'));
       if (locationState.active) body.append(element('span', 'nearby-distance', nearby.formatDistance(place.distance)));
       if(!hasCoordinates(place)) body.append(element('span','map-location-missing','지도 위치 미등록'));

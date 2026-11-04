@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}제주 지도 | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261104-discovery"><link rel="stylesheet" href="/static/nearby.css?v=20261104"><link rel="stylesheet" href="/static/map-mobile.css?v=20261104-quick">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261104-legend"><link rel="stylesheet" href="/static/nearby.css?v=20261104"><link rel="stylesheet" href="/static/map-mobile.css?v=20261104-legend">{% endblock %}
 {% block body_class %}map-body{% endblock %}
 {% block body %}
 <main class="map-workspace" id="mapWorkspace" data-kakao-key="{{ kakao_map_key }}">
@@ -16,7 +16,7 @@
     <section class="map-canvas-panel" aria-label="제주 장소 지도">
       <div id="kakaoMap" aria-label="장소 위치 지도"></div>
       <div class="map-canvas-actions"><button id="mapFit" class="map-fit" type="button" aria-label="전체 장소 범위 보기" disabled><span class="map-wide">장소 전체 범위</span><span class="map-mobile" aria-hidden="true">⛶</span></button><a id="mapRegisterLink" class="primary-inline" href="/map/register" aria-label="장소 알려주기">+ 장소<span class="map-wide">&nbsp;알려주기</span></a>
-        <details class="map-legend" id="mapLegend"><summary aria-label="마커 안내"><span class="map-wide">마커 안내</span><span class="map-mobile" aria-hidden="true">?</span></summary><ul aria-label="지도 마커 상태 안내"><li><span class="map-legend-symbol map-status--unverified" aria-hidden="true"><span class="map-pin-shape">●</span></span>{{ user_status.EDITORIAL.label }} / {{ user_status.WAITING.label }}</li><li><span class="map-legend-symbol map-status--verified" aria-hidden="true"><span class="map-pin-shape">✓</span></span>{{ user_status.VERIFIED.label }}</li><li><span class="map-legend-symbol map-status--pick" aria-hidden="true"><span class="map-pin-shape">★</span></span>JEJU_KNOW PICK</li></ul></details>
+        <details class="map-legend" id="mapLegend"><summary aria-label="마커 안내" title="마커 안내"><span class="map-wide">마커 안내</span><span class="map-mobile" aria-hidden="true">ⓘ</span></summary><ul id="mapLegendItems" aria-label="지도 마커 상태 안내"></ul></details>
       </div>
       <div class="map-mobile map-geo"><div id="mapGeoDock"></div><details id="mapRadiusMenu"><summary aria-label="내 주변 반경 선택">주변 5km</summary><div id="mapRadiusOptions"></div></details></div>
       <p id="mapNotice" class="map-notice" role="status">지도를 불러오고 있어요.</p>
@@ -41,4 +41,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/map-mobile.js?v=1"></script><script src="/static/map-quick-filters.js?v=20261104-quick"></script><script src="/static/map.js?v=20261104-quick"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/map-mobile.js?v=1"></script><script src="/static/map-quick-filters.js?v=20261104-quick"></script><script src="/static/map.js?v=20261104-legend"></script>{% endblock %}
