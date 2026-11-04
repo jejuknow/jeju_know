@@ -40,6 +40,79 @@ const sdk = `window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.
     assert.equal(await p.locator('#mapResultsList').isVisible(),false);
     console.log('mobile',w,h,'map',rect.height,'px',Math.round(rect.height/h*100)+'%');
   }
+  const taxonomy=await(await ctx.request.get(base+'/api/place-taxonomy')).json();
+  const filters=require('../static/place-search.js');
+  const majors=filters.cuisinesFor(taxonomy),korean=majors.find(t=>t.name==='한식');
+  const dishes=filters.termsFor(taxonomy,'food',korean.slug),meal=dishes.find(t=>t.name==='백반·정식');
+  const cafes=filters.termsFor(taxonomy,'cafe');
+  const quick=p.locator('#mapQuickFilters');
+  let requests=0;
+  p.on('request',r=>{if(new URL(r.url()).pathname==='/api/places')requests++});
+  async function quickClick(text){
+    const before=requests;await filterClick('#mapQuickFilters',text);await verifyApi();
+    assert.equal(requests-before,1,'one quick action must trigger one search');
+  }
+  for(const [w,h] of [[320,568],[360,740],[375,812],[390,844],[430,932]]){
+    await p.setViewportSize({width:w,height:h});
+    const initial=await p.locator('#kakaoMap').boundingBox();
+    assert.equal(await quick.isVisible(),false);assert.equal(await p.locator('#mapReset').isVisible(),false);
+    await filterClick('.map-categories','맛집');
+    assert.deepEqual(await quick.locator('button').allTextContents(),['전체 음식',...majors.map(t=>t.name)]);
+    await quickClick('한식');
+    assert.deepEqual(await quick.locator('button').allTextContents(),['← 한식','전체',...dishes.map(t=>t.name)]);
+    assert.equal(await quick.evaluate(n=>n.scrollLeft),0);
+    await quickClick('백반·정식');
+    assert.equal(await quick.getByRole('button',{name:'백반·정식',exact:true}).getAttribute('aria-pressed'),'true');
+    assert.equal(await p.evaluate(()=>document.activeElement.textContent),'백반·정식');
+    await open();
+    assert.equal(await p.locator('#mapCuisines').getByRole('button',{name:'한식',exact:true}).getAttribute('aria-pressed'),'true');
+    assert.equal(await p.locator('#mapDetails').getByRole('button',{name:'백반·정식',exact:true}).getAttribute('aria-pressed'),'true');
+    await filterClick('#mapDetails','전체');await apply();
+    assert.equal(await quick.getByRole('button',{name:'전체',exact:true}).getAttribute('aria-pressed'),'true');
+    await quickClick('한식에서 음식 대분류로 돌아가기');
+    assert.equal(new URL(p.url()).searchParams.get('category'),'food');
+    assert.equal(new URL(p.url()).searchParams.has('cuisine'),false);
+    assert.equal(await quick.evaluate(n=>n.scrollLeft),0);
+    await filterClick('.map-categories','카페');
+    assert.deepEqual(await quick.locator('button').allTextContents(),['전체 카페',...cafes.map(t=>t.name)]);
+    await quickClick(cafes[0].name);await quickClick(cafes[1].name);
+    assert.equal(await quick.locator('[aria-pressed=true]').count(),2);
+    assert.equal(new URL(p.url()).searchParams.has('cuisine'),false);
+    await open();assert.equal(await p.locator('#mapDetails [aria-pressed=true]').count(),2);await apply();
+    const layout=await quick.evaluate(n=>({height:n.getBoundingClientRect().height,ys:Array.from(n.children).map(b=>b.getBoundingClientRect().y),scroll:n.scrollWidth>n.clientWidth}));
+    assert.equal(layout.height,44);assert.equal(new Set(layout.ys).size,1);assert.equal(layout.scroll,true);
+    assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth),w);
+    const after=await p.locator('#kakaoMap').boundingBox();
+    assert.equal(after.height,initial.height);assert.equal(after.y,initial.y);
+    assert.equal(await p.locator('#mapActiveFilters').isVisible(),false);
+    await p.locator('#mapReset').click();await ready();
+    console.log('quick',w,'food drill/back, cafe multi, sheet sync, single row, map unchanged');
+  }
+  await p.setViewportSize({width:390,height:844});
+  await filterClick('.map-categories','가볼 곳');
+  assert.equal(await quick.isVisible(),filters.termsFor(taxonomy,'attraction').length>0);
+  await p.locator('#mapReset').click();await ready();
+  await filterClick('.map-categories','JEJU_KNOW PICK');assert.equal(await quick.isVisible(),false);
+  await p.locator('#mapReset').click();await ready();
+  await filterClick('.map-categories','맛집');await quickClick('한식');await quickClick('백반·정식');
+  await p.goBack();await ready();assert.equal(await quick.getByRole('button',{name:'전체',exact:true}).getAttribute('aria-pressed'),'true');
+  await p.goForward();await ready();assert.equal(await quick.getByRole('button',{name:'백반·정식',exact:true}).getAttribute('aria-pressed'),'true');
+  const foodRows=await(await ctx.request.get(base+'/api/places'+new URL(p.url()).search)).json();
+  const foodAnchor=foodRows.find(geo.hasCoordinates)||(await(await ctx.request.get(base+'/api/places?category=food')).json()).find(geo.hasCoordinates);
+  if(foodAnchor){
+    const point={latitude:foodAnchor.latitude,longitude:foodAnchor.longitude};await ctx.setGeolocation(point);
+    await p.locator('[data-locate]').click();await p.waitForFunction(()=>!document.querySelector('[data-radius]').disabled);
+    await p.locator('#mapRadiusMenu summary').click();await p.locator('[data-radius]').selectOption('5');
+    assert.deepEqual(await p.locator('#mapResultsList article').evaluateAll(ns=>ns.map(n=>+n.dataset.placeId)),geo.within(foodRows,point,5).map(x=>x.id));
+    await p.keyboard.press('Escape');
+    console.log('food + korean + meal + nearby 5km',foodRows.length,'before radius');
+  }else console.log('No public geocoded food result; radius covered by isolated fixture');
+  if(process.env.MAP_EVIDENCE_DIR){
+    await p.screenshot({path:path.join(process.env.MAP_EVIDENCE_DIR,'quick-drill-'+(local?'local':'live')+'.png')});
+    await p.locator('#mapReset').click();await ready();await filterClick('.map-categories','맛집');
+    await p.screenshot({path:path.join(process.env.MAP_EVIDENCE_DIR,'quick-major-'+(local?'local':'live')+'.png')});
+  }
+  await p.locator('#mapReset').click();await ready();
   await p.setViewportSize({width:390,height:844});
   await filterClick('.map-categories','맛집');
   assert.equal(await p.locator('#mapCuisines').isVisible(),false);
@@ -61,8 +134,8 @@ const sdk = `window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.
     assert.ok(await p.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1));
   }
   await p.setViewportSize({width:390,height:844});
-  assert.ok((await p.locator('#mapActiveFilters').textContent()).includes('백반·정식'));
-  await p.getByRole('button',{name:'백반·정식 조건 제거',exact:true}).click();await verifyApi();
+  assert.equal(await p.locator('#mapActiveFilters').isVisible(),false);
+  await filterClick('#mapQuickFilters','백반·정식');await verifyApi();
   await open();await p.keyboard.press('Escape');assert.equal(await p.locator('#mapFilterSheet[open]').count(),0);
   await open();await p.mouse.click(3,3);assert.equal(await p.locator('#mapFilterSheet[open]').count(),0);
   await p.locator('#mapReset').click();await ready();
@@ -131,15 +204,30 @@ const sdk = `window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.
     assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth),w);
     const mobile=w===390||h===390;
     assert.equal(await p.locator('#mapOpenFilters').isVisible(),mobile);
-    if(!mobile){assert.equal(await p.locator('.map-tools .map-extra-filters').isVisible(),true);assert.equal(await p.locator('.map-filter-panel .nearby-controls').count(),1);assert.equal(await p.locator('#mapResultsList').isVisible(),true)}
+    if(!mobile){
+      assert.equal(await p.locator('.map-tools .map-extra-filters').isVisible(),true);assert.equal(await p.locator('.map-filter-panel .nearby-controls').count(),1);assert.equal(await p.locator('#mapResultsList').isVisible(),true);
+      await filterClick('.map-categories','맛집');assert.equal(await quick.isVisible(),false);
+      await filterClick('#mapCuisines','한식');assert.equal(await p.locator('#mapDetails').isVisible(),true);
+      await filterClick('#mapDetails','백반·정식');await verifyApi();
+      await p.locator('#mapReset').click();await ready();
+    }
     if(h===390){await p.locator('#kakaoMap').scrollIntoViewIfNeeded();assert.ok((await p.locator('#kakaoMap').boundingBox()).height>=h*.5)}
     console.log('resize',w,h,'OK');
   }
   assert.equal(await beforeMap.evaluate(n=>n===document.querySelector('#kakaoMap')),true);
   if(local){assert.equal(await p.evaluate(()=>window.mapInstances),1);assert.ok(await p.evaluate(()=>window.relayouts>0))}
+  const linked=await ctx.newPage();linked.on('pageerror',e=>errors.push(e.message));
+  await linked.goto(base+'/find?category=food&cuisine='+korean.slug+'&detail='+meal.slug);
+  await linked.locator('#finderMapLink').click();
+  await linked.locator('#mapResultsList[aria-busy=false]').waitFor({state:'attached'});
+  assert.equal(await linked.locator('.map-categories [data-category=food]').getAttribute('aria-pressed'),'true');
+  assert.equal(await linked.locator('#mapQuickFilters').getByRole('button',{name:'백반·정식',exact:true}).getAttribute('aria-pressed'),'true');
+  assert.equal(await linked.locator('#mapQuickFilters button').first().textContent(),'← 한식');
+  assert.equal(new URL(linked.url()).searchParams.get('cuisine'),korean.slug);
+  await linked.close();
   // A failed request must not leave the filter CTA loading forever.
   await ctx.route('**/api/places?**',r=>r.fulfill({status:503,body:'unavailable'}));
-  await p.locator('#mapReset').click();await ready();await open();
+  await p.locator('#mapSearch button').click();await ready();await open();
   assert.equal(await p.locator('#mapFilterApply').textContent(),'다시 시도');
   await ctx.unroute('**/api/places?**');
   await p.locator('#mapFilterApply').click();await ready();await apply();

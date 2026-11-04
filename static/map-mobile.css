@@ -35,13 +35,18 @@
  .map-body #mapSearch button{position:absolute;right:0;top:0;height:44px;width:44px;padding:0;display:grid;place-items:center;border:0;background:none;color:var(--brand);border-radius:12px}
  .map-body .map-filter-panel{overflow:visible;min-width:0;z-index:2}
  .map-body .map-categories{max-width:100%;padding:4px 12px;gap:6px;overflow-x:auto;scrollbar-width:none}
- .map-body .map-categories::-webkit-scrollbar,.map-body #mapActiveFilters::-webkit-scrollbar{display:none}
+ .map-body .map-categories::-webkit-scrollbar,.map-body #mapQuickFilters::-webkit-scrollbar{display:none}
  .map-body .map-category{padding:8px 14px;min-height:44px;font-size:12px}
  .map-body .map-filter-panel>.map-filter-summary{display:flex;align-items:center;gap:6px;margin:0;padding:0 8px;min-height:44px}
- .map-body .map-filter-summary #mapActiveFilters{display:flex;flex:1;flex-wrap:nowrap;overflow-x:auto;min-width:0;gap:6px;padding:0;scrollbar-width:none}
- .map-body #mapActiveFilters .chip{white-space:nowrap;flex-shrink:0;min-height:44px;font-size:12px;padding:8px 10px}
+ .map-body .map-filter-summary #mapActiveFilters{display:none}
+ .map-body #mapQuickFilters{display:flex;flex:1;align-items:center;flex-wrap:nowrap;min-width:0;height:44px;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+ .map-body #mapQuickFilters .map-category{padding:8px 10px}
+ .map-body #mapQuickFilters .map-quick-back{background:var(--soft);color:var(--muted)}
+ .map-body #mapQuickFilters button:focus-visible{outline-offset:-3px}
  .map-body #mapOpenFilters{align-items:center;justify-content:center;border:1px solid var(--line);background:#fff;border-radius:12px;font-weight:700;white-space:nowrap}
  .map-body #mapOpenFilters,.map-body #mapReset{min-height:44px;padding:8px;flex-shrink:0;font-size:12px}
+ .map-body #mapOpenFilters{margin-left:auto}
+ .map-body #mapReset.is-empty{display:none}
  .map-body .map-canvas-panel{grid-area:canvas;min-height:50vh;min-height:50dvh}
  .map-body .map-canvas-actions{left:10px;right:10px;top:10px;gap:6px;max-width:none;pointer-events:none}
  .map-body .map-canvas-actions>*{pointer-events:auto}

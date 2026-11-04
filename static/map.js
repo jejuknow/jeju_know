@@ -114,6 +114,7 @@
     }
   });
   const mobile = root.mobileMapDiscovery(workspace);
+  const quickFilters = root.MapQuickFilters.mount(document.getElementById('mapQuickFilters'),selectFilter);
   const regionLabel=value=>({'제주시':'제주시내','서귀포시':'서귀포시내'}[value]||value);
   function thumbnail(place) {
     const frame=element('div','map-thumb');
@@ -140,6 +141,7 @@
     focusSlot.hidden=state.category!=='cafe'||!taxonomy.cafe_focus?.length;
     if(!focusSlot.hidden) filters.chips(document.getElementById('mapFocus'),taxonomy.cafe_focus,state.focus);
     mobile.sections(state);
+    quickFilters(state,taxonomy);
     if(focusGroup && active.dataset.value!==undefined) {
       Array.from(focusGroup.querySelectorAll('[data-value]')).find(b=>b.dataset.value===active.dataset.value)?.focus({preventScroll:true});
     }
@@ -211,6 +213,7 @@
     list.append(section, element('h3', 'nearby-list-heading', '내 주변 장소 · 거리순'));
   }
   function render() {
+    updateFilterSummary();
     const name=categoryName();
     const places = locationState.active ? nearby.within(state.places, locationState.point, locationState.radius) : state.places;
     count.textContent = (locationState.active ? '내 주변 ' + locationState.radius + 'km · ' : '') + `${name} · 총 ${places.length}곳`;
@@ -259,8 +262,7 @@
     document.getElementById('mapFindLink').href=filters.href('/find',state);
     document.getElementById('mapRegisterLink').href=filters.registrationHref(state);
     filters.activeChips(document.getElementById('mapActiveFilters'),state,taxonomy,item=>{filters.removeFilter(state,item.key,item.value);query.value=state.q;renderDetails();search();});
-    const extraCount=filters.selectedFilters(state,taxonomy).filter(item=>!['category','q','pick'].includes(item.key)).length;
-    document.getElementById('mapOpenFilters').textContent='필터'+(extraCount?' · '+extraCount:'');
+    updateFilterSummary();
     try {
       const response=await fetch('/api/places?'+params,{signal:pending.signal,headers:{Accept:'application/json'}});
       if(!response.ok) throw new Error('장소를 불러오지 못했습니다. 다시 검색해 주세요.');
@@ -276,15 +278,23 @@
     } finally { if(request===sequence)list.setAttribute('aria-busy','false'); }
   }
   categoryNav.addEventListener('click',event=>{const button=event.target.closest('[data-category],[data-pick]');if(!button)return;if(button.dataset.pick)state.pick=state.pick?'':'current';else filters.select(state,'category',button.dataset.category||'');renderDetails();state.q=query.value.trim();search();});
-  for(const [id,key] of [['mapRegions','region'],['mapCompanions','companions'],['mapFocus','focus']])document.getElementById(id).addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,key,button.dataset.value);renderDetails();search();});
-  cuisineNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;filters.select(state,'cuisine',button.dataset.value);renderDetails();search();});
-  detailNav.addEventListener('click',event=>{const button=event.target.closest('[data-value]');if(!button)return;
-    if(state.category==='food'){
+  function updateFilterSummary(){
+    const selected=filters.selectedFilters(state,taxonomy);
+    const extraCount=selected.filter(item=>!['category','cuisine','terms','q','pick'].includes(item.key)).length;
+    document.getElementById('mapOpenFilters').textContent='상세필터'+(extraCount?' · '+extraCount:'');
+    document.getElementById('mapReset').classList.toggle('is-empty',!selected.length&&!locationState.active);
+  }
+  function selectFilter(key,value){
+    if(key==='terms' && state.category==='food'){
       state.cuisine=filters.selectedCuisine(taxonomy,state);
       const allowed=filters.termsFor(taxonomy,'food',state.cuisine).map(t=>t.slug);
       state.terms=state.terms.filter(t=>allowed.includes(t));
     }
-    filters.select(state,'terms',button.dataset.value);renderDetails();search();});
+    filters.select(state,key,value);renderDetails();search();
+  }
+  for(const [node,key] of [[document.getElementById('mapRegions'),'region'],[document.getElementById('mapCompanions'),'companions'],[document.getElementById('mapFocus'),'focus'],[cuisineNav,'cuisine'],[detailNav,'terms']])node.addEventListener('click',event=>{
+    const button=event.target.closest('[data-value]');if(button)selectFilter(key,button.dataset.value);
+  });
   document.getElementById('mapSearch').addEventListener('submit',event=>{event.preventDefault();state.q=query.value.trim();search();});
   query.addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(()=>{state.q=query.value.trim();search('replace');},250);});
   document.getElementById('mapReset').addEventListener('click',()=>{locationState.resetRadius();mobile.updateLocation(locationState);Object.assign(state,filters.defaultState());query.value='';renderDetails();search();});
