@@ -23,7 +23,9 @@ from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
 from image_limits import MEMBER_PLACE_SLOTS
 from place_taxonomy import linked_ids, save_links
 from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, official_terms
-from admin_settings import catalog
+from admin_settings import catalog, read_settings
+from place_auto_checks import (validate_address, duplicate_matches, inspect as inspect_place,
+                               record as record_check, BURST_LIMIT, BURST_SECONDS)
 from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
 from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, USAGE_LABELS,
                                     parse_proposal, queue_proposal, approve_proposal)
@@ -41,6 +43,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
 
     def member_guard(request):
         if not current_user(request):
+            flash(request, "로그인이 필요한 기능입니다.", "error")
             return redirect("/login?next=" + quote(request.url.path + ("?" + request.url.query if request.url.query else ""), safe=""))
 
     def actor(request):
@@ -94,7 +97,10 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         return render(request, "best.html", collection=dict(collection), places=[row_to_place(r, public=True) for r in rows], seo=collection_metadata(dict(collection)))
 
     def place_form(request, data=None, *, status=200, error=None, similar=None, new_only=False):
+        with closing(connect_db()) as conn:
+            auto_publish = read_settings(conn)["user_place_auto_publish"] is True
         return render(request, "member_place_form.html", status, place=data, error=error,
+                      auto_publish=auto_publish,
                       similar=similar or [], new_only=new_only, hours_ui=controls(data or {}),
                       time_options=TIME_OPTIONS, weekdays=WEEKDAYS, usage_labels=USAGE_LABELS,
                       **form_options(data.get("category_id") if data else None))
@@ -178,6 +184,10 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if limited(request, "community-place"):
             return HTMLResponse("등록 요청이 많습니다. 잠시 후 다시 시도해주세요.", status_code=429)
         user_id = current_user(request)["id"]
+        if not place_id and rate_limited(connect_db, secret, "community-place-new",
+                [("user", str(user_id)), ("ip", request.client.host if request.client else "unknown")],
+                limit=BURST_LIMIT, window=BURST_SECONDS):
+            return HTMLResponse("짧은 시간에 등록 요청이 많습니다. 10분 뒤 다시 시도해주세요.", status_code=429)
         new_only = form.get("from_new") == "1"
         with closing(connect_db()) as conn:
             existing = get_place(conn, place_id) if place_id else None
@@ -188,6 +198,8 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 allowed_regions = [i['value'] for i in catalog(conn, 'region')]
                 if existing and existing['region'] not in allowed_regions: allowed_regions.append(existing['region'])
                 data = facts(normalized, conn, allowed_regions, new_only=new_only, existing=existing)
+                if not existing or existing["auto_check_status"] is not None:
+                    validate_address(data)
                 restaurant_ids = parse_selection(conn, form, data['category_id'], existing, required=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
                 _, cafe_proposal = parse_member_features(conn, form, data["category_id"], existing)
@@ -203,10 +215,11 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
                 values.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
-            similar = duplicates(conn, data, place_id)
+            exact, _ = duplicate_matches(conn, data, place_id)
         data.update(id=place_id, images=image_store.list("places", place_id) if place_id else [])
-        if similar and form.get("duplicate_ack") != "1":
-            return place_form(request, data, status=409, error="비슷한 장소가 이미 등록되어 있습니다. 기존 장소를 먼저 확인해주세요.", similar=similar, new_only=new_only)
+        if exact:
+            return place_form(request, data, status=409, error="이미 등록되었거나 확인 중인 장소입니다. 새로 등록하지 않고 기존 장소의 정보 바로잡기를 이용해주세요.",
+                              similar=[p for p in exact if p["published"]], new_only=new_only)
         try:
             plan = await image_store.prepare(form, "places", slots=MEMBER_PLACE_SLOTS)
         except ImageError as exc:
@@ -217,7 +230,14 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if place_id and (not fresh or not editable(fresh, user_id)):
                 plan.discard()
                 return HTMLResponse("정보 확인 상태가 변경되었습니다. 수정 제안을 이용해주세요.", status_code=403)
+            # Serialize duplicate detection and insertion, including other members/private rows.
+            exact, similar = duplicate_matches(conn, data, place_id)
+            if exact:
+                plan.discard()
+                return place_form(request, data, status=409, error="이미 등록되었거나 확인 중인 장소입니다.",
+                                  similar=[p for p in exact if p["published"]], new_only=new_only)
             try:
+                facts(normalized, conn, allowed_regions, new_only=new_only, existing=fresh)
                 restaurant_ids = parse_selection(conn, form, data['category_id'], fresh, required=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
                 _, cafe_proposal = parse_member_features(conn, form, data["category_id"], fresh)
@@ -232,15 +252,35 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             else:
                 slug = "place-" + secrets.token_hex(12)
                 fields = (*FACT_FIELDS, "category")
-                place_id = conn.execute("INSERT INTO places (" + ",".join(fields) + ",slug,submitted_by_user_id,source_type,verification_status,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user','unverified',1)", (*[data[k] for k in fields],slug,user_id)).lastrowid
+                place_id = conn.execute("INSERT INTO places (" + ",".join(fields) + ",slug,submitted_by_user_id,source_type,verification_status,published) VALUES (" + ",".join("?" for _ in fields) + ",?,?,'user','unverified',0)", (*[data[k] for k in fields],slug,user_id)).lastrowid
             # Food classification saves directly; cafe classification always uses review.
             if restaurant_ids is not None:
                 save_links(conn, place_id, restaurant_ids)
             queue_proposal(conn, get_place(conn, place_id), user_id, proposal)
             plan.apply(conn, place_id)
-        message = "장소 수정사항을 저장했습니다." if fresh else "장소가 등록되어 공개되었습니다."
-        flash(request, f"{message} 현재 상태: {WAITING.label}." + (" 세부 정보는 관리자 확인 후 반영됩니다." if proposal else ""))
-        return redirect("/place/" + slug)
+            published = bool(fresh and fresh["published"])
+            state = None
+            if not fresh or fresh["auto_check_status"] is not None:
+                has_photo = bool(conn.execute("SELECT 1 FROM images WHERE place_id=? LIMIT 1", (place_id,)).fetchone()
+                                 or (fresh and fresh["image_url"]))
+                state, reasons = inspect_place(data, similar=bool(similar), has_photo=has_photo,
+                    enabled=True if fresh else read_settings(conn)["user_place_auto_publish"] is True)
+                # A member edit can hide newly unsafe content, never undo an administrator's hide.
+                published = state != "hold" and (not fresh or bool(fresh["published"]))
+                conn.execute("UPDATE places SET published=? WHERE id=?", (int(published), place_id))
+                record_check(conn, place_id, state, reasons, published)
+        if not published:
+            message = "장소는 저장되었지만 추가 확인이 필요해 지도에는 아직 표시되지 않습니다. JEJU_KNOW 확인 후 공개될 수 있습니다."
+        elif state == "review":
+            message = "장소가 등록되었습니다. 현재 사용자 등록 장소로 표시되며, 일부 정보는 JEJU_KNOW에서 추가 확인할 예정입니다."
+        else:
+            message = "장소 수정사항을 저장했습니다." if fresh else "장소가 등록되었습니다. 사용자 등록 장소로 지도에 표시됩니다. JEJU_KNOW 확인 후 정보가 업데이트될 수 있습니다."
+        flash(request, message + (" 세부 정보는 관리자 확인 후 반영됩니다." if proposal else ""))
+        destination = "/place/" + slug if published else "/account/places#activity-" + str(place_id)
+        # Fetch must not consume the flash on a followed redirect before browser navigation.
+        if request.headers.get("X-Requested-With") == "fetch":
+            return JSONResponse({"redirect": destination})
+        return redirect(destination)
 
     @app.post("/map/register")
     @app.post("/places/new")

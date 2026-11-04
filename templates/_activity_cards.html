@@ -13,6 +13,7 @@
     <h3>{% if tab=='inquiries' or (tab in ('places','issues') and i.visible) %}<a href="{{ i.href }}">{{ i.title }}</a>{% else %}{{ i.title }}{% endif %}</h3>
   </div>{{ badges(i.labels) }}</div>
   {% if tab=='places' %}
+    {% if i.auto_check_status %}<p class="member-help">최근 자동검사 · {{ i.auto_check_label }}{% if i.auto_check_reasons %} · {{ i.auto_check_reasons|join(' · ') }}{% endif %}</p>{% if not i.visible %}<p class="member-help">현재 비공개 상태입니다. 수정사항을 저장해도 자동으로 공개되지 않으며, JEJU_KNOW 확인 후 공개될 수 있습니다.</p>{% endif %}{% endif %}
     {% if i.merged_into_id %}<p class="member-help">중복 장소로 병합되었습니다.</p>{% endif %}
     {% if i.can_edit or i.visible %}<div class="row-actions">
       {% if i.visible %}<a class="mini-btn" href="/places/{{ i.id }}/suggest">정보 바로잡기</a>{% endif %}

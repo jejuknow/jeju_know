@@ -47,11 +47,12 @@ class AdminUITest(unittest.TestCase):
                     self.assertIn('/admin/login',response.headers['location'])
 
     def test_new_mutations_keep_server_role_and_csrf_guards(self):
+        before=self.rows('SELECT * FROM site_settings')
         for path in ('/admin/classifications/cafe_focus','/admin/settings/home','/admin/settings/general','/admin/best/new','/admin/best/1/delete'):
             for client in (self.member,self.visitor):
                 self.assertEqual(self.post(client,path,action='new',value='denied',name='권한 없음').status_code,303)
             self.assertEqual(self.admin.post(path,data={}).status_code,400)
-        self.assertFalse(self.rows('SELECT * FROM site_settings'))
+        self.assertEqual(self.rows('SELECT * FROM site_settings'),before)
 
     def test_dashboard_counts_and_member_status_tabs(self):
         p=self.place(name='사용자 미확인')

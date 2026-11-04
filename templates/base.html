@@ -46,7 +46,7 @@
   {% if not request.url.path.startswith('/admin') and request.url.path != '/map' %}{% include '_site_footer.html' %}{% endif %}
   {% if analytics_token %}<script src="/static/analytics.js?v=20261029"></script>{% endif %}
   <script src="/static/site-nav.js?v=20261008-home"></script>
-  <script src="/static/image-uploads.js?v=20261102-review" defer></script>
+  <script src="/static/image-uploads.js?v=20261104-auto-publish" defer></script>
   {% if not request.url.path.startswith('/admin') %}<script src="/static/place-card-status.js?v=20261104"></script>{% endif %}
   {% block scripts %}{% endblock %}
 </body>

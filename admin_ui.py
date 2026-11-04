@@ -20,6 +20,7 @@ from admin_roles import ROLE_LABELS, SUPER, audit, identity
 from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal, snapshot
 SUGGESTION_LABELS = {**SUGGESTION_FIELDS, DETAIL_FIELD: DETAIL_LABEL}
 from taxonomy_migrations import TYPES
+from place_auto_checks import counts as auto_counts, ORDER as AUTO_ORDER, decorate as decorate_check
 
 ACTIVE = "p.deleted_at IS NULL AND p.merged_into_id IS NULL"
 KINDS = {"region": "지역", "place": "장소 카테고리", "restaurant_subcategory": "맛집 유형",
@@ -70,7 +71,7 @@ def counters(conn):
     now = today()
     new_sql, new_args = new_clause(now)
     scalar = lambda sql, args=(): conn.execute(sql, args).fetchone()[0]
-    return dict(total=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE),
+    return dict(auto=auto_counts(conn), total=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE),
                 unverified=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE + " AND source_type='user' AND verification_status='unverified'"),
                 issue_pending=scalar("SELECT count(*) FROM news_posts WHERE author_type='user' AND approval_status='pending' AND deleted_at IS NULL"),
                 unread_inquiries=scalar("SELECT count(*) FROM contact_inquiries WHERE status='unread'"),
@@ -154,7 +155,7 @@ class AdminUI:
             from analytics import report
             stats = report(conn, {'period':'30d'})
             freshness = freshness_counts(conn, ACTIVE, six_month_cutoff(today()).isoformat())
-            places = conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE " + ACTIVE + " AND p.source_type='user' AND p.verification_status='unverified' ORDER BY p.id DESC LIMIT 5").fetchall()
+            places = [decorate_check(dict(r)) for r in conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE " + ACTIVE + " AND p.source_type='user' AND p.verification_status='unverified' ORDER BY " + AUTO_ORDER + ",p.id DESC LIMIT 5")]
             suggestions = conn.execute("SELECT s.*,p.name FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id WHERE s.status='pending' ORDER BY s.id DESC LIMIT 5").fetchall()
         return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS, analytics=stats, freshness=freshness)
 
@@ -208,6 +209,8 @@ class AdminUI:
             if status == "unverified": where.append("p.verification_status='unverified'")
             elif status == "verified": where.append("p.verification_status!='unverified'")
             elif status == "hidden": where.append("p.published=0")
+            if f.get("auto_check") in ("normal", "review", "hold"):
+                where.append("p.auto_check_status=?"); args.append(f["auto_check"])
         year = integer(f.get("year"), today().year, 1900, today().year)
         if mode == "new":
             new_sql, new_args = new_clause()
@@ -219,6 +222,8 @@ class AdminUI:
         with closing(self.db()) as conn:
             select = "p.*,u.nickname,(SELECT count(*) FROM place_correction_suggestions s WHERE s.place_id=p.id AND s.status='pending') AS pending_count"
             order = "p.updated_at DESC,p.id DESC"
+            if mode == "community":
+                order = AUTO_ORDER + ",p.created_at DESC,p.id DESC"
             if mode == "all":
                 # Imports use SQLite timestamps; admin edits also use offset-bearing ISO timestamps.
                 order = "p.published ASC, julianday(p.updated_at) DESC, p.id DESC"
@@ -434,6 +439,7 @@ class AdminUI:
             if section == "home": values = {key: form.get(key)=="1" for key in DEFAULTS if key.startswith("home_")}
             elif section == "general":
                 values = {key: str(form.get(key, "")).strip() for key in ("site_name", "instagram_url", "site_description")}
+                values["user_place_auto_publish"] = form.get("user_place_auto_publish") == "1"
                 if not values["site_name"] or len(values["site_name"])>40 or len(values["site_description"])>300 or len(values["instagram_url"])>2000 or not safe_external_url(values["instagram_url"]):
                     return HTMLResponse("사이트 이름·소개·링크를 확인해주세요.", status_code=400)
             else: return HTMLResponse("설정을 찾을 수 없습니다.", status_code=404)

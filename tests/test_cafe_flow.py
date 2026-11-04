@@ -95,9 +95,9 @@ class CafeFlowTest(unittest.TestCase):
     def test_features_or_other_dimensions_and_and_pending_not_searchable(self):
         first = self.create_cafe(["bakery"], region="애월")
         self.review()
-        second = self.create_cafe(["view"], name="다른 뷰 카페", address="별개 주소", region="구좌")
+        second = self.create_cafe(["view"], name="다른 뷰 카페", address="제주시 별개 주소", region="구좌")
         self.review()
-        self.create_cafe(["coffee"], name="미승인 카페", address="검수 주소")
+        self.create_cafe(["coffee"], name="미승인 카페", address="제주시 검수 주소")
         query = "?category=cafe&detail=cafe-bakery,cafe-view"
         self.assertEqual({r["id"] for r in self.api(query)}, {first["id"], second["id"]})
         self.assertEqual([r["id"] for r in self.api(query + "&region=애월")], [first["id"]])

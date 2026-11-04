@@ -10,6 +10,7 @@ from admin_ui import integer
 from auth_security import current_user
 from community_migrations import today
 from community_places import SUGGESTION_FIELDS, editable
+from place_auto_checks import decorate as decorate_check
 from contact_inquiries import cipher, kst_time, unpack
 import user_status as status
 from issue_discovery import public_where, schedule
@@ -77,6 +78,7 @@ def activity_rows(conn, section, uid, day: date, limit, offset=0, *, recent=Fals
         item = dict(r)
         link = f"/account/{section}#activity-{r['id']}"
         if section == "places":
+            decorate_check(item)
             shown = bool(r["published"] and not r["merged_into_id"])
             title = r["name"]
             labels = [status.place_review(r["source_type"], r["verification_status"]), status.VISIBILITY[shown]]

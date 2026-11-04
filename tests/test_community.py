@@ -42,6 +42,7 @@ class CommunityTest(unittest.TestCase):
             self.assertEqual(r.status_code,303)
         self.category={r['slug']:r['id'] for r in self.rows("SELECT * FROM categories WHERE type='place'")}
         self.now=date.today()
+        self.execute("UPDATE site_settings SET value='true' WHERE key='user_place_auto_publish'")
 
     def tearDown(self):
         for client in self.clients: client.close()
@@ -67,7 +68,7 @@ class CommunityTest(unittest.TestCase):
         return client.post(path,data={'csrf_token':self.csrf(client,'/admin' if client is self.admin else '/account'),**data},follow_redirects=False)
 
     def form(self,**changes):
-        data = {'name':'테스트 커피','region':'애월','category_id':str(self.category['cafe']),'address':'제주 테스트로 123',**changes}
+        data = {'name':'테스트 커피','region':'애월','category_id':str(self.category['cafe']),'address':'제주특별자치도 제주시 테스트로 123','latitude':'33.45','longitude':'126.56',**changes}
         if str(data['category_id']) == str(self.category['food']):
             data.setdefault('restaurant_taxonomy_present','1')
             data.setdefault('restaurant_main_id',str(self.rows("SELECT id FROM categories WHERE slug='food-korean'")[0]['id']))
@@ -114,7 +115,7 @@ class CommunityTest(unittest.TestCase):
         result=self.api()[0]
         self.assertEqual(result['status_label'],'사용자 등록')
         mine=self.member.get('/place/'+p['slug']).text
-        self.assertIn('현재 상태: 검토 대기',mine)
+        self.assertIn('현재 사용자 등록 장소로 표시',mine)
         self.assertIn('>사용자 등록</span>',mine)
         self.assertIn('검토 대기',self.member.get('/account/places').text)
         self.assertFalse(result['is_pick']);self.assertEqual(p['reason'],'')
@@ -140,7 +141,7 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(self.api(),[])
 
     def test_05_unsafe_urls_and_coordinates_rejected(self):
-        for data in ({'map_url':'javascript:alert(1)'},{'website_url':'data:text/html,evil'},{'latitude':'nan','longitude':'126'},{'latitude':'33'},{'latitude':'91','longitude':'126'}):
+        for data in ({'map_url':'javascript:alert(1)'},{'website_url':'data:text/html,evil'},{'latitude':'nan','longitude':'126'},{'latitude':'33','longitude':''},{'latitude':'91','longitude':'126'}):
             self.assertEqual(self.create(**data).status_code,400,data)
 
     def test_06_forged_admin_fields_rejected(self):
@@ -231,7 +232,8 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(self.api()[0]['name'],'운영자 수정')
 
     def test_15_suggestion_validation_and_xss(self):
-        p=self.place(name='<script>alert(1)</script>')
+        p=self.place()
+        self.execute("UPDATE places SET name=? WHERE id=?", ('<script>alert(1)</script>',p['id']))
         html=self.visitor.get('/place/'+p['slug']).text
         self.assertIn('&lt;script&gt;',html);self.assertNotIn('<script>alert(1)</script>',html)
         for field,value in [('is_pick','1'),('category_id','999'),('website_url','javascript:evil'),('opening','99999'),('coordinates','nan,1')]:
@@ -275,19 +277,21 @@ class CommunityTest(unittest.TestCase):
         self.execute("UPDATE places SET new_override='show',published=0")
         self.assertEqual(self.api('?new=current'),[])
 
-    def test_21_duplicate_name_normalization_warning_and_ack(self):
+    def test_21_exact_duplicate_cannot_be_acknowledged(self):
         self.place(name='테스트 커피')
-        r=self.create(name='테스트커피!')
-        self.assertEqual(r.status_code,409);self.assertIn('비슷한 장소',r.text)
+        for extras in ({}, {'duplicate_ack':'1'}):
+            r=self.create(name='테스트커피',**extras)
+            self.assertEqual(r.status_code,409);self.assertIn('정보 바로잡기',r.text)
         self.assertEqual(len(self.rows('SELECT * FROM places')),1)
-        self.assertEqual(self.create(name='테스트커피!',duplicate_ack='1').status_code,303)
 
-    def test_22_duplicate_address_and_coordinates(self):
+    def test_22_similar_is_review_private_exact_does_not_leak(self):
         p=self.place(latitude='33.4',longitude='126.5')
-        self.assertEqual(self.create(name='테스트 카페').status_code,409)
-        self.assertEqual(self.create(name='테스트 커피점',address='완전히 다른 주소',latitude='33.40001',longitude='126.50001').status_code,409)
+        self.assertEqual(self.create(name='테스트 커피점',latitude='33.40001',longitude='126.50001').status_code,303)
+        self.assertEqual(self.rows('SELECT auto_check_status FROM places ORDER BY id DESC')[0]['auto_check_status'],'review')
         self.execute('UPDATE places SET published=0')
-        self.assertEqual(self.create().status_code,303)  # Private name/address must not leak.
+        response=self.create()
+        self.assertEqual(response.status_code,409)
+        self.assertNotIn('/place/'+p['slug'],response.text)
 
     def test_23_pick_only_admin_and_category_unchanged(self):
         p=self.place()
@@ -307,7 +311,8 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(len(self.rows('SELECT * FROM place_pick_periods')),2)
 
     def test_25_pick_order_hidden_and_missing_coordinates(self):
-        first=self.place();second=self.place(name='음식점',address='다른 주소')
+        first=self.place();second=self.place(name='음식점',address='제주시 다른 주소')
+        self.execute('UPDATE places SET latitude=NULL,longitude=NULL WHERE id=?',(second['id'],))
         self.pick(first);self.pick(second)
         self.execute('UPDATE place_pick_periods SET sort_order=10 WHERE place_id=?',(first['id'],))
         self.assertEqual([p['id'] for p in self.api('?pick=current')],[second['id'],first['id']])
@@ -329,7 +334,7 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(self.rows('SELECT * FROM best_collection_places'),[])
 
     def test_27_merge_keeps_relations_and_old_links(self):
-        source=self.place();target=self.place(name='유지할 장소',address='새 주소')
+        source=self.place();target=self.place(name='유지할 장소',address='제주시 새 주소')
         self.execute("UPDATE places SET image_url='https://example.com/legacy-photo.jpg' WHERE id=?",(source['id'],))
         self.suggestion(source);self.pick(source)
         self.post(self.admin,'/admin/best/1/places',action='add',place_id=source['id'])
@@ -345,7 +350,7 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(self.member.get(f"/places/{source['id']}/edit").status_code,404)
 
     def test_28_merge_permissions_self_cycle_private_target(self):
-        p=self.place();target=self.place(name='유지',address='다른 주소')
+        p=self.place();target=self.place(name='유지',address='제주시 다른 주소')
         url=f"/admin/places/{p['id']}/merge"
         self.assertEqual(self.post(self.member,url,target_id=target['id'],confirm_merge='1').status_code,303)
         self.assertEqual(self.post(self.admin,url,target_id=p['id'],confirm_merge='1').status_code,400)
@@ -357,7 +362,7 @@ class CommunityTest(unittest.TestCase):
     def test_29_image_upload_merge_overflow_and_private_access(self):
         output=io.BytesIO();Image.new('RGB',(40,50),'blue').save(output,'PNG')
         files=[(f'image_{n}',(f'{n}.png',output.getvalue(),'image/png')) for n in range(5)]
-        for name,address in [('사진 원본','주소1'),('사진 유지','주소2')]:
+        for name,address in [('사진 원본','제주시 주소1'),('사진 유지','제주시 주소2')]:
             # Seed the fifth image as legacy data, outside the new upload route.
             p=self.place(name=name,address=address)
             r=self.admin.post(f"/admin/places/{p['id']}/edit",data={'csrf_token':self.csrf(self.admin,'/admin'),**self.form(name=name,address=address),'published':'1'},files=files[:4],follow_redirects=False)
@@ -427,7 +432,7 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(self.api('?new=current')[0]['opened_month'],self.now.month)
 
     def test_39_merge_chain_preserves_all_shared_slugs(self):
-        places=[self.place(name=f'장소 {n}',address=f'주소 {n}',duplicate_ack='1') for n in range(3)]
+        places=[self.place(name=f'장소 {n}',address=f'제주시 주소 {n}',duplicate_ack='1') for n in range(3)]
         for source,target in zip(places,places[1:]):
             self.assertEqual(self.post(self.admin,f"/admin/places/{source['id']}/merge",target_id=target['id'],confirm_merge='1').status_code,303)
         for old in places[:2]:
@@ -525,10 +530,12 @@ class CommunityTest(unittest.TestCase):
     def test_43_new_context_requires_year_and_still_allows_missing_coordinates(self):
         r=self.post(self.member,'/map/register',**self.form(from_new='1'))
         self.assertEqual(r.status_code,400)
-        r=self.post(self.member,'/map/register',**self.form(from_new='1',opened_year=str(self.now.year)))
+        r=self.post(self.member,'/map/register',**self.form(from_new='1',opened_year=str(self.now.year),latitude='',longitude=''))
         self.assertEqual(r.status_code,303)
         self.assertEqual(self.api('?new=current'),[])  # Unknown opening month is never auto-NEW.
-        result=self.api()[0]
+        self.assertEqual(self.api(),[])
+        result=self.rows('SELECT * FROM places')[0]
+        self.assertEqual(result['auto_check_status'],'hold')
         self.assertIsNone(result['latitude']);self.assertIsNone(result['longitude'])
 
 
@@ -537,7 +544,7 @@ class CommunityMigrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             db=str(Path(folder)/'old.db')
             # Build exactly the previous commit's schema through its existing migration functions.
-            with patch.dict(os.environ,{'JEJUNO_SKIP_SEED':'1'}),patch('app.migrate_community'),patch('app.backup_before_community_migration'),patch('app.migrate_admin_ui'),patch('app.migrate_admin_place_cleanup'):
+            with patch.dict(os.environ,{'JEJUNO_SKIP_SEED':'1'}),patch('app.migrate_community'),patch('app.backup_before_community_migration'),patch('app.migrate_admin_ui'),patch('app.migrate_admin_place_cleanup'),patch('user_place_auto_publish_migration.migrate'):
                 create_app({'TESTING':True,'DATABASE':db,'SECRET_KEY':'migration-test'})
             with closing(sqlite3.connect(db)) as conn,conn:
                 conn.execute("INSERT INTO places(slug,name,category,region,is_pick,companions,checked_at) VALUES ('old','기존 장소','카페','애월',1,'[\"부모님\"]','2020-01-01')")

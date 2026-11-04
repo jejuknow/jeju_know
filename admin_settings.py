@@ -8,7 +8,8 @@ FOCUS = [("taste", "맛 중심"), ("space", "공간 중심"), ("experience", "�
 DEFAULTS = {"site_name": "JEJU_KNOW", "instagram_url": "https://www.instagram.com/jeju_know/",
             "openchat_url": "https://open.kakao.com/o/gLuLBdVi",
             "site_description": "JEJU_KNOW가 기록하는 이유 있는 제주 추천",
-            "home_pick": True, "home_new": True, "home_issue": True, "home_best": True}
+            "home_pick": True, "home_new": True, "home_issue": True, "home_best": True,
+            "user_place_auto_publish": False}
 
 
 def read_settings(conn):

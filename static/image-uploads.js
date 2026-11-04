@@ -131,11 +131,11 @@
     });
     function showDuplicate(doc){
       const warning=doc.querySelector('.duplicate-warning');
-      if(!warning)return;
       form.parentNode.querySelector('.duplicate-warning')?.remove();
+      if(!warning)return;
       // This is our escaped, same-origin server form, never an external response.
       form.before(warning);
-      if(!form.querySelector('[name=duplicate_ack]')){
+      if(form.hasAttribute('data-member-issue-form')&&!form.querySelector('[name=duplicate_ack]')){
         const label=document.createElement('label');label.className='member-check';
         const check=document.createElement('input');check.type='checkbox';check.name='duplicate_ack';check.value='1';check.required=true;
         label.append(check,document.createTextNode(form.hasAttribute('data-member-issue-form')?'기존 ISSUE를 확인했으며 다른 소식입니다.':'기존 장소를 확인했으며 서로 다른 장소입니다.'));feedback.before(label);
@@ -152,7 +152,13 @@
         if(event.submitter?.name)data.set(event.submitter.name,event.submitter.value);
         states.forEach(s=>{if(s.file&&!s.remove.checked)data.set(s.input.name,s.file,s.file.name);});
         feedback.textContent=form.hasAttribute('data-member-place-form')?'장소 등록 중...':'사진과 내용을 저장 중...';
-        const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin'});
+        const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin',
+          headers:form.hasAttribute('data-member-place-form')?{'X-Requested-With':'fetch'}:{}});
+        if(response.ok&&form.hasAttribute('data-member-place-form')&&response.headers.get('content-type')?.includes('application/json')){
+          const result=await response.json();
+          if(typeof result.redirect==='string'&&/^\/(?:place\/|account\/places#)/.test(result.redirect)){location.assign(result.redirect);return;}
+          throw new Error('Invalid registration response');
+        }
         if(response.redirected&&response.ok){location.assign(response.url);return;}
         const text=await response.text(),doc=new DOMParser().parseFromString(text,'text/html');
         if(response.status===409)showDuplicate(doc);

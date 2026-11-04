@@ -340,6 +340,8 @@ def create_app(test_config=None):
         migrate_contact(app.state.database)
         migrate_member_inquiries(app.state.database)
         migrate_admin_roles(app.state.database)
+        from user_place_auto_publish_migration import migrate as migrate_auto_publish
+        migrate_auto_publish(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -391,6 +393,9 @@ def create_app(test_config=None):
 
     def row_to_place(row, *, public=False):
         place = dict(row)
+        if not public:
+            from place_auto_checks import decorate
+            decorate(place)
         place["has_coordinates"] = (
             place.get("latitude") is not None and place.get("longitude") is not None
             and math.isfinite(place["latitude"]) and math.isfinite(place["longitude"])
@@ -717,7 +722,8 @@ def create_app(test_config=None):
                 places.sort(key=lambda p: (p["pick_order"],p["id"]))
             # Private submitter IDs and internal moderator identities are never public API fields.
             for place in places:
-                for key in ("submitted_by_user_id","verified_by","deleted_at","merged_into_id","admin_import_note"):
+                for key in ("submitted_by_user_id","verified_by","deleted_at","merged_into_id","admin_import_note",
+                            "auto_check_status","auto_check_reason","auto_checked_at"):
                     place.pop(key, None)
             return JSONResponse(places, headers={"Cache-Control": "no-store"})
         finally:

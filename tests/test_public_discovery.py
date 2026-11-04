@@ -29,7 +29,7 @@ class PublicDiscoveryTest(unittest.TestCase):
 
     def test_public_metadata_facts_and_private_boundaries(self):
         for category,kind in [('cafe','CafeOrCoffeeShop'),('food','Restaurant')]:
-            p=self.place(category_id=self.category[category])
+            p=self.place(name='메타 점검 '+category,category_id=self.category[category])
             self.execute("UPDATE places SET business_hours='09:30 ~ 16:00',closed_days='연중무휴',signature_menu='필터커피',representative_price=7000,note='실제 꿀팁',latitude=33.4,longitude=126.5 WHERE id=?",(p['id'],))
             url='/place/'+p['slug']
             page=self.visitor.get(url+'?tracking=1')
@@ -52,7 +52,10 @@ class PublicDiscoveryTest(unittest.TestCase):
             self.assertNotIn(p['slug'],self.visitor.get('/sitemap.xml').text)
 
     def test_missing_facts_and_json_injection(self):
-        p=self.place(name='공개 </script><script>alert(1)</script>')
+        p=self.place()
+        p['name']='공개 </script><script>alert(1)</script>'
+        # Legacy/admin data still must be escaped, independently of submission checks.
+        self.execute('UPDATE places SET name=?,latitude=NULL,longitude=NULL WHERE id=?',(p['name'],p['id']))
         page=self.visitor.get('/place/'+p['slug'])
         data=self.schema(page.text)
         self.assertEqual(data['name'],p['name'])

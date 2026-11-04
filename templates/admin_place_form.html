@@ -5,6 +5,7 @@
 
 {% set p = place or {} %}
 {% block admin_content %}
+{% if p.get('auto_check_status') %}<section class="admin-panel admin-editor-body"><h2>사용자 등록 자동검사 · {{ p.auto_check_label }}</h2><p>{{ p.auto_check_reasons|join(' · ') or '기본 입력 검사 통과' }}</p><p class="form-help">{{ p.auto_checked_at }} 검사 · 자동검사는 사실 확인이 아닙니다. 장소 정보와 지도 위치를 직접 확인한 뒤 확인 상태·공개 여부를 변경해주세요.</p></section>{% endif %}
 {% if mode == 'edit' %}
 <section class="admin-panel" id="freshness" aria-labelledby="freshnessTitle">
   <div class="admin-panel-heading"><h2 id="freshnessTitle">정보 최신성</h2><a href="/admin/places/stale">오래된 정보 목록 →</a></div>

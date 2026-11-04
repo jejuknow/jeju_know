@@ -65,10 +65,10 @@ class TaxonomyUnificationTest(unittest.TestCase):
 
     def test_same_cafe_ids_through_admin_member_approval_and_csv(self):
         ids = [self.term('cafe-' + k)['id'] for k in ('coffee', 'bakery', 'view')]
-        self.post(self.admin, '/admin/places/new', **self.form(name='관리자 카페', address='관리자 주소',
+        self.post(self.admin, '/admin/places/new', **self.form(name='관리자 카페', address='제주시 관리자 주소',
                   taxonomy_present='1', term_ids=list(map(str, ids)), published='1'))
         admin_place = self.rows('SELECT * FROM places ORDER BY id DESC')[0]
-        result = self.post(self.member, '/map/register', **self.form(name='회원 카페', address='회원 주소',
+        result = self.post(self.member, '/map/register', **self.form(name='회원 카페', address='제주시 회원 주소',
                            cafe_features_present='1', cafe_feature_ids=list(map(str, ids))))
         self.assertEqual(result.status_code, 303)
         member_place = self.rows('SELECT * FROM places ORDER BY id DESC')[0]
@@ -88,7 +88,7 @@ class TaxonomyUnificationTest(unittest.TestCase):
         data = self.form(category_id=str(self.category['food']), restaurant_taxonomy_present='1',
                          restaurant_main_id=str(main['id']), restaurant_subtype_id=str(child['id']))
         for client, path, name in ((self.admin, '/admin/places/new', '관리자 맛집'), (self.member, '/map/register', '회원 맛집')):
-            payload = {**data, 'name': name, 'address': name + ' 주소'}
+            payload = {**data, 'name': name, 'address': '제주시 ' + name + ' 주소'}
             if client is self.admin:
                 payload['published'] = '1'
             response = self.post(client, path, **payload)

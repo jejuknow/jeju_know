@@ -47,3 +47,6 @@
 .admin-freshness-summary .admin-summary-card{display:flex;grid-column:auto}
 #freshness .admin-editor-body>p:first-child{margin-top:0}
 #confirmInformation{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* Keep the additional inspection column readable; mobile retains stacked cards. */
+@media(min-width:701px){.admin-community-list .admin-data-table{min-width:1300px}.admin-community-list td[data-label="지역"],.admin-community-list td[data-label="날짜"]{white-space:nowrap}.admin-community-list td[data-label="자동검사"]{min-width:170px}}

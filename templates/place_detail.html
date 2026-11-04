@@ -17,6 +17,7 @@
       <h1 class="detail-title">{{ place.name }}</h1>
       <div class="meta-row">{% if place.status_label %}<span class="user-badge tone-{{ place.status_tone }}">{{ place.status_label }}</span>{% endif %}{% if place.is_new %}<span class="badge">NEW</span>{% endif %}{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
+      {% if place.source_type=='user' and place.verification_status=='unverified' %}<p class="form-help">사용자가 등록한 장소입니다. JEJU_KNOW의 정보 확인 전이며, 방문 전 최신 정보를 확인해주세요.</p>{% endif %}
       {% if place.one_line %}<p class="detail-lead">{{ place.one_line }}</p>{% endif %}
       {% if place.detail_features or place.companions %}<section class="detail-section detail-highlights" aria-label="핵심 특징">
         {% if place.detail_features %}<h2>장소 특징</h2><div class="tag-row">{% for item in place.detail_features %}<span class="tag">#{{ item }}</span>{% endfor %}</div>{% endif %}
