@@ -9,7 +9,7 @@ ORIGIN = 'https://www.jeju-know.com'
 DEFAULT_IMAGE = ORIGIN + '/static/images/brand/default-og.png'
 FILTER_PAGES = {'/', '/find', '/map', '/places', '/new', '/news'}
 PAGES = {
-    '/': ('JEJU_KNOW | 제주 맛집·카페·가볼 곳 추천', '맛집과 카페, 가볼 곳부터 제주 행사와 소식까지. 직접 기록한 추천과 함께 모은 장소 정보를 JEJU_KNOW에서 찾아보세요.'),
+    '/': ('JEJU_KNOW | 제주노의 맛집·카페·행사 추천', '제주노가 기록한 제주 맛집, 카페, 가볼 곳과 행사·이슈를 지역·취향·동행에 맞게 찾아보세요.'),
     '/find': ('제주 취향 장소 찾기 | JEJU_KNOW', '제주 지역, 장소 종류, 동행과 카페·맛집 특징을 선택해 취향에 맞는 장소를 찾아보세요. 검색한 장소는 지도에서도 확인할 수 있습니다.'),
     '/map': ('제주 맛집·카페 지도 | JEJU_KNOW', '제주 맛집과 카페, 가볼 곳의 위치를 지도에서 살펴보세요. 지역과 카테고리로 탐색하고 장소별 정보와 추천 이유를 확인하세요.'),
     '/new': ('제주 신상 맛집·카페 NEW | JEJU_KNOW', '최근 6개월 사이에 문을 연 제주 맛집·카페와 새 소식으로 소개하는 장소를 모았습니다. 오픈 정보와 확인 상태를 함께 살펴보세요.'),
@@ -92,13 +92,13 @@ def page_metadata(request, description, settings=None):
         result['title'], result['description'] = PAGES[path]
     if path == '/':
         organization = {'@type': 'Organization', '@id': ORIGIN + '/#organization',
-                        'name': 'JEJU_KNOW', 'url': ORIGIN + '/',
+                        'name': 'JEJU_KNOW', 'alternateName': '제주노', 'url': ORIGIN + '/',
                         'logo': ORIGIN + '/static/images/brand/jeju_know-logo.png'}
         instagram = (settings or {}).get('instagram_url', '')
         if instagram.startswith('https://www.instagram.com/'):
             organization['sameAs'] = [instagram]
         result['json_ld'] = {'@context': 'https://schema.org', '@type': 'WebSite',
-                             'name': 'JEJU_KNOW', 'url': ORIGIN + '/',
+                             'name': 'JEJU_KNOW', 'alternateName': '제주노', 'url': ORIGIN + '/',
                              'publisher': organization}
     elif path in ('/contact', '/contact/sent'):
         result.update(title='문의하기 | JEJU_KNOW', description='JEJU_KNOW 광고·제휴, 협업 및 홈페이지 관련 문의를 남겨주세요.',
