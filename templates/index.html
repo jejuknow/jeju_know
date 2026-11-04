@@ -66,7 +66,7 @@
             <div class="news-overlay-badges">{{ schedule_badge(item) }}<span class="news-category">{{ item.category_label }}</span>{% if item.is_promoted %}<span class="sponsor-badge">홍보·제휴</span>{% elif item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div>
           </div>
           <div class="news-card-body">
-            <p class="issue-author">{{ item.author_label }} · {{ item.author_name }}</p><div class="news-date">{{ item.date_label if item.event_start else '등록 ' ~ item.created_at[:10] }}{% if item.venue %} · {{ item.venue }}{% endif %}</div>
+            <p class="issue-author">{% if item.author_type == 'user' %}사용자 등록 · {% endif %}{{ item.author_name }}</p><div class="news-date">{{ item.date_label if item.event_start else '등록 ' ~ item.created_at[:10] }}{% if item.venue %} · {{ item.venue }}{% endif %}</div>
             <h3>{{ item.title }}</h3>
             <p>{{ item.summary }}</p><span class="news-detail-link">상세보기 →</span>
           </div>

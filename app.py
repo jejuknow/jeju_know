@@ -389,7 +389,7 @@ def create_app(test_config=None):
         except (json.JSONDecodeError, TypeError):
             return []
 
-    def row_to_place(row):
+    def row_to_place(row, *, public=False):
         place = dict(row)
         place["has_coordinates"] = (
             place.get("latitude") is not None and place.get("longitude") is not None
@@ -417,6 +417,10 @@ def create_app(test_config=None):
             place['is_new'] = bool(conn.execute('SELECT 1 FROM places p JOIN categories c ON c.id=p.category_id WHERE p.id=? AND '+clause, [place['id'], *values]).fetchone())
         finally:
             conn.close()
+        if public:
+            from user_status import public_place_badge
+            place["status_label"], place["status_tone"] = public_place_badge(
+                place["source_type"], place["verification_status"], place["is_pick"])
         return image_store.decorate(place, "places")
 
     def row_to_news(row, day=None):
@@ -687,7 +691,7 @@ def create_app(test_config=None):
         conn.close()
         if not row or not row["published"]:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
-        place = row_to_place(row)
+        place = row_to_place(row, public=True)
         from urllib.parse import quote
         place['internal_map_url'] = '/map?place=' + quote(place['slug'], safe='')
         place['directions_url'] = (f"https://map.kakao.com/link/to/{quote(place['name'], safe='')},{place['latitude']},{place['longitude']}"
@@ -708,7 +712,7 @@ def create_app(test_config=None):
         conn = connect_db()
         try:
             rows = public_search(conn, category, q, region, companion, detail, condition, pick, new, focus, cuisine)
-            places = [row_to_place(row) for row in rows]
+            places = [row_to_place(row, public=True) for row in rows]
             if pick == "current":
                 places.sort(key=lambda p: (p["pick_order"],p["id"]))
             # Private submitter IDs and internal moderator identities are never public API fields.

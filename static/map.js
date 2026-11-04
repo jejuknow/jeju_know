@@ -9,24 +9,21 @@
     pick:{key:'pick',style:'pick',symbol:'★',label:'JEJU_KNOW PICK'},
     verified:{key:'verified',style:'verified',symbol:'✓',label:'JEJU_KNOW 확인'},
     user_submitted:{key:'user_submitted',style:'unverified',symbol:'●',label:'사용자 등록'},
-    editorial:{key:'editorial',style:'unverified',symbol:'●',label:'JEJU_KNOW 등록'},
-    default:{key:'default',style:'unverified',symbol:'●',label:'상태 확인 필요'}
+    default:{key:'default',style:'unverified',symbol:'',label:'일반 장소'}
   };
   function placeStatus(place) {
     if(place.is_pick===true||place.is_pick===1)return markerStates.pick;
     if(place.verification_status==='jejuno_verified')return markerStates.verified;
     if(place.source_type==='user')return markerStates.user_submitted;
-    if(place.source_type==='jejuno')return markerStates.editorial;
     return markerStates.default;
   }
   function cardPresentation(place){
     const status=placeStatus(place);
-    return {...place,is_pick:status.key==='pick',status_label:status.key==='pick'?'':status.label,
+    return {...place,is_pick:status.key==='pick',status_label:['pick','default'].includes(status.key)?'':status.label,
       status_tone:status.key==='verified'?'brand':'neutral'};
   }
-  function legendStatuses(places){
-    const shown=new Set(places.filter(hasCoordinates).map(p=>placeStatus(p).key));
-    return [markerStates.user_submitted,...['editorial','default'].filter(k=>shown.has(k)).map(k=>markerStates[k]),markerStates.verified,markerStates.pick];
+  function legendStatuses(){
+    return [markerStates.user_submitted,markerStates.verified,markerStates.pick];
   }
   function makeStatusBadge(place,doc) {
     const status=placeStatus(place),badge=doc.createElement('span');

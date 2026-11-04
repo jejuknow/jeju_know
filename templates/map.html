@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}제주 지도 | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261104-legend"><link rel="stylesheet" href="/static/nearby.css?v=20261104"><link rel="stylesheet" href="/static/map-mobile.css?v=20261104-legend">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css?v=20261104-public-status"><link rel="stylesheet" href="/static/nearby.css?v=20261104"><link rel="stylesheet" href="/static/map-mobile.css?v=20261104-public-status">{% endblock %}
 {% block body_class %}map-body{% endblock %}
 {% block body %}
 <main class="map-workspace" id="mapWorkspace" data-kakao-key="{{ kakao_map_key }}">
@@ -41,4 +41,4 @@
 </main>
 <script id="mapCategoriesData" type="application/json">{{ taxonomy|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/map-mobile.js?v=1"></script><script src="/static/map-quick-filters.js?v=20261104-quick"></script><script src="/static/map.js?v=20261104-legend"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js?v=20261008"></script><script src="/static/place-search.js?v=20261028-public"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/map-mobile.js?v=1"></script><script src="/static/map-quick-filters.js?v=20261104-quick"></script><script src="/static/map.js?v=20261104-public-status"></script>{% endblock %}

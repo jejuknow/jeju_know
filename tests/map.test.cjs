@@ -54,37 +54,39 @@ test('authorship, missing status and community confirmation never imply editoria
   }
  }
  assert.equal(placeStatus({source_type:'user',status_label:'검토 대기'}).label,'사용자 등록');
- assert.equal(placeStatus({source_type:'jejuno',status_label:'JEJU_KNOW 등록'}).label,'JEJU_KNOW 등록');
- assert.equal(placeStatus({verification_status:'unknown'}).label,'상태 확인 필요');
+ assert.equal(placeStatus({source_type:'jejuno',status_label:'JEJU_KNOW 등록'}).key,'default');
+ assert.equal(placeStatus({verification_status:'unknown'}).label,'일반 장소');
  for(const place of [{},{source_type:''},{source_type:'admin'},{submitted_by_user_id:10},{status_label:'사용자 등록'}]){
   assert.notEqual(placeStatus(place).label,'사용자 등록','missing provenance must never imply user submission');
  }
 });
 
-test('six provenance/priority cases agree across marker and MAP card without changing review workflow',()=>{
+test('eight provenance/priority cases keep generic places badge-free without changing review workflow',()=>{
  const cases=[
   [{source_type:'user',verification_status:'unverified',status_label:'검토 대기'},'user_submitted','사용자 등록'],
   [{source_type:'user',verification_status:'jejuno_verified'},'verified','JEJU_KNOW 확인'],
   [{source_type:'user',verification_status:'jejuno_verified',is_pick:true},'pick','JEJU_KNOW PICK'],
   [{source_type:'jejuno',verification_status:'jejuno_verified'},'verified','JEJU_KNOW 확인'],
-  [{source_type:'jejuno',verification_status:'unverified'},'editorial','JEJU_KNOW 등록'],
-  [{verification_status:'unverified'},'default','상태 확인 필요']
+  [{source_type:'jejuno',verification_status:'unverified'},'default','일반 장소'], // admin
+  [{source_type:'jejuno',verification_status:'unverified',admin_import_note:'CSV'},'default','일반 장소'],
+  [{source_type:'jejuno',is_pick:true},'pick','JEJU_KNOW PICK'], // CSV PICK
+  [{verification_status:'unverified'},'default','일반 장소']
  ];
  for(const [place,key,label]of cases){
   const original=JSON.stringify(place),marker=placeStatus(place);
   assert.equal(marker.key,key);assert.equal(marker.label,label);
   const view=cardPresentation({...place,is_new:true,opening_label:'2026년 11월 오픈'});
-  assert.deepEqual(cardStatus.entries(view).map(s=>s.label),[label,'NEW']);
+  assert.deepEqual(cardStatus.entries(view).map(s=>s.label),key==='default'?['NEW']:[label,'NEW']);
   assert.equal(view.opening_label,'2026년 11월 오픈');
   assert.equal(JSON.stringify(place),original,'presentation must not alter source/workflow data');
  }
 });
 
-test('legend explains real mapped fallback origins and uses the same status definitions',()=>{
+test('legend only explains user, verified and PICK; defaults never imply member submission',()=>{
  const places=[{...cafe,source_type:'jejuno'},{...food},{id:3,source_type:'user'}];
- assert.deepEqual(legendStatuses(places).map(s=>s.label),['사용자 등록','JEJU_KNOW 등록','상태 확인 필요','JEJU_KNOW 확인','JEJU_KNOW PICK']);
+ assert.deepEqual(legendStatuses(places).map(s=>s.label),['사용자 등록','JEJU_KNOW 확인','JEJU_KNOW PICK']);
  assert.deepEqual(legendStatuses([{source_type:'jejuno'}]).map(s=>s.key),['user_submitted','verified','pick']);
- assert.equal(legendStatuses(places)[1],placeStatus(places[0]));
+ assert.notEqual(placeStatus(places[0]).symbol,placeStatus({source_type:'user'}).symbol);
 });
 
 test('marker and card share status, with accessible text and a distinct symbol for each status',()=>{

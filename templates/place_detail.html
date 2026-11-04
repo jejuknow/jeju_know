@@ -15,7 +15,7 @@
     <div class="detail-content">
       <p class="compact-place-meta">{{ region_labels.get(place.region,place.region) }} · {{ place.category }}{% if place.restaurant_label %} · {{ place.restaurant_label }}{% endif %}</p>
       <h1 class="detail-title">{{ place.name }}</h1>
-      <div class="meta-row"><span class="user-badge tone-{{ place.status_tone }}">{{ place.status_label }}</span>{% if place.is_new %}<span class="badge">NEW</span>{% endif %}{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
+      <div class="meta-row">{% if place.status_label %}<span class="user-badge tone-{{ place.status_tone }}">{{ place.status_label }}</span>{% endif %}{% if place.is_new %}<span class="badge">NEW</span>{% endif %}{% if place.is_pick %}<span class="badge pick">JEJU_KNOW PICK</span>{% endif %}{% if place.is_example %}<span class="badge example">예시 데이터</span>{% endif %}</div>
       {% if place.opening_label %}<p class="place-opening">{{ place.opening_label }}</p>{% endif %}
       {% if place.one_line %}<p class="detail-lead">{{ place.one_line }}</p>{% endif %}
       {% if place.detail_features or place.companions %}<section class="detail-section detail-highlights" aria-label="핵심 특징">
@@ -34,7 +34,7 @@
       {% if place.note %}<section class="detail-section place-visit-note"><h2>꿀팁</h2><p class="place-paragraph">{{ place.note }}</p></section>{% endif %}
       {% if place.is_pick and place.pick_note %}<section class="detail-section"><h2>JEJU_KNOW PICK</h2><p class="place-paragraph">{{ place.pick_note }}</p></section>{% endif %}
       <section class="detail-section"><h2>주소·지도</h2><p class="place-paragraph">{{ place.address or '주소 미확인' }}</p>{% if not place.has_coordinates %}<p class="muted">지도 위치 미등록</p>{% endif %}<div class="detail-actions"><a class="map-btn" href="{{ place.internal_map_url }}">지도에서 보기</a>{% if place.directions_url %}<a class="share-btn" href="{{ place.directions_url }}" target="_blank" rel="noopener noreferrer">길찾기 ↗</a>{% endif %}</div>{% if place.website_url %}<p><a href="{{ place.website_url }}" target="_blank" rel="noopener noreferrer">홈페이지·Instagram ↗</a></p>{% endif %}</section>
-      <section class="detail-section facts"><h2>기본 정보 및 정보 확인</h2><dl class="place-facts"><div><dt>정보 출처</dt><dd>{{ place.info_source or '미확인' }}</dd></div><div><dt>최근 정보 확인</dt><dd>{{ place.checked_at or '미확인' }}</dd></div><div><dt>등록</dt><dd>{{ '사용자 등록' if place.source_type == 'user' else 'JEJU_KNOW 등록' }}</dd></div></dl></section>
+      <section class="detail-section facts"><h2>기본 정보 및 정보 확인</h2><dl class="place-facts"><div><dt>정보 출처</dt><dd>{{ place.info_source or '미확인' }}</dd></div><div><dt>최근 정보 확인</dt><dd>{{ place.checked_at or '미확인' }}</dd></div>{% if place.source_type == 'user' %}<div><dt>등록</dt><dd>사용자 등록</dd></div>{% endif %}</dl></section>
       {% if place.reason or place.recommended_menu or place.dessert_note or place.food_taste_note %}<details class="detail-section legacy-place-info"><summary>이전에 기록한 추가 정보</summary>
         {% if place.reason %}<h3>JEJU_KNOW 추천 이유</h3><p class="place-paragraph">{{ place.reason }}</p>{% endif %}
         {% if place.category_slug in ('cafe','food') and place.recommended_menu %}<h3>대표 / 추천 메뉴 기록</h3><p class="place-paragraph">{{ place.recommended_menu }}</p>{% endif %}

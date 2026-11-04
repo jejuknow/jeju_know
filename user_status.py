@@ -32,6 +32,21 @@ def place_review(source, verification):
     return UNKNOWN
 
 
+def public_place_badge(source, verification, is_pick=False):
+    """Public discovery labels, independent of internal review/provenance labels.
+
+    PICK is rendered separately by cards. Defaults have no public status badge.
+    Only the stored, explicit user source proves a member submission.
+    """
+    if is_pick:
+        return Badge("")
+    if verification == "jejuno_verified":
+        return VERIFIED
+    if source == "user":
+        return Badge("사용자 등록")
+    return Badge("")
+
+
 def issue_approval(value, visible):
     # Approved posts may be hidden or past their public calendar window.
     if value == "approved" and not visible:

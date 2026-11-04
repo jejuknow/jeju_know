@@ -22,9 +22,11 @@ const sdk=`window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.el
    assert.equal(await p.locator('.map-pin[data-marker-type='+key+']').count(),places.filter(x=>hasCoordinates(x)&&placeStatus(x).key===key).length);
   }
   for(const place of places){
-   const badge=await p.locator('[data-place-id="'+place.id+'"] .place-card-badges .user-badge').first().textContent();
-   assert.equal(badge,placeStatus(place).label);
-   if(place.source_type!=='user')assert.notEqual(badge,'사용자 등록');
+   const badges=await p.locator('[data-place-id="'+place.id+'"] .place-card-badges .user-badge').allTextContents();
+   const state=placeStatus(place);
+   assert.deepEqual(badges,[...(state.key==='default'?[]:[state.label]),...(place.is_new?['NEW']:[])]);
+   if(place.source_type!=='user')assert.ok(!badges.includes('사용자 등록'));
+   assert.ok(!JSON.stringify(place).includes('JEJU_KNOW 등록'));
   }
   const summary=p.locator('#mapLegend summary'),legend=p.locator('#mapLegendItems');
   assert.equal(await summary.getAttribute('aria-label'),'마커 안내');
@@ -53,10 +55,13 @@ const sdk=`window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.el
    if(await p.locator('#mapWorkspace').getAttribute('data-list-level')==='0')await p.locator('#mapSheetToggle').click();
    await p.locator('[data-place-id="'+place.id+'"] .map-place-select').click();
    const panel=p.locator('#mapSelected');await panel.waitFor();
-   assert.equal(await panel.locator('.user-badge').first().textContent(),placeStatus(place).label);
+   const state=placeStatus(place);
+   assert.deepEqual(await panel.locator('.user-badge').allTextContents(),[...(state.key==='default'?[]:[state.label]),...(place.is_new?['NEW']:[])]);
    assert.equal(await panel.locator('.detail-link').first().getAttribute('href'),'/place/'+encodeURIComponent(place.slug));
    const detail=await ctx.request.get(base+'/place/'+encodeURIComponent(place.slug));assert.equal(detail.status(),200);
-   if(place.source_type==='user')assert.ok((await detail.text()).includes('<dt>등록</dt><dd>사용자 등록</dd>'));
+   const detailHtml=await detail.text();
+   assert.ok(!detailHtml.includes('JEJU_KNOW 등록'));
+   if(place.source_type==='user')assert.ok(detailHtml.includes('<dt>등록</dt><dd>사용자 등록</dd>'));
    await panel.locator('.map-close').click();
   }
   if(local){
@@ -65,8 +70,8 @@ const sdk=`window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.el
    await ctx.route('**/api/places?**',r=>r.fulfill({contentType:'application/json',body:JSON.stringify([legacy])}));
    await p.locator('#mapSearch button').click();await ready();
    assert.equal(await p.locator('.map-pin').getAttribute('data-marker-type'),'default');
-   assert.equal(await p.locator('.map-place-card .user-badge').first().textContent(),'상태 확인 필요');
-   await summary.click();assert.ok((await legend.textContent()).includes('상태 확인 필요'));await summary.click();
+   assert.equal(await p.locator('.map-place-card .user-badge').count(),0);
+   await summary.click();assert.deepEqual(await legend.locator('li>span:last-child').allTextContents(),['사용자 등록','JEJU_KNOW 확인','JEJU_KNOW PICK']);await summary.click();
    await ctx.unroute('**/api/places?**');await p.locator('#mapSearch button').click();await ready();
   }
   for(const width of [1280,1440,1920]){
@@ -76,7 +81,7 @@ const sdk=`window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.el
    assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth),width);
   }
   await p.setViewportSize({width:390,height:844});await summary.click();
-  if(process.env.MAP_EVIDENCE_DIR)await p.screenshot({path:path.join(process.env.MAP_EVIDENCE_DIR,'marker-legend-'+(local?'local':'live')+'.png')});
+  if(process.env.MAP_EVIDENCE_DIR)await p.screenshot({path:path.join(process.env.MAP_EVIDENCE_DIR,'public-marker-legend-'+(local?'local':'live')+'.png')});
   assert.deepEqual(errors,[]);
   console.log('PASS marker/card/popup/legend priority, provenance, privacy, desktop; page errors none');
  }finally{await browser.close()}

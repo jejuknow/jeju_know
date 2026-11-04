@@ -91,7 +91,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 return HTMLResponse("추천 모음을 찾을 수 없습니다.", status_code=404)
             rows = conn.execute("""SELECT p.* FROM best_collection_places b JOIN places p ON p.id=b.place_id
                 WHERE b.collection_id=? AND p.published=1 AND p.deleted_at IS NULL AND p.merged_into_id IS NULL ORDER BY b.sort_order,p.id""", (collection["id"],)).fetchall()
-        return render(request, "best.html", collection=dict(collection), places=[row_to_place(r) for r in rows], seo=collection_metadata(dict(collection)))
+        return render(request, "best.html", collection=dict(collection), places=[row_to_place(r, public=True) for r in rows], seo=collection_metadata(dict(collection)))
 
     def place_form(request, data=None, *, status=200, error=None, similar=None, new_only=False):
         return render(request, "member_place_form.html", status, place=data, error=error,

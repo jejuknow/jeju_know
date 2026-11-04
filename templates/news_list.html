@@ -26,7 +26,7 @@
         <a href="{{ url_for('news_detail',slug=item.slug) }}"><div class="issue-poster">{% if item.image_url %}<img src="{{ item.image_url }}" alt="" loading="lazy">{% else %}{{ navigation_icon('issue') }}{% endif %}</div>
           <div class="issue-copy"><div class="issue-tags"><span data-category>{{ item.category_label }}</span>{{ schedule_badge(item) }}{% if item.is_promoted or item.is_sponsored %}<span>{{ '홍보·제휴' if item.is_promoted else '광고·협찬' }}</span>{% endif %}</div><h3>{{ item.title }}</h3>
           {% if item.region or item.venue %}<p>{{ region_labels.get(item.region,item.region) }}{% if item.region and item.venue %} · {% endif %}{{ item.venue }}</p>{% endif %}
-          <p data-dates>{{ item.date_label }}</p><span class="nearby-distance" data-distance hidden></span><small>{{ item.author_label }} · {{ item.author_name }}</small></div></a>
+          <p data-dates>{{ item.date_label }}</p><span class="nearby-distance" data-distance hidden></span><small>{% if item.author_type == 'user' %}사용자 등록 · {% endif %}{{ item.author_name }}</small></div></a>
       </article>{% else %}<div class="issue-empty"><h3>조건에 맞는 제주 ISSUE가 없습니다.</h3><a href="/news">전체 보기 →</a><p>제주에서 열리는 행사를 알고 계신가요?</p><a class="secondary-btn" href="/issues/new">ISSUE 등록하기</a></div>{% endfor %}
       <p class="nearby-empty" data-near-empty hidden>반경 안에 ISSUE가 없습니다. 반경을 넓히거나 내 주변을 해제해 보세요.</p>
     </section>

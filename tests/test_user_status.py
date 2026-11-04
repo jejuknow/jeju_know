@@ -2,7 +2,7 @@ import unittest
 from datetime import date
 
 from issue_discovery import schedule
-from user_status import CORRECTION, INQUIRY, UNKNOWN, issue_approval, place_review
+from user_status import CORRECTION, INQUIRY, UNKNOWN, issue_approval, place_review, public_place_badge
 
 
 class UserStatusTests(unittest.TestCase):
@@ -27,3 +27,13 @@ class UserStatusTests(unittest.TestCase):
         self.assertEqual([CORRECTION[k].label for k in ("pending","accepted","rejected")],["검토 대기","반영","반려"])
         self.assertEqual([INQUIRY[k].label for k in ("unread","read","done")],["접수","확인중","처리완료"])
         self.assertEqual(INQUIRY.get("unexpected",UNKNOWN).label,"상태 확인 필요")
+
+    def test_public_badges_do_not_expose_internal_review_or_default_source(self):
+        for source in ('jejuno', None, '', 'legacy', 'csv', 'admin'):
+            self.assertEqual(public_place_badge(source, 'unverified').label, '')
+        self.assertEqual(public_place_badge('user', 'unverified').label, '사용자 등록')
+        for source in ('user', 'jejuno', None):
+            self.assertEqual(public_place_badge(source, 'jejuno_verified').label, 'JEJU_KNOW 확인')
+            # The existing separate PICK badge wins; no duplicate status badge.
+            self.assertEqual(public_place_badge(source, 'jejuno_verified', True).label, '')
+        self.assertEqual(place_review('user', 'unverified').label, '검토 대기')
