@@ -272,11 +272,12 @@ class AdminUI:
 
     def issues(self, request, user_only=False):
         if response := self.guard(request): return response
-        f = request.query_params
+        f = dict(request.query_params)
         where, args = ["1=1" if user_only else "deleted_at IS NULL"], []
         if q := f.get("q", "").strip()[:200]: where.append("instr(title,?)>0"); args.append(q)
         if f.get("category"):
             category = self.news_aliases.get(f["category"], f["category"][:40])
+            f["category"] = category
             values = [category] + [old for old, new in self.news_aliases.items() if new == category]
             where.append("category IN (" + ",".join("?" for _ in values) + ")"); args.extend(values)
         if user_only or f.get("source") in ("admin", "user"):
@@ -298,7 +299,7 @@ class AdminUI:
             where.append("published=0")
         with closing(self.db()) as conn:
             rows, page = page_rows(conn, request, "*", "FROM news_posts", " AND ".join(where), args, "id DESC")
-        return self.render(request, "issues.html", issues=[self.news(row, calendar_day) for row in rows], pagination=page, user_only=user_only)
+        return self.render(request, "issues.html", issues=[self.news(row, calendar_day) for row in rows], pagination=page, user_only=user_only, filters=f)
 
     def users(self, request):
         if response := self.guard(request): return response

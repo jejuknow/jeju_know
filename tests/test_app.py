@@ -10,7 +10,7 @@ from app import create_app
 
 
 class JejunoAppTest(unittest.TestCase):
-    news_categories = ["행사•축제", "전시•팝업", "체험•교육", "지역소식", "공모•지원"]
+    news_categories = ["행사•축제", "전시•팝업", "교육·체험", "지역소식", "공모•지원"]
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -203,7 +203,8 @@ class JejunoAppTest(unittest.TestCase):
 
     def test_legacy_news_reads_filters_and_restart_do_not_rewrite_data(self):
         self.setup_admin_and_login()
-        aliases = {"행사·축제":"행사•축제", "전시":"전시•팝업", "체험·교육":"체험•교육", "공모·지원":"공모•지원"}
+        aliases = {"행사·축제":"행사•축제", "전시":"전시•팝업", "체험·교육":"교육·체험",
+                   "체험•교육":"교육·체험", "교육•체험":"교육·체험", "공모·지원":"공모•지원"}
         for index, category in enumerate(list(aliases) + ["마켓", "지역소식"] + self.news_categories):
             self.insert_news(f"legacy-{index}", category)
         self.insert_news("hidden-event", "행사·축제", published=0)

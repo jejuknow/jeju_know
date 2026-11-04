@@ -51,7 +51,7 @@ from starlette.concurrency import run_in_threadpool
 from analytics import Analytics
 from admin_roles import SUPER, audit, migrate as migrate_admin_roles, require_admin
 from admin_accounts import register_admin_accounts, password_error, valid_username
-from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES
+from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES, RENAMED_CATEGORIES
 from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule
 from ad_banners import active_banners, banner_image, migrate as migrate_ads, register_ad_routes
 from contact_inquiries import migrate as migrate_contact, migrate_member_inquiries, register_contact_routes
@@ -552,10 +552,11 @@ def create_app(test_config=None):
     async def parse_news_form(request: Request, existing=None):
         form = await request.form(max_files=1, max_fields=40, max_part_size=FORM_BYTES)
         slug = unique_news_slug(form.get("slug"), existing["id"] if existing else None)
+        category = str(form.get("category", "")).strip()
         return form, {
             "slug": slug,
             "title": str(form.get("title", "")).strip(),
-            "category": str(form.get("category", "")).strip(),
+            "category": RENAMED_CATEGORIES.get(category, category),
             "summary": str(form.get("summary", "")).strip(),
             "body": str(form.get("body", "")).strip(),
             "image_url": str(form.get("image_url", existing["image_url"] if existing else "")).strip(),

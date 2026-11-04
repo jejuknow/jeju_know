@@ -76,6 +76,43 @@ class IssueBrowserTest(unittest.TestCase):
             region,published,show_on_map,latitude,longitude) VALUES (?,?,?,?,?,'애월',?,?,?,?)""",
             (slug,slug,category,start,end,public,mapped,*coords))
 
+    def test_education_aliases_preserve_records_across_public_admin_and_account(self):
+        day = today().isoformat()
+        aliases = ("체험•교육", "체험·교육", "교육•체험", "교육·체험")
+        uid = self.rows("SELECT id FROM users WHERE username='member'")[0]["id"]
+        for index, label in enumerate(aliases):
+            row_id = self.issue(f"education-{index}", day, day, label, mapped=1, coords=(33.45,126.4))
+            self.execute("UPDATE news_posts SET author_type='user',author_id=?,venue='교육장',address='제주 애월읍' WHERE id=?", (uid,row_id))
+        self.issue("other-event", day, day, "행사•축제")
+        before = self.rows("SELECT * FROM news_posts ORDER BY id")
+        for category in (*aliases, "activities"):
+            page = self.visitor.get("/news", params={"category":category,"period":"today",
+                "region":"애월","q":"education-","view":"map"})
+            self.assertEqual(page.status_code, 200)
+            self.assertEqual(page.context["selected"]["category"], "교육·체험")
+            self.assertEqual(page.context["map_count"], 4)
+            self.assertEqual({r["slug"] for r in page.context["news_items"]}, {f"education-{i}" for i in range(4)})
+            self.assertNotIn("체험·교육", page.text)
+            self.assertNotIn("체험•교육", page.text)
+        for label in aliases:
+            page = self.admin.get("/admin/issues", params={"category":label})
+            self.assertEqual(page.context["filters"]["category"], "교육·체험")
+            self.assertEqual(len(page.context["issues"]), 4)
+            self.assertIn('<option selected>교육·체험</option>', page.text)
+        for row in before[:4]:
+            detail = self.visitor.get("/news/"+row["slug"])
+            self.assertEqual(detail.status_code, 200)
+            self.assertEqual(detail.context["item"]["category_label"], "교육·체험")
+            self.assertIn("교육·체험", detail.context["seo"]["title"])
+            self.assertIn('"@type": "Event"', detail.text)
+            edit = self.admin.get(f'/admin/news/{row["id"]}/edit')
+            self.assertIn('value="교육·체험" selected', edit.text)
+        account = self.member.get("/account/issues")
+        self.assertIn("교육·체험", account.text)
+        self.assertNotIn("체험·교육", account.text)
+        self.assertNotIn("education-", self.other.get("/account/issues").text)
+        self.assertEqual(self.rows("SELECT * FROM news_posts ORDER BY id"), before)
+
     def test_all_public_entry_points_and_intersections(self):
         self.issue("running", "2026-10-30","2026-11-09", mapped=1, coords=(33.45,126.4))
         self.issue("weekend", "2026-11-06","2026-11-09", mapped=1)

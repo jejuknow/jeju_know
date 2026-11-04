@@ -13,7 +13,7 @@ from community_places import SUGGESTION_FIELDS, editable
 from place_auto_checks import decorate as decorate_check
 from contact_inquiries import cipher, kst_time, unpack
 import user_status as status
-from issue_discovery import public_where, schedule
+from issue_discovery import ALIASES, public_where, schedule
 from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal
 
 
@@ -86,6 +86,7 @@ def activity_rows(conn, section, uid, day: date, limit, offset=0, *, recent=Fals
             if shown:
                 link = "/place/" + r["slug"]
         elif section == "issues":
+            item["category"] = ALIASES.get(item["category"], item["category"])
             item.update(schedule(item, day))
             title = r["title"]
             labels = [status.issue_approval(r["approval_status"], r["visible"]), status.SCHEDULE[item["schedule_key"]]]

@@ -73,6 +73,30 @@ class IssueReviewTest(unittest.TestCase):
         self.assertEqual(self.rows("SELECT reviewed_by,approval_status FROM news_posts")[0],
                          {"reviewed_by":"admin:1","approval_status":"approved"})
 
+    def test_education_legacy_submission_edit_and_approval_use_canonical_label(self):
+        for client, path in ((self.member,"/issues/new"),(self.admin,"/admin/news/new")):
+            page = client.get(path)
+            self.assertIn('value="교육·체험"', page.text)
+            self.assertNotIn('value="체험', page.text)
+        self.assertEqual(self.submit(category="체험•교육").status_code, 303)
+        row = self.rows("SELECT * FROM news_posts")[0]
+        self.assertEqual((row["category"],row["approval_status"],row["published"]), ("교육·체험","pending",0))
+        # Simulate a pending record created before deployment; GET must not rewrite it.
+        self.execute("UPDATE news_posts SET category='체험•교육' WHERE id=?", (row["id"],))
+        path = f'/issues/{row["id"]}/edit'
+        self.assertIn('value="교육·체험" selected',self.member.get(path).text)
+        self.assertEqual(self.rows("SELECT category FROM news_posts")[0]["category"],"체험•교육")
+        self.assertEqual(self.other.get(path).status_code, 403)
+        saved = self.member.post(path, data=self.data(category="체험·교육",csrf_token=self.csrf(self.member)), follow_redirects=False)
+        self.assertEqual(saved.status_code,303)
+        row = self.rows("SELECT * FROM news_posts")[0]
+        self.assertEqual((row["category"],row["approval_status"],row["published"]), ("교육·체험","pending",0))
+        self.assertEqual(self.review(row,category="교육•체험").status_code,303)
+        approved = self.rows("SELECT * FROM news_posts")[0]
+        self.assertEqual((approved["category"],approved["approval_status"],approved["published"]), ("교육·체험","approved",1))
+        self.assertEqual((approved["id"],approved["slug"],approved["author_id"]), (row["id"],row["slug"],row["author_id"]))
+        self.assertIn(row["title"],self.visitor.get("/news?category=activities").text)
+
     def test_rejection_duplicates_disclosure_and_rate_limit(self):
         self.submit()
         row=self.rows("SELECT * FROM news_posts")[0]

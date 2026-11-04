@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}제주 ISSUE | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261102-review"><link rel="stylesheet" href="/static/nearby.css?v=20261104">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261104-education"><link rel="stylesheet" href="/static/nearby.css?v=20261104">{% endblock %}
 {% from '_user_status.html' import schedule_badge %}
 {% block body %}
 <main class="issue-discovery wrap" data-view="{{ selected.view }}" data-kakao-key="{{ kakao_map_key }}">
-  <header class="issue-intro"><div><p class="kicker">JEJU ISSUE</p><h1>지금 제주에서 뭐 하지?</h1><p>제주에서 열리는 행사부터 전시·팝업, 체험과 지역소식을 모았습니다.</p></div><a class="secondary-btn issue-submit-link" href="/issues/new">+ ISSUE 등록하기</a></header>
+  <header class="issue-intro"><div><p class="kicker">JEJU ISSUE</p><h1>지금 제주에서 뭐 하지?</h1><p>제주에서 열리는 행사부터 전시·팝업, 교육·체험과 지역소식을 모았습니다.</p></div><a class="secondary-btn issue-submit-link" href="/issues/new">+ ISSUE 등록하기</a></header>
   <section class="issue-filters" aria-label="ISSUE 탐색 조건">
     <nav class="issue-filter-row" aria-label="기간"><strong>기간</strong>{% for key,label in periods.items() %}<a data-filter href="{{ issue_link(period=key) }}" {% if selected.period==key %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>
     <nav class="issue-filter-row" aria-label="카테고리"><strong>종류</strong>{% for value in ['']+public_issue_categories %}<a data-filter href="{{ issue_link(category=value) }}" {% if selected.category==value %}aria-current="true"{% endif %}>{{ value.replace('•','·') or '전체' }}</a>{% endfor %}</nav>

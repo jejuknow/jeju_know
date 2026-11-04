@@ -6,11 +6,13 @@ from urllib.parse import urlencode
 from community_migrations import today
 from user_status import SCHEDULE
 
-# Preserve the stored labels and accept both separators in old links and records.
-LABELS = {"events": "행사•축제", "exhibitions": "전시•팝업", "activities": "체험•교육",
+# Keep stable keys and read existing records without rewriting their categories.
+LABELS = {"events": "행사•축제", "exhibitions": "전시•팝업", "activities": "교육·체험",
           "local": "지역소식", "opportunities": "공모•지원"}
 PUBLIC_CATEGORIES = {key: label for key, label in LABELS.items() if key != "opportunities"}
+RENAMED_CATEGORIES = {old: LABELS["activities"] for old in ("체험•교육", "체험·교육", "교육•체험")}
 ALIASES = {label.replace("•", "·"): label for label in LABELS.values() if "•" in label}
+ALIASES.update(RENAMED_CATEGORIES)
 ALIASES.update({"전시": LABELS["exhibitions"], "지원·공모": LABELS["opportunities"],
                 "지원사업": LABELS["opportunities"]})
 PERIODS = {"all": "전체", "today": "오늘", "week": "이번 주", "weekend": "이번 주말", "month": "이번 달"}
