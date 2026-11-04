@@ -70,7 +70,14 @@ const sdk = `window.JejunoKakao={load:async()=>({Map:class{constructor(el){this.
   await p.mouse.move(grip.x+grip.width/2,grip.y+grip.height/2);await p.mouse.down();await p.mouse.move(grip.x+grip.width/2,grip.y-80,{steps:6});await p.mouse.up();
   assert.equal(await p.locator('#mapWorkspace').getAttribute('data-list-level'),'1');
   await p.locator('#mapSheetClose').click();
-  for(const expected of ['1','2','0']){await p.locator('#mapSheetToggle').click();assert.equal(await p.locator('#mapWorkspace').getAttribute('data-list-level'),expected)}
+  for(const expected of ['1','2','0']){
+    await p.locator('#mapSheetToggle').click();
+    assert.equal(await p.locator('#mapWorkspace').getAttribute('data-list-level'),expected);
+    const sheet=await p.locator('.map-results').boundingBox();
+    assert.ok(expected==='0'?sheet.height<=120:sheet.height>=(expected==='1'?400:650),JSON.stringify(sheet));
+    assert.equal(await p.locator('.map-place-select').first().isVisible(),expected!=='0');
+    assert.equal((await p.locator('#kakaoMap').boundingBox()).height,mapHeight);
+  }
   await p.locator('#mapSheetToggle').click();
   await p.locator('.map-place-select').first().click();
   assert.equal(await p.locator('#mapWorkspace').getAttribute('data-list-level'),'0');

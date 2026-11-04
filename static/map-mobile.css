@@ -81,7 +81,7 @@
  .map-body [data-list-level="0"] #mapResultsList{display:none}
  .map-body [data-list-level="0"] #mapCoordinateCount{display:none}
  .map-body .map-results-list{overflow-y:auto;overscroll-behavior:contain;padding:4px 10px calc(12px + env(safe-area-inset-bottom))}
- .map-body [data-list-level="1"] .map-results,.map-body [data-list-level="2"] .map-results{position:absolute;bottom:0;left:0;right:0;height:50vh;height:50dvh;max-height:100%}
+ .map-body [data-list-level="1"] .map-results,.map-body [data-list-level="2"] .map-results{grid-area:auto;position:absolute;bottom:0;left:0;right:0;height:50vh;height:50dvh;max-height:100%}
  .map-body [data-list-level="2"] .map-results{height:85vh;height:85dvh}
  .map-body [data-list-level="1"] .map-selected,.map-body [data-list-level="2"] .map-selected{visibility:hidden}
  .map-body .community-header .header-inner{min-height:60px}
@@ -105,4 +105,3 @@
  .map-body>.map-workspace{flex-shrink:0;min-height:calc(100dvh + 100px)}
  .map-body .map-canvas-panel{min-height:70dvh}
 }
-
