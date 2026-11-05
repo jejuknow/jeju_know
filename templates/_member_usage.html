@@ -1,0 +1,6 @@
+<fieldset class="submission-field member-usage"><legend>이용 정보 (선택)</legend>
+<div class="member-usage-grid">
+{% for key,label in usage_labels.items() %}<fieldset class="member-usage-row"><legend>{{ label }}</legend><div class="member-usage-options">
+{% for value in member_use_options %}<label><input type="radio" name="detail_{{ key }}" value="{{ value }}" {% if (p.get('detail_' ~ key) or '미확인') == value %}checked{% endif %}><span>{{ value }}</span></label>{% endfor %}
+</div></fieldset>{% endfor %}
+</div></fieldset>

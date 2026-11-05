@@ -15,5 +15,6 @@
 <div class="form-grid two"><label class="span-2">추천메뉴 (선택)<textarea name="detail_recommended_menu" maxlength="1000" rows="2" placeholder="한 줄에 메뉴 이름 하나씩">{{ p.get('detail_recommended_menu','') }}</textarea></label>
 <label>커피 맛 특징<select name="detail_coffee_taste">{% for item in coffee_options %}<option value="{{ item }}" {% if (p.get('detail_coffee_taste') or '미확인') == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
 <label>디저트·베이커리 특징<textarea name="detail_dessert_note" maxlength="300" rows="3">{{ p.get('detail_dessert_note','') }}</textarea></label></div>
+<fieldset class="submission-field"><legend>추천 시간대 (선택)</legend><div class="chips">{% for value in cafe_visit_time_options %}<label class="member-term"><input type="checkbox" name="detail_cafe_visit_times" value="{{ value }}" {% if value in p.get('detail_cafe_visit_times',[]) %}checked{% endif %}>{{ value }}</label>{% endfor %}</div><p class="form-help">알려주신 시간대는 관리자 확인 후 반영됩니다.</p></fieldset>
 </section>
 {% endfor %}

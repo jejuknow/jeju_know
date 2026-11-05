@@ -103,14 +103,14 @@ class PlaceDetailsTest(unittest.TestCase):
         self.assertNotIn('<script>alert(1)</script>',page)
 
     def test_member_cannot_write_admin_details(self):
-        for field in ('reason','is_pick','verification_status','checked_at','reservation_status'):
+        for field in ('reason','is_pick','verification_status','checked_at'):
             self.assertEqual(self.create(**{field:'forged'}).status_code,403)
         self.assertFalse(self.rows('SELECT id FROM places'))
 
     def test_specific_corrections_require_review_and_validate_choices(self):
         p=self.place()
         path=f"/places/{p['id']}/suggest"
-        for field,value in [('business_hours','09:00 ~ 17:00'),('closed_days','매주 월요일'),('reservation_status','가능'),('parking_status','제한')]:
+        for field,value in [('business_hours','09:00 ~ 17:00'),('closed_days','매주 월요일'),('pet_status','불가'),('parking_status','가능')]:
             before=self.rows('SELECT * FROM places')[0]
             self.assertEqual(self.post(self.member,path,field=field,new_value=value,reason='공식 안내에서 확인했습니다').status_code,303)
             self.assertEqual(self.rows('SELECT * FROM places')[0],before)

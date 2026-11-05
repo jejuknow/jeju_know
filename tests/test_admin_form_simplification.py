@@ -26,7 +26,7 @@ class AdminFormSimplificationTest(unittest.TestCase):
 
     def test_new_edit_and_validation_forms_have_no_retired_controls(self):
         for slug in ('cafe', 'food', 'attraction'):
-            p = self.place(category_id=self.category[slug], name='검증 장소 ' + slug, address='제주 ' + slug)
+            p = self.place(category_id=self.category[slug], name='검증 장소 ' + slug, address='제주시 테스트로 ' + slug)
             responses = [self.admin.get('/admin/places/new'),
                          self.admin.get(f"/admin/places/{p['id']}/edit"),
                          self.post(self.admin, f"/admin/places/{p['id']}/edit",

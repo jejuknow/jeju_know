@@ -8,7 +8,7 @@ from urllib.parse import quote
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.concurrency import run_in_threadpool
-from starlette.datastructures import UploadFile
+from starlette.datastructures import FormData, UploadFile
 
 from admin_roles import audit
 from auth_security import current_user, rate_limited, safe_external_url
@@ -17,7 +17,7 @@ from place_details import validate_detail_value
 from public_seo import collection_metadata, initial_places
 from cafe_features import FIELDS as CAFE_FIELDS, parse_member_features, combine_proposals
 from user_status import WAITING
-from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
+from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, MEMBER_SUGGESTION_FIELDS, VERIFICATION_LABELS, coordinates,
                               duplicates, editable, facts, merge_places, opening)
 from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
 from image_limits import MEMBER_PLACE_SLOTS
@@ -27,7 +27,7 @@ from admin_settings import catalog, read_settings
 from place_auto_checks import (validate_address, duplicate_matches, inspect as inspect_place,
                                record as record_check, BURST_LIMIT, BURST_SECONDS)
 from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
-from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, USAGE_LABELS,
+from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, MEMBER_USAGE_LABELS, MEMBER_USE_OPTIONS, IGNORED_MEMBER_FIELDS,
                                     parse_proposal, queue_proposal, approve_proposal)
 
 
@@ -35,7 +35,8 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                               row_to_place, form_options, regions, secret, image_store):
     def render(request, template, status=200, **context):
         return templates.TemplateResponse(request=request, name=template, context={"current_year": today().year,
-            "current_month": today().month, "suggestion_fields": SUGGESTION_FIELDS,
+            "current_month": today().month, "suggestion_fields": MEMBER_SUGGESTION_FIELDS,
+            "member_use_options": MEMBER_USE_OPTIONS,
             "verification_labels": VERIFICATION_LABELS, **context}, status_code=status)
 
     def redirect(url):
@@ -106,7 +107,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         return render(request, "member_place_form.html", status, place=data, error=error,
                       auto_publish=auto_publish,
                       similar=similar or [], new_only=new_only, hours_ui=controls(data or {}),
-                      time_options=TIME_OPTIONS, weekdays=WEEKDAYS, usage_labels=USAGE_LABELS,
+                      time_options=TIME_OPTIONS, weekdays=WEEKDAYS, usage_labels=MEMBER_USAGE_LABELS,
                       **form_options(data.get("category_id") if data else None))
 
     @app.post("/api/place-photos/prepare")
@@ -182,9 +183,10 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if form is None:
             return bad_csrf()
         # Only basic facts and explicitly namespaced pending details are accepted.
+        form = FormData([(k, v) for k, v in form.multi_items() if k not in IGNORED_MEMBER_FIELDS])
         allowed = set(FACT_FIELDS) | CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | CAFE_FIELDS | {"csrf_token", "from_new", "duplicate_ack"} | {f"image_{n}" for n in range(5)} | {f"remove_image_{n}" for n in range(5)}
         if any(k not in allowed for k in form):
-            return HTMLResponse("허용하지 않는 입력 항목입니다. 기본 정보·사진과 선택형 세부 정보만 제출해주세요.", status_code=403)
+            return HTMLResponse("허용하지 않는 입력 항목입니다. 기본 정보·사진과 선택 정보만 제출해주세요.", status_code=403)
         if limited(request, "community-place"):
             return HTMLResponse("등록 요청이 많습니다. 잠시 후 다시 시도해주세요.", status_code=429)
         user_id = current_user(request)["id"]
@@ -211,11 +213,11 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 data.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
                 data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
                 data.update(term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isdigit() and len(str(v)) <= 10],
-                            detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
+                            closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
             except ValueError as exc:
                 values = {k: str(form.get(k, "")) for k in FACT_FIELDS}
                 values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
-                values.update(detail_companions=form.getlist("detail_companions"), closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
+                values.update(closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
                 values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
                 values.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
@@ -311,10 +313,13 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         flash(request, "장소를 삭제했습니다. 공개 화면에서 더 이상 표시되지 않습니다.")
         return redirect("/account/places")
 
-    def suggestion_value(conn, field, raw):
+    def suggestion_value(conn, field, raw, *, member=False):
         value = raw.strip()
-        if field not in SUGGESTION_FIELDS or not value or len(value) > 2000:
+        allowed = MEMBER_SUGGESTION_FIELDS if member else SUGGESTION_FIELDS
+        if field not in allowed or not value or len(value) > 2000:
             raise ValueError("제안 항목과 변경 내용을 확인해주세요. 2,000자까지 입력할 수 있습니다.")
+        if field in MEMBER_USAGE_LABELS and value not in (MEMBER_USE_OPTIONS if member else (*MEMBER_USE_OPTIONS, "제한")):
+            raise ValueError("이용 정보는 미확인·가능·불가 중 선택해주세요.")
         value = validate_detail_value(field, value)
         if field == "category_id":
             category = conn.execute("SELECT id FROM categories WHERE id=? AND type='place' AND is_active=1", (value,)).fetchone()
@@ -373,11 +378,14 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
             field, reason = str(form.get("field", "")), str(form.get("reason", "")).strip()
             try:
-                value = suggestion_value(conn, field, str(form.get("new_value", "")))
+                value = suggestion_value(conn, field, str(form.get("new_value", "")), member=True)
                 if not 5 <= len(reason) <= 2000:
                     raise ValueError("확인할 근거를 5~2,000자로 입력해주세요.")
             except ValueError as exc:
                 return render(request, "place_suggestion.html", 400, place=dict(place), error=str(exc), **form_options(place["category_id"]))
+            if field in MEMBER_USAGE_LABELS and value == "미확인":
+                flash(request, "미확인은 기존 이용 정보를 바꾸지 않습니다.")
+                return redirect("/account/suggestions")
             conn.execute("INSERT INTO place_correction_suggestions(place_id,user_id,field,new_value,original_value,reason) VALUES (?,?,?,?,?,?)", (place_id,current_user(request)["id"],field,value,original_value(place,field),reason))
         flash(request, "수정 제안을 보냈습니다. 관리자가 확인하기 전에는 원본 정보가 바뀌지 않습니다.")
         return redirect("/account/suggestions")

@@ -11,10 +11,14 @@ DETAIL_FIELD = "submission_details"
 DETAIL_LABEL = "사용자 세부 정보"
 USAGE_LABELS = {"parking_status": "주차", "pet_status": "반려동물", "child_status": "아이 동반",
                 "accessible_status": "무장애", "reservation_status": "예약", "waiting_status": "웨이팅"}
-# Waiting has established facts (none / present / seasonal), unlike admission policies.
-WAITING_MAP = {"미확인": "미확인", "가능": "있음", "불가": "없음", "제한": "주말·성수기 있음"}
-INPUT_FIELDS = {"details_enabled", "detail_companions", "term_ids", "taxonomy_present", "detail_note",
-                *("detail_" + k for k in USAGE_LABELS)}
+MEMBER_USAGE_LABELS = {k: v for k, v in USAGE_LABELS.items() if k not in ("reservation_status", "waiting_status")}
+MEMBER_USE_OPTIONS = ("미확인", "가능", "불가")
+INPUT_FIELDS = {"term_ids", "taxonomy_present", "detail_note", *("detail_" + k for k in MEMBER_USAGE_LABELS)}
+# Ignore removed controls from cached forms and forged requests. They never enter
+# the fact UPDATE or the review queue; existing canonical/legacy values survive.
+IGNORED_MEMBER_FIELDS = {"details_enabled", "detail_companions", "companion", "companions", "recommended_companion",
+                         "reservation", "reservation_status", "detail_reservation_status",
+                         "waiting", "waiting_status", "detail_waiting_status"}
 
 
 def dumps(value):
@@ -22,12 +26,6 @@ def dumps(value):
 
 
 def parse_proposal(form, conn, category_id):
-    if form.get("details_enabled") != "1":
-        return None
-    companions = list(dict.fromkeys(form.getlist("detail_companions")))
-    allowed = {i["value"] for i in catalog(conn, "companion") if i["is_active"]}
-    if len(companions) > 30 or any(c not in allowed for c in companions):
-        raise ValueError("잘 맞는 동행 선택값을 확인해주세요.")
     data = {"category_id": category_id, "features": [], "term_ids": form.getlist("term_ids")}
     if error := validate_terms(conn, data):
         raise ValueError(error)
@@ -39,18 +37,18 @@ def parse_proposal(form, conn, category_id):
         if len(data["term_ids"]) > 5:
             raise ValueError("카페 특징은 최대 5개까지 선택할 수 있어요.")
     usage = {}
-    for key, label in USAGE_LABELS.items():
+    for key, label in MEMBER_USAGE_LABELS.items():
         value = form.get("detail_" + key, "미확인")
-        if value not in USE_OPTIONS:
+        if value not in MEMBER_USE_OPTIONS:
             raise ValueError(label + " 선택값을 확인해주세요.")
         if value != "미확인":
-            usage[key] = WAITING_MAP[value] if key == "waiting_status" else value
+            usage[key] = value
     note = str(form.get('detail_note', '')).strip()
     if len(note) > 4000 or any(ord(c) < 32 and c not in '\n\r\t' for c in note):
         raise ValueError('꿀팁은 4,000자 이내로 입력해주세요.')
-    if not companions and not data["term_ids"] and not usage and not note:
+    if not data["term_ids"] and not usage and not note:
         return None
-    return {"category_id": category_id, "companions": sorted(companions), "term_ids": sorted(data["term_ids"]), "usage": usage, **({'note': note} if note else {})}
+    return {"category_id": category_id, "companions": [], "term_ids": sorted(data["term_ids"]), "usage": usage, **({'note': note} if note else {})}
 
 
 def snapshot(conn, place, proposal):

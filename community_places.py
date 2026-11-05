@@ -16,9 +16,12 @@ VERIFICATION_LABELS = {"unverified": "미확인", "jejuno_verified": "JEJU_KNOW 
 SUGGESTION_FIELDS = {"name": "장소명", "address": "주소", "coordinates": "지도 위치",
                      "signature_menu": "대표메뉴", "representative_price": "가격", "tamnaneunjeon_status": "탐나는전 가능 여부",
                      "business_hours": "영업시간", "phone": "전화번호", "closed_days": "휴무일", "closed": "폐업/휴업",
-                     "reservation_status": "예약", "parking_status": "주차",
+                     "reservation_status": "예약", "parking_status": "주차", "pet_status": "반려동물",
+                     "child_status": "아이 동반", "accessible_status": "무장애", "note": "꿀팁",
                      "category_id": "카테고리", "business": "영업 관련 정보", "opening": "오픈 정보",
                      "map_url": "지도 링크", "website_url": "홈페이지·Instagram", "other": "기타"}
+# Keep old queued reservation suggestions readable/reviewable by administrators.
+MEMBER_SUGGESTION_FIELDS = {k: v for k, v in SUGGESTION_FIELDS.items() if k != "reservation_status"}
 
 
 def normalize(value):

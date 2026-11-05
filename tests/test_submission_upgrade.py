@@ -80,7 +80,9 @@ class SubmissionUpgradeTest(unittest.TestCase):
         self.assertFalse(self.rows('SELECT * FROM place_category_links'))
         self.assertEqual(self.visitor.get('/api/places?category=cafe&detail=cafe-view&companion=연인').json(),[])
         page=self.admin.get('/admin/suggestions').text
-        for value in ('사용자 세부 정보','전체 승인','연인 / 친구','주차: 가능','웨이팅: 주말·성수기 있음'): self.assertIn(value,page)
+        for value in ('사용자 세부 정보','전체 승인','주차: 가능'): self.assertIn(value,page)
+        self.assertNotIn('웨이팅:',page)
+        self.assertNotIn('연인 / 친구',page)
         self.assertNotIn('submission_details',self.member.get(f"/places/{p['id']}/suggest").text)
         sid=self.rows('SELECT id FROM place_correction_suggestions')[0]['id']
         self.assertEqual(self.admin.post(f'/admin/suggestions/{sid}/review',data={'action':'accept'}).status_code,400)
@@ -90,13 +92,14 @@ class SubmissionUpgradeTest(unittest.TestCase):
         updated=self.rows('SELECT * FROM places')[0]
         self.assertEqual(updated['verification_status'],'unverified')
         self.assertEqual(updated['parking_status'],'가능')
-        self.assertEqual(updated['waiting_status'],'주말·성수기 있음')
-        self.assertEqual(len(self.visitor.get('/api/places?category=cafe&detail=cafe-view&companion=연인').json()),1)
-        self.assertIn('#연인',self.visitor.get('/place/'+p['slug']).text)
+        self.assertEqual(updated['waiting_status'],'미확인')
+        self.assertEqual(json.loads(updated['companions']),[])
+        self.assertEqual(len(self.visitor.get('/api/places?category=cafe&detail=cafe-view').json()),1)
+        self.assertEqual(self.visitor.get('/api/places?category=cafe&detail=cafe-view&companion=연인').json(),[])
         self.assertEqual(self.review().status_code,409)
 
-    def test_off_reject_stale_and_existing_official_data_preserved(self):
-        p=self.place(**(self.details()|{'details_enabled':''}))
+    def test_reject_stale_and_existing_official_data_preserved(self):
+        p=self.place()
         self.assertFalse(self.rows('SELECT * FROM place_correction_suggestions'))
         self.execute("UPDATE places SET cafe_focus='[\"taste\"]',companions='[\"부모님\"]',child_status='가능'")
         path=f"/places/{p['id']}/edit"
@@ -112,16 +115,16 @@ class SubmissionUpgradeTest(unittest.TestCase):
         self.assertEqual(self.rows('SELECT cafe_focus FROM places')[0]['cafe_focus'],'["taste"]')
 
     def test_details_tampering_and_empty_unknown_do_not_write(self):
-        for extra in ({'detail_companions':['fake']},{'term_ids':['99999']},{'detail_parking_status':'fake'}):
+        for extra in ({'term_ids':['99999']},{'detail_parking_status':'fake'}):
             self.assertEqual(self.create(**(self.details()|extra)).status_code,400)
-        for extra in ({'parking_status':'가능'},{'companions':['연인']},{'cafe_focus':['taste']}):
+        for extra in ({'parking_status':'가능'},{'cafe_focus':['taste']}):
             self.assertEqual(self.create(**extra).status_code,403)
         p=self.place(details_enabled='1',detail_parking_status='미확인')
         self.assertFalse(self.rows('SELECT * FROM place_correction_suggestions'))
         html=self.member.get(f"/places/{p['id']}/edit").text
         self.assertNotIn('이 카페는 어떤 곳인가요?',html)
         self.assertIn('카페 특징 (선택)',html)
-        self.assertIn('세부 정보도 알려줄게요',html)
+        self.assertNotIn('세부 정보도 알려줄게요',html)
         self.assertIn('accept="image/*"',html)
 
     def test_new_facts_corrections_preserve_until_admin_accept(self):

@@ -3,7 +3,7 @@
   const category=document.getElementById('suggestionCategory'), text=document.getElementById('suggestionText'), help=document.getElementById('suggestionHelp');
   const status=document.getElementById('suggestionStatus');
   function render(){
-    const isCategory=field.value==='category_id', isStatus=['reservation_status','parking_status'].includes(field.value);
+    const isCategory=field.value==='category_id', isStatus=['parking_status','pet_status','child_status','accessible_status','tamnaneunjeon_status'].includes(field.value);
     category.hidden=!isCategory;status.hidden=!isStatus;text.hidden=isCategory||isStatus;
     category.querySelector('select').disabled=!isCategory;status.querySelector('select').disabled=!isStatus;value.disabled=isCategory||isStatus;
     value.maxLength=['business_hours','closed_days'].includes(field.value)?200:field.value==='phone'?80:2000;

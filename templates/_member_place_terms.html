@@ -1,0 +1,8 @@
+<div class="member-place-terms span-2" id="memberPlaceTerms">
+{% for c in categories if c.slug not in ['food', 'cafe'] %}
+<fieldset class="submission-field" data-category-id="{{ c.id }}" {% if p.get('category_id')|string != c.id|string %}hidden{% endif %}>
+<legend>{{ c.name }} 세부 분류 (선택)</legend><div class="chips">
+{% for t in taxonomy.terms if t.parent_id == c.id and t.selectable %}<label class="member-term"><input type="checkbox" name="term_ids" value="{{ t.id }}" {% if t.id in p.get('term_ids',[]) %}checked{% endif %}>{{ t.name }}</label>{% endfor %}
+</div><p class="form-help">알려주신 특징은 확인 후 반영되며, 기존 분류는 유지됩니다.</p></fieldset>
+{% endfor %}
+</div>

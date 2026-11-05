@@ -26,7 +26,7 @@ def parse_member_features(conn, form, category_id, existing=None):
         if not value:
             raise ValueError("가성비 제안 항목이 변경되었습니다. 새로고침해주세요.")
         selected = list(dict.fromkeys(selected + [str(value["id"])]))
-    legacy_proposal = form.getlist("term_ids") if form.get("details_enabled") == "1" else []
+    legacy_proposal = form.getlist("term_ids")
     if len(set(selected + legacy_proposal)) > MAX_MEMBER_FEATURES:
         raise ValueError("카페 특징은 최대 5개까지 선택할 수 있어요.")
     if any(value not in choices or choices[value]["member_policy"] == "admin" for value in selected):
@@ -37,7 +37,7 @@ def parse_member_features(conn, form, category_id, existing=None):
         value = str(form.get("detail_" + key, "")).strip()
         if value and value != "미확인":
             details[key] = validate_detail_value(key, value)
-    if form.get("details_enabled") == "1" and form.getlist("detail_cafe_visit_times"):
+    if form.getlist("detail_cafe_visit_times"):
         details["cafe_visit_times"] = validate_times(form.getlist("detail_cafe_visit_times"))
     proposed = sorted({int(v) for v in selected} - set(previous))
     pending = {"category_id": category_id, "companions": [], "term_ids": proposed, "usage": {}, "cafe_details": details} if proposed or details else None

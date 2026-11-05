@@ -58,7 +58,7 @@ class CafeFeaturesTest(unittest.TestCase):
         self.assertFalse(self.api("?category=cafe&detail=cafe-bakery"))
         suggestion = self.rows("SELECT * FROM place_correction_suggestions")[0]
         self.assertEqual(self.post(self.admin, f"/admin/suggestions/{suggestion['id']}/review", action="accept").status_code, 303)
-        self.create_cafe([], name="메뉴만 있는 카페", address="다른 주소", signature_menu="빵")
+        self.create_cafe([], name="메뉴만 있는 카페", address="제주시 다른길 123", signature_menu="빵")
         for slug in ("bakery", "dessert", "coffee"):
             result = self.api("?category=cafe&detail=cafe-" + slug)
             self.assertEqual([r["id"] for r in result], [p["id"]])

@@ -71,9 +71,9 @@ class CafeFlowTest(unittest.TestCase):
         self.assertFalse(self.rows("SELECT * FROM place_category_links"))
         self.assertEqual(self.pending()["status"], "pending")
 
-    def test_time_toggle_validation_and_error_preservation(self):
-        self.create_cafe(details_enabled="0", detail_cafe_visit_times=["노을"])
-        self.assertFalse(self.rows("SELECT * FROM place_correction_suggestions"))
+    def test_time_without_toggle_validation_and_error_preservation(self):
+        self.create_cafe(detail_cafe_visit_times=["노을"])
+        self.assertEqual(json.loads(self.pending()["new_value"])["cafe_details"]["cafe_visit_times"],["노을"])
         for changes in ({"details_enabled":"1", "detail_cafe_visit_times":["심야"]},
                         {"detail_coffee_taste":"단맛"}, {"detail_dessert_note":"가" * 301}):
             response = self.post(self.member, "/map/register", **self.form(cafe_features_present="1", **changes))
