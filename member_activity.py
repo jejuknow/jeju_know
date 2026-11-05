@@ -94,6 +94,7 @@ def activity_rows(conn, section, uid, day: date, limit, offset=0, *, recent=Fals
                 link = "/news/" + r["slug"]
         elif section == "suggestions":
             title, labels = r["place_name"], [status.CORRECTION.get(r["status"], status.UNKNOWN)]
+            item["status_help"] = status.CORRECTION_HELP.get(r["status"], "")
             if not recent:
                 item.update(field_label=DETAIL_LABEL if r["field"] == DETAIL_FIELD else SUGGESTION_FIELDS.get(r["field"],"기타"),
                             before=suggestion_value(conn,r["field"],r["original_value"]),

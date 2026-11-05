@@ -1,0 +1,25 @@
+{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge %}
+{% block admin_content %}
+<p><a href="/admin/suggestions">← 검토 대기 목록</a> · <a href="/admin/suggestions?status=all">전체 처리 이력</a></p>
+{% if error %}<div class="correction-warning" role="alert">{{ error }}</div>{% endif %}
+{% if s %}<section class="admin-panel admin-editor-body correction-detail">
+<div class="admin-panel-heading"><h2>{{ s.name or '장소 확인 필요' }} · 정보 바로잡기 #{{ s.id }}</h2>{{ badge(correction_labels.get(s.status,'상태 확인 필요'),'warning' if s.status=='pending' else 'success' if s.status in ['accepted','resolved'] else 'neutral') }}</div>
+<p>{{ suggestion_fields.get(s.field,s.field) }} · {{ s.nickname or '탈퇴한 사용자' }} · {{ s.created_at }}</p>
+{% set stale_warning='이 제안이 등록된 이후 장소 정보가 수정되었습니다. 최신 정보를 확인한 뒤 처리해주세요.' %}
+{% if s.status=='pending' and s.stale %}<div class="correction-warning" role="status">{{ stale_warning }}</div>{% endif %}
+{% if s.status=='pending' and s.block_reason and not (s.stale and s.block_reason==stale_warning) %}<p class="correction-warning">{{ s.block_reason }}</p>{% endif %}
+<dl class="correction-values"><div><dt>제안 당시 값</dt><dd>{{ s.original_value or '미입력' }}</dd></div><div><dt>현재 최신 값</dt><dd>{{ s.current_value or '미입력' }}</dd></div><div><dt>제안 값</dt><dd>{{ s.new_value }}</dd></div></dl>
+<h3>확인 근거</h3><p class="correction-text">{{ s.reason }}</p>
+{% if s.place_available %}<p><a class="secondary-btn" href="/admin/places/{{ s.place_id }}/edit?next={{ ('/admin/suggestions/'~s.id)|urlencode }}">장소 수정 →</a></p>{% endif %}
+{% if s.status=='pending' %}
+{% if s.field=='closed' %}<p>제안을 반영하면 장소가 비공개로 바뀝니다.</p>{% endif %}
+<form method="post" action="/admin/suggestions/{{ s.id }}/review" class="admin-form" data-confirm="현재 정보와 제안 내용을 비교했습니까? 선택한 처리 결과가 저장됩니다.">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="/admin/suggestions/{{ s.id }}">
+<label>처리 메모 (선택)<textarea name="review_note" maxlength="2000" rows="3">{{ review_note or '' }}</textarea></label>
+<p class="form-help" id="resolveHelp">장소 정보를 직접 확인하거나 수정한 경우, 제안값을 적용하지 않고 이 건만 처리완료합니다. 장소의 정보 확인 상태는 변경하지 않습니다.</p>
+<div class="row-actions correction-actions"><button class="primary-inline" name="action" value="accept" {% if s.block_reason %}disabled{% endif %}>제안 반영</button><button class="secondary-btn" name="action" value="resolve" aria-describedby="resolveHelp">직접 확인 후 처리완료</button><button class="mini-btn danger" name="action" value="reject">반려</button></div>
+</form>
+{% else %}<dl class="correction-history"><dt>처리일</dt><dd>{{ s.reviewed_at or '기록 없음' }}</dd><dt>처리자</dt><dd>{{ s.reviewed_by or '기록 없음' }}</dd><dt>처리 메모</dt><dd>{{ s.review_note or '메모 없음' }}</dd></dl>
+{% if s.status=='resolved' %}<p>제안을 확인하고 처리완료했습니다. 장소 정보는 자동 변경되지 않았습니다.</p>{% elif s.status=='accepted' %}<p>제안 내용이 장소 정보에 반영되었습니다.</p>{% endif %}
+{% endif %}</section>{% else %}<section class="admin-panel admin-empty">제안을 찾을 수 없습니다.</section>{% endif %}
+{% endblock %}

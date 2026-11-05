@@ -346,6 +346,8 @@ def create_app(test_config=None):
         migrate_contact(app.state.database)
         migrate_member_inquiries(app.state.database)
         migrate_admin_roles(app.state.database)
+        from correction_migrations import migrate as migrate_correction_resolution
+        migrate_correction_resolution(app.state.database)
         from user_place_auto_publish_migration import migrate as migrate_auto_publish
         migrate_auto_publish(app.state.database)
 
@@ -1245,7 +1247,7 @@ def create_app(test_config=None):
         conn.close()
         if not row:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
-        return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": place, "mode": "edit", **form_options(row["category_id"])})
+        return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": place, "mode": "edit", "return_to": admin_return(request.query_params, "/admin/places"), **form_options(row["category_id"])})
 
     @app.post("/admin/places/{place_id}/edit")
     async def admin_place_edit_post(request: Request, place_id: int):
@@ -1263,12 +1265,12 @@ def create_app(test_config=None):
         error = validate_place(data, existing)
         if error:
             flash(request, error, "error")
-            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": place_id}, "mode": "edit", **form_options(existing["category_id"])}, status_code=400)
+            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": place_id}, "mode": "edit", "return_to": admin_return(form, "/admin/places"), **form_options(existing["category_id"])}, status_code=400)
         try:
             plan = await image_store.prepare(form, "places")
         except ImageError as exc:
             flash(request, str(exc), "error")
-            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": place_id, "legacy_image_url": data["image_url"], "images": image_store.list("places", place_id)}, "mode": "edit", **form_options()}, status_code=400)
+            return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": place_id, "legacy_image_url": data["image_url"], "images": image_store.list("places", place_id)}, "mode": "edit", "return_to": admin_return(form, "/admin/places"), **form_options()}, status_code=400)
         with plan.transaction() as conn:
             conn.execute(
                 """

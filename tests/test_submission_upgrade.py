@@ -80,7 +80,7 @@ class SubmissionUpgradeTest(unittest.TestCase):
         self.assertFalse(self.rows('SELECT * FROM place_category_links'))
         self.assertEqual(self.visitor.get('/api/places?category=cafe&detail=cafe-view&companion=연인').json(),[])
         page=self.admin.get('/admin/suggestions').text
-        for value in ('사용자 세부 정보','전체 승인','주차: 가능'): self.assertIn(value,page)
+        for value in ('사용자 세부 정보','내용 보기','주차: 가능'): self.assertIn(value,page)
         self.assertNotIn('웨이팅:',page)
         self.assertNotIn('연인 / 친구',page)
         self.assertNotIn('submission_details',self.member.get(f"/places/{p['id']}/suggest").text)

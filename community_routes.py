@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData, UploadFile
 
 from admin_roles import audit
+from correction_review import original_value, describe as describe_correction
 from auth_security import current_user, rate_limited, safe_external_url
 from community_migrations import today
 from place_details import validate_detail_value
@@ -343,15 +344,6 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             raise ValueError("장소명은 120자, 주소는 300자 이내로 입력해주세요.")
         return str(value) if value is not None else ""
 
-    def original_value(place, field):
-        if field == "opening":
-            return json.dumps([place["opened_year"],place["opened_month"]])
-        if field == "coordinates":
-            return json.dumps([place["latitude"],place["longitude"]])
-        if field in ("closed","business","other"):
-            return ""
-        return str(place[field]) if place[field] is not None else ""
-
     @app.get("/places/{place_id}/suggest")
     async def suggest_get(request: Request, place_id: int):
         if response := member_guard(request):
@@ -394,6 +386,10 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
     async def community_admin(request: Request, status: str = "unverified"):
         return app.state.admin_ui.places(request, "community")
 
+    @app.get("/admin/suggestions/{suggestion_id}")
+    async def suggestion_detail(request: Request, suggestion_id: int):
+        return app.state.admin_ui.suggestion_detail(request, suggestion_id)
+
     @app.post("/admin/suggestions/{suggestion_id}/review")
     async def review_suggestion(request: Request, suggestion_id: int):
         if response := admin_guard(request):
@@ -402,52 +398,53 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if form is None:
             return bad_csrf()
         action, note = form.get("action"), str(form.get("review_note", "")).strip()
-        if action not in ("accept","reject") or len(note) > 2000:
-            return HTMLResponse("처리 방식과 메모를 확인해주세요.", status_code=400)
+        def failure(message, status=409):
+            return app.state.admin_ui.suggestion_detail(request, suggestion_id, status_code=status, error=message, review_note=note[:2000])
+        if action not in ("accept","resolve","reject") or len(note) > 2000:
+            return failure("처리 방식과 메모를 확인해주세요.", 400)
         with closing(connect_db()) as conn, conn:
             conn.execute("BEGIN IMMEDIATE")
             suggestion = conn.execute("SELECT * FROM place_correction_suggestions WHERE id=? AND status='pending'", (suggestion_id,)).fetchone()
             if not suggestion:
-                return HTMLResponse("이미 처리되었거나 없는 제안입니다.", status_code=409)
+                return failure("이미 처리된 제안입니다. 최신 상태를 확인해주세요.")
             place = get_place(conn, suggestion["place_id"])
             if action == "accept":
                 if not place:
-                    return HTMLResponse("삭제·병합된 장소를 먼저 확인해주세요.", status_code=409)
+                    return failure("삭제·병합된 장소를 먼저 확인해주세요.")
+                if block := describe_correction(conn, suggestion, place)["block_reason"]:
+                    return failure(block)
                 field, value = suggestion["field"], suggestion["new_value"]
-                if field == DETAIL_FIELD:
-                    try:
+                try:
+                    if field == DETAIL_FIELD:
                         approve_proposal(conn, place, suggestion)
-                    except ValueError as exc:
-                        return HTMLResponse(str(exc), status_code=409)
-                elif field not in SUGGESTION_FIELDS:
-                    return HTMLResponse("지원하지 않는 제안 항목입니다.", status_code=400)
-                elif original_value(place, field) != suggestion["original_value"]:
-                    return HTMLResponse("제안 이후 원본 정보가 변경되었습니다. 최신 장소를 확인하고 이 제안을 거절하거나 새 제안으로 처리해주세요.", status_code=409)
-                if field == DETAIL_FIELD:
-                    pass
-                elif field in ("opening","coordinates"):
-                    parts = json.loads(value)
-                    values = opening(*parts) if field == "opening" else coordinates(*parts)
-                    columns = ("opened_year","opened_month") if field == "opening" else ("latitude","longitude")
-                    conn.execute(f"UPDATE places SET {columns[0]}=?,{columns[1]}=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (*values,place["id"]))
-                elif field == "closed":
-                    conn.execute("UPDATE places SET published=0,updated_at=CURRENT_TIMESTAMP WHERE id=?", (place["id"],))
-                elif field in ("business", "other"):
-                    if not note:
-                        return HTMLResponse("영업 관련 정보·기타 제안은 장소 수정에서 반영한 내용을 처리 메모에 기록해주세요.", status_code=400)
-                else:
-                    try:
-                        value = suggestion_value(conn, field, value)
-                    except ValueError as exc:
-                        return HTMLResponse(str(exc), status_code=400)
-                    conn.execute(f"UPDATE places SET {field}=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (value,place["id"]))
-                    if field == "category_id":
-                        conn.execute("UPDATE places SET category=(SELECT name FROM categories WHERE id=?) WHERE id=?", (value,place["id"]))
-                        conn.execute("DELETE FROM place_category_links WHERE place_id=?", (place["id"],))
-            conn.execute("UPDATE place_correction_suggestions SET status=?,reviewed_at=CURRENT_TIMESTAMP,reviewed_by=?,review_note=? WHERE id=?", ("accepted" if action == "accept" else "rejected",actor(request),note,suggestion_id))
-            audit(conn,request,"수정 제안 반영" if action=="accept" else "수정 제안 반려","수정 제안",suggestion_id,place["name"])
-        flash(request, "제안을 반영했습니다." if action == "accept" else "제안을 거절했습니다.")
-        return redirect("/admin/community" if form.get("next") == "/admin/community" else "/admin/suggestions")
+                    elif field in ("opening","coordinates"):
+                        parts = json.loads(value)
+                        values = opening(*parts) if field == "opening" else coordinates(*parts)
+                        columns = ("opened_year","opened_month") if field == "opening" else ("latitude","longitude")
+                        conn.execute(f"UPDATE places SET {columns[0]}=?,{columns[1]}=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (*values,place["id"]))
+                    elif field == "closed":
+                        conn.execute("UPDATE places SET published=0,updated_at=CURRENT_TIMESTAMP WHERE id=?", (place["id"],))
+                    else:
+                        value = suggestion_value(conn, field, value, member=True)
+                        if field in MEMBER_USAGE_LABELS and value == "미확인":
+                            raise ValueError("미확인 제안으로 기존 이용 정보를 지울 수 없습니다.")
+                        conn.execute(f"UPDATE places SET {field}=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (value,place["id"]))
+                        if field == "category_id":
+                            conn.execute("UPDATE places SET category=(SELECT name FROM categories WHERE id=?) WHERE id=?", (value,place["id"]))
+                            conn.execute("DELETE FROM place_category_links WHERE place_id=?", (place["id"],))
+                except (ValueError, TypeError, KeyError) as exc:
+                    conn.rollback()
+                    return failure(str(exc) if isinstance(exc, ValueError) else "제안 형식을 확인해주세요.", 409)
+            state = {"accept":"accepted", "resolve":"resolved", "reject":"rejected"}[action]
+            changed = conn.execute("UPDATE place_correction_suggestions SET status=?,reviewed_at=CURRENT_TIMESTAMP,reviewed_by=?,review_note=? WHERE id=? AND status='pending'", (state,actor(request),note,suggestion_id))
+            if changed.rowcount != 1:
+                conn.rollback()
+                return failure("이미 처리된 제안입니다. 최신 상태를 확인해주세요.")
+            label = {"accept":"반영", "resolve":"처리완료", "reject":"반려"}[action]
+            audit(conn,request,"정보 바로잡기 " + label,"수정 제안",suggestion_id,f"place_id={suggestion['place_id']} · pending → {state}")
+        flash(request, {"accept":"제안 내용을 장소 정보에 반영했습니다.", "resolve":"제안을 확인하고 처리완료했습니다. 장소 정보는 자동 변경되지 않았습니다.", "reject":"제안을 반려했습니다."}[action])
+        destination = str(form.get("next", ""))
+        return redirect(destination if destination in ("/admin/community", f"/admin/suggestions/{suggestion_id}") else "/admin/suggestions")
 
     @app.get("/admin/places/{place_id}/merge")
     async def merge_get(request: Request, place_id: int, target_id: int = 0):

@@ -2,7 +2,7 @@
 import json
 
 from admin_settings import catalog
-from place_details import USE_OPTIONS, WAITING_OPTIONS, FIELD_LABELS, validate_detail_value
+from place_details import FIELD_LABELS, validate_detail_value
 from cafe_features import DETAIL_KEYS
 from cafe_visit_times import validate_times
 from place_taxonomy import linked_ids, save_links, validate_terms
@@ -76,26 +76,37 @@ def queue_proposal(conn, place, user_id, proposal):
                  (place["id"], user_id, DETAIL_FIELD, value, original, "장소 등록·수정 시 사용자가 제공한 선택 정보입니다. 확인 후 승인해주세요."))
 
 
-def approve_proposal(conn, place, suggestion):
+def validate_proposal(conn, place, suggestion):
     proposal = json.loads(suggestion["new_value"])
-    if snapshot(conn, place, proposal) != suggestion["original_value"]:
-        raise ValueError("제안 이후 원본 정보가 변경되었습니다. 최신 정보를 확인하고 새 제안으로 처리해주세요.")
+    if not isinstance(proposal, dict) or set(proposal) - {"category_id", "companions", "term_ids", "usage", "note", "cafe_details"}:
+        raise ValueError("제안 항목을 확인해주세요.")
+    if not isinstance(proposal.get("companions"), list) or not isinstance(proposal.get("term_ids"), list) or not isinstance(proposal.get("usage"), dict):
+        raise ValueError("제안 형식을 확인해주세요.")
+    if proposal["companions"] or set(proposal["usage"]) - set(MEMBER_USAGE_LABELS):
+        raise ValueError("현재 회원 제안에서 허용하지 않는 동행·예약·웨이팅 정보가 포함되어 있습니다. 장소를 직접 확인한 뒤 처리완료하거나 반려해주세요.")
+    if json.loads(snapshot(conn, place, proposal)) != json.loads(suggestion["original_value"]):
+        raise ValueError("이 제안이 등록된 이후 장소 정보가 수정되었습니다. 최신 정보를 확인한 뒤 처리해주세요.")
     if proposal["category_id"] != place["category_id"]:
         raise ValueError("장소 카테고리가 변경되었습니다. 새 분류를 확인해주세요.")
-    allowed = {i["value"] for i in catalog(conn, "companion") if i["is_active"]}
-    if any(c not in allowed for c in proposal["companions"]):
-        raise ValueError("제안된 동행 분류가 변경되었습니다. 다시 확인해주세요.")
     data = {"category_id": place["category_id"], "term_ids": proposal["term_ids"], "features": []}
     if error := validate_terms(conn, data):
         raise ValueError(error)
+    restricted = {r[0] for r in conn.execute("SELECT id FROM categories WHERE type='cafe_feature' AND member_policy='admin'")}
+    if set(data["term_ids"]) & restricted:
+        raise ValueError("관리자 전용 카페 특징은 회원 제안으로 반영할 수 없습니다.")
     for key, value in proposal["usage"].items():
-        if key not in USAGE_LABELS or value not in (WAITING_OPTIONS if key == "waiting_status" else USE_OPTIONS):
+        if key not in MEMBER_USAGE_LABELS or value not in MEMBER_USE_OPTIONS or value == "미확인":
             raise ValueError("이용 정보 선택값을 확인해주세요.")
     details = proposal.get("cafe_details", {})
     note = proposal.get('note')
     if note is not None and (not isinstance(note, str) or len(note) > 4000):
         raise ValueError('꿀팁 제안 내용을 확인해주세요.')
-    if details and conn.execute("SELECT slug FROM categories WHERE id=?", (place["category_id"],)).fetchone()[0] != "cafe":
+    if not isinstance(details, dict):
+        raise ValueError("카페 제안 항목을 확인해주세요.")
+    category = conn.execute("SELECT slug FROM categories WHERE id=?", (place["category_id"],)).fetchone()
+    if category and category[0] == "cafe" and len(data["term_ids"]) > 5:
+        raise ValueError("카페 특징은 최대 5개까지 반영할 수 있어요.")
+    if details and (not category or category[0] != "cafe"):
         raise ValueError("카페 정보는 카페에서만 반영할 수 있어요.")
     for key, value in details.items():
         if key == "cafe_visit_times":
@@ -104,14 +115,17 @@ def approve_proposal(conn, place, suggestion):
             raise ValueError("카페 제안 항목을 확인해주세요.")
         else:
             validate_detail_value(key, value)
+    return proposal
+
+
+def approve_proposal(conn, place, suggestion):
     # Validate the complete batch before the first canonical write.
+    proposal = validate_proposal(conn, place, suggestion)
+    note, details = proposal.get("note"), proposal.get("cafe_details", {})
     if note:
         conn.execute('UPDATE places SET note=? WHERE id=?', (note, place['id']))
     for key, value in proposal["usage"].items():
         conn.execute(f"UPDATE places SET {key}=? WHERE id=?", (value, place["id"]))
-    if proposal["companions"]:
-        combined = sorted(set(json.loads(place["companions"] or "[]")) | set(proposal["companions"]))
-        conn.execute("UPDATE places SET companions=? WHERE id=?", (dumps(combined), place["id"]))
     if proposal["term_ids"]:
         save_links(conn, place["id"], sorted(set(linked_ids(conn, place["id"])) | set(proposal["term_ids"])))
     for key, value in details.items():

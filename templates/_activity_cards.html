@@ -27,6 +27,7 @@
       <form method="post" action="/issues/{{ i.id }}/delete" onsubmit="return confirm('ISSUE 등록을 취소할까요?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="mini-btn danger">등록 취소</button></form></div>
     {% elif i.approval_status=='approved' %}<a class="mini-btn" href="/contact?issue_id={{ i.id }}">수정·삭제 문의</a>{% endif %}
   {% elif tab=='suggestions' %}
+    {% if i.status_help %}<p class="member-help">{{ i.status_help }}</p>{% endif %}
     <dl class="suggestion-diff">
       {% if i.before %}<div><dt>기존</dt><dd>{{ i.before }}</dd></div>{% endif %}
       <div><dt>제안</dt><dd>{{ i.after }}</dd></div>

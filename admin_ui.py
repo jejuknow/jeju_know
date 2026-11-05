@@ -17,7 +17,8 @@ from place_freshness import CHECK_DATE, NEVER, STALE, freshness_counts, six_mont
 from new_visibility import new_clause
 from community_places import SUGGESTION_FIELDS
 from admin_roles import ROLE_LABELS, SUPER, audit, identity
-from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal, snapshot
+from submission_suggestions import DETAIL_FIELD, DETAIL_LABEL, display_proposal
+from correction_review import STATUS_LABELS as CORRECTION_LABELS, PENDING as CORRECTION_PENDING, pending_count, describe as describe_correction
 SUGGESTION_LABELS = {**SUGGESTION_FIELDS, DETAIL_FIELD: DETAIL_LABEL}
 from taxonomy_migrations import TYPES
 from place_auto_checks import counts as auto_counts, ORDER as AUTO_ORDER, decorate as decorate_check
@@ -75,7 +76,7 @@ def counters(conn):
                 unverified=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE + " AND source_type='user' AND verification_status='unverified'"),
                 issue_pending=scalar("SELECT count(*) FROM news_posts WHERE author_type='user' AND approval_status='pending' AND deleted_at IS NULL"),
                 unread_inquiries=scalar("SELECT count(*) FROM contact_inquiries WHERE status='unread'"),
-                suggestions=scalar("SELECT count(*) FROM place_correction_suggestions WHERE status='pending'"),
+                suggestions=pending_count(conn),
                 new=scalar("SELECT count(*) FROM places p JOIN categories c ON c.id=p.category_id WHERE " + ACTIVE + " AND " + new_sql, new_args),
                 picks=scalar("SELECT count(*) FROM place_pick_periods k JOIN places p ON p.id=k.place_id WHERE " + ACTIVE + " AND k.year=? AND k.month=? AND k.is_active=1", (now.year, now.month)))
 
@@ -129,6 +130,8 @@ def admin_context(request, conn):
         detail = "문의 상세"
     if path.startswith("/admin/admins/"):
         detail = "서브관리자 추가" if path.endswith("/new") else "서브관리자 수정"
+    if path.startswith("/admin/suggestions/"):
+        section, title, active, detail = "장소 관리", "정보 바로잡기", "suggestions", "제안 상세"
     return {"is_super": actor["role"] == SUPER, "admin_account": account, "admin_counts": counters(conn), "admin_active": active,
             "admin_section": section, "admin_title": detail or title, "admin_parent_title": title,
             "admin_is_detail": bool(detail), "classification_kinds": {k: v for k, v in KINDS.items() if k != "cafe_focus"}}
@@ -141,8 +144,8 @@ class AdminUI:
         self.place, self.news, self.news_categories = place, news, news_categories
         self.news_aliases = news_aliases or {}
 
-    def render(self, request, name, **context):
-        return self.templates.TemplateResponse(request=request, name="admin/" + name, context={"filters": dict(request.query_params), **context})
+    def render(self, request, name, status_code=200, **context):
+        return self.templates.TemplateResponse(request=request, name="admin/" + name, context={"filters": dict(request.query_params), **context}, status_code=status_code)
 
     async def checked(self, request):
         form = await request.form()
@@ -156,7 +159,7 @@ class AdminUI:
             stats = report(conn, {'period':'30d'})
             freshness = freshness_counts(conn, ACTIVE, six_month_cutoff(today()).isoformat())
             places = [decorate_check(dict(r)) for r in conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE " + ACTIVE + " AND p.source_type='user' AND p.verification_status='unverified' ORDER BY " + AUTO_ORDER + ",p.id DESC LIMIT 5")]
-            suggestions = conn.execute("SELECT s.*,p.name FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id WHERE s.status='pending' ORDER BY s.id DESC LIMIT 5").fetchall()
+            suggestions = conn.execute("SELECT s.*,p.name FROM place_correction_suggestions s LEFT JOIN places p ON p.id=s.place_id WHERE " + CORRECTION_PENDING + " ORDER BY s.id DESC LIMIT 5").fetchall()
         return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS, analytics=stats, freshness=freshness)
 
     def stale_places(self, request):
@@ -244,8 +247,10 @@ class AdminUI:
     def suggestions(self, request):
         if response := self.guard(request): return response
         status = request.query_params.get("status", "pending")
+        if status not in (*CORRECTION_LABELS, "all"):
+            status = "pending"
         where, args = ["1=1"], []
-        if status in ("pending", "accepted", "rejected"):
+        if status in CORRECTION_LABELS:
             where.append("s.status=?"); args.append(status)
         if q := request.query_params.get("q", "").strip()[:200]:
             where.append("instr(p.name,?)>0"); args.append(q)
@@ -253,22 +258,18 @@ class AdminUI:
             rows, page = page_rows(conn, request, "s.*,p.name,u.nickname", "FROM place_correction_suggestions s JOIN places p ON p.id=s.place_id JOIN users u ON u.id=s.user_id", " AND ".join(where), args, "s.id DESC")
             items = []
             for row in rows:
-                item = dict(row)
                 p = dict(conn.execute("SELECT * FROM places WHERE id=?", (row["place_id"],)).fetchone())
-                field = row["field"]
-                current = (json.dumps([p["latitude"], p["longitude"]], ensure_ascii=False) if field == "coordinates" else json.dumps([p["opened_year"], p["opened_month"]], ensure_ascii=False) if field == "opening" else ("공개" if p["published"] else "숨김") if field == "closed" else str(p.get(field) or ""))
-                item["current_value"] = current
-                if field == "category_id":
-                    for key in ("current_value", "original_value", "new_value"):
-                        category = conn.execute("SELECT name FROM categories WHERE id=?", (item[key],)).fetchone()
-                        if category: item[key] = category[0]
-                if field == DETAIL_FIELD:
-                    proposal = json.loads(row["new_value"])
-                    item["current_value"] = display_proposal(conn, snapshot(conn, p, proposal))
-                    item["original_value"] = display_proposal(conn, row["original_value"])
-                    item["new_value"] = display_proposal(conn, row["new_value"])
-                items.append(item)
-        return self.render(request, "suggestions.html", suggestions=items, pagination=page, selected_status=status, suggestion_fields=SUGGESTION_LABELS)
+                items.append(describe_correction(conn, row, p))
+        return self.render(request, "suggestions.html", suggestions=items, pagination=page, selected_status=status, suggestion_fields=SUGGESTION_LABELS, correction_labels=CORRECTION_LABELS)
+
+    def suggestion_detail(self, request, suggestion_id, status_code=200, error="", review_note=""):
+        if response := self.guard(request): return response
+        with closing(self.db()) as conn:
+            row = conn.execute("SELECT s.*,p.name,u.nickname FROM place_correction_suggestions s LEFT JOIN places p ON p.id=s.place_id LEFT JOIN users u ON u.id=s.user_id WHERE s.id=?", (suggestion_id,)).fetchone()
+            place = conn.execute("SELECT * FROM places WHERE id=?", (row["place_id"],)).fetchone() if row else None
+            item = describe_correction(conn, row, place) if row else None
+        return self.render(request, "suggestion_detail.html", status_code=status_code if row else 404,
+                           s=item, error=error, review_note=review_note, correction_labels=CORRECTION_LABELS, suggestion_fields=SUGGESTION_LABELS)
 
     def issues(self, request, user_only=False):
         if response := self.guard(request): return response

@@ -108,9 +108,9 @@ class AdminUITest(unittest.TestCase):
         p=self.place(name='이전 이름')
         self.post(self.member,f"/places/{p['id']}/suggest",field='name',new_value='제안 이름',reason='직접 확인')
         self.execute("UPDATE places SET name='현재 이름' WHERE id=?",(p['id'],))
-        page=self.admin.get('/admin/suggestions')
-        for text in ('이전 이름','현재 이름','제안 이름'): self.assertIn(text,page.text)
         sid=self.rows('SELECT id FROM place_correction_suggestions')[0]['id']
+        page=self.admin.get(f'/admin/suggestions/{sid}')
+        for text in ('이전 이름','현재 이름','제안 이름'): self.assertIn(text,page.text)
         self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='accept').status_code,409)
         self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='reject').status_code,303)
         self.assertNotIn('제안 이름',self.admin.get('/admin/suggestions').text)

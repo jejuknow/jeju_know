@@ -50,3 +50,15 @@
 
 /* Keep the additional inspection column readable; mobile retains stacked cards. */
 @media(min-width:701px){.admin-community-list .admin-data-table{min-width:1300px}.admin-community-list td[data-label="지역"],.admin-community-list td[data-label="날짜"]{white-space:nowrap}.admin-community-list td[data-label="자동검사"]{min-width:170px}}
+
+/* Correction decisions are separate from place verification. */
+.correction-warning{background:#fff8e6;color:#705619;border:1px solid #eddbab;border-radius:10px;padding:14px 16px;line-height:1.7;margin:16px 0;word-break:keep-all;overflow-wrap:anywhere}
+.correction-detail .admin-panel-heading{padding:0 0 16px;gap:12px;flex-wrap:wrap}
+.correction-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0}
+.correction-values>div{min-width:0;background:#f8faff;border:1px solid var(--line);border-radius:10px;padding:16px}
+.correction-values dt,.correction-history dt{font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px}
+.correction-values dd,.correction-history dd,.correction-text{margin:0;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;line-height:1.7}
+.correction-actions{display:flex;flex-wrap:wrap;gap:10px}.correction-actions button{min-height:44px;white-space:nowrap}.correction-actions button:disabled{opacity:.5;cursor:not-allowed}
+.correction-history{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 16px}
+.correction-stale-label{color:#8c6518}
+@media(max-width:900px){.correction-values{grid-template-columns:1fr}.correction-actions{align-items:stretch}.correction-actions button{flex:1 1 auto;max-width:100%}}

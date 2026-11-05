@@ -24,7 +24,7 @@ class UserStatusTests(unittest.TestCase):
         self.assertEqual(place_review("unknown","unverified"),UNKNOWN)
 
     def test_current_storage_values_are_domain_specific(self):
-        self.assertEqual([CORRECTION[k].label for k in ("pending","accepted","rejected")],["검토 대기","반영","반려"])
+        self.assertEqual([CORRECTION[k].label for k in ("pending","accepted","resolved","rejected")],["검토 대기","반영","처리완료","반려"])
         self.assertEqual([INQUIRY[k].label for k in ("unread","read","done")],["접수","확인중","처리완료"])
         self.assertEqual(INQUIRY.get("unexpected",UNKNOWN).label,"상태 확인 필요")
 

@@ -213,16 +213,16 @@ class CommunityTest(unittest.TestCase):
         self.assertEqual(self.post(self.other,review,action='accept',review_note='임의 처리').status_code,303)
         page=self.admin.get('/admin/suggestions')
         self.assertIn('화요일 휴무',page.text)
-        self.assertIn('장소 수정에서 필요한 정보를 반영',page.text)
-        self.assertEqual(self.post(self.admin,review,action='accept').status_code,400)
+        self.assertIn('장소 수정에서 필요한 정보를 반영',self.admin.get(f'/admin/suggestions/{s["id"]}').text)
+        self.assertEqual(self.post(self.admin,review,action='accept').status_code,409)
         self.assertEqual(self.rows('SELECT status FROM place_correction_suggestions')[0]['status'],'pending')
         self.assertEqual(self.post(self.admin,review,action='reject',review_note='운영자 확인 결과 기존 정보 유지').status_code,303)
         self.assertEqual(self.rows('SELECT * FROM places'),before)
         self.assertEqual(self.rows('SELECT status FROM place_correction_suggestions')[0]['status'],'rejected')
         self.assertEqual(self.post(self.member,path,field='business',new_value='화요일 정상 영업',reason='운영자 공지에서 확인했습니다').status_code,303)
         sid=self.rows('SELECT id FROM place_correction_suggestions ORDER BY id DESC')[0]['id']
-        self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='accept',review_note='현재 장소 정보가 운영자 공지와 일치하는지 확인').status_code,303)
-        self.assertEqual(self.rows('SELECT status FROM place_correction_suggestions WHERE id=?',(sid,))[0]['status'],'accepted')
+        self.assertEqual(self.post(self.admin,f'/admin/suggestions/{sid}/review',action='resolve',review_note='현재 장소 정보가 운영자 공지와 일치하는지 확인').status_code,303)
+        self.assertEqual(self.rows('SELECT status FROM place_correction_suggestions WHERE id=?',(sid,))[0]['status'],'resolved')
         self.assertEqual(self.rows('SELECT * FROM places'),before)
 
     def test_14_stale_suggestion_cannot_overwrite_newer_fact(self):
@@ -544,7 +544,7 @@ class CommunityMigrationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             db=str(Path(folder)/'old.db')
             # Build exactly the previous commit's schema through its existing migration functions.
-            with patch.dict(os.environ,{'JEJUNO_SKIP_SEED':'1'}),patch('app.migrate_community'),patch('app.backup_before_community_migration'),patch('app.migrate_admin_ui'),patch('app.migrate_admin_place_cleanup'),patch('user_place_auto_publish_migration.migrate'):
+            with patch.dict(os.environ,{'JEJUNO_SKIP_SEED':'1'}),patch('app.migrate_community'),patch('app.backup_before_community_migration'),patch('app.migrate_admin_ui'),patch('app.migrate_admin_place_cleanup'),patch('correction_migrations.migrate'),patch('user_place_auto_publish_migration.migrate'):
                 create_app({'TESTING':True,'DATABASE':db,'SECRET_KEY':'migration-test'})
             with closing(sqlite3.connect(db)) as conn,conn:
                 conn.execute("INSERT INTO places(slug,name,category,region,is_pick,companions,checked_at) VALUES ('old','기존 장소','카페','애월',1,'[\"부모님\"]','2020-01-01')")

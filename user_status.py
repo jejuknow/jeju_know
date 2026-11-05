@@ -13,7 +13,10 @@ VERIFIED = Badge("JEJU_KNOW 확인", "brand")
 EDITORIAL = Badge("JEJU_KNOW 등록")
 REJECTED = Badge("반려", "attention")
 VISIBILITY = {True: Badge("공개", "positive"), False: Badge("비공개")}
-CORRECTION = {"pending": WAITING, "accepted": Badge("반영", "positive"), "rejected": REJECTED}
+CORRECTION = {"pending": WAITING, "accepted": Badge("반영", "positive"),
+              "resolved": Badge("처리완료", "positive"), "rejected": REJECTED}
+CORRECTION_HELP = {"accepted": "제안 내용이 장소 정보에 반영되었습니다.",
+                   "resolved": "제안 내용을 확인하여 처리가 완료되었습니다."}
 ISSUE_APPROVAL = {"pending": WAITING, "approved": Badge("승인·공개", "positive"), "rejected": REJECTED}
 SCHEDULE = {"upcoming": Badge("예정", "brand"), "ongoing": Badge("진행중", "positive"),
             "ended": Badge("종료"), "undated": Badge("일정 미등록")}
