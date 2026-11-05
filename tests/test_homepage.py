@@ -66,6 +66,8 @@ class HomepageTest(unittest.TestCase):
         self.assertTrue(promoted['is_featured'] and promoted['is_sponsored'] and promoted['is_promoted'])
         edit=self.client.get(f"/admin/news/{promoted['id']}/edit")
         self.assertIn('name="is_promoted" value="1" checked',edit.text)
+        self.assertIn('노출 순서는 일정 임박순을 따릅니다.',edit.text)
+        self.assertNotIn('목록 우선 노출',edit.text)
         payload.pop('is_promoted')
         self.client.post(f"/admin/news/{promoted['id']}/edit",data=payload)
         self.assertEqual(self.client.get('/').context['news_items'][0]['slug'],'promoted')
