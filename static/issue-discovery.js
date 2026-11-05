@@ -26,7 +26,9 @@
 
   function renderResults(focusLocation = false) {
     const {active, point, radius} = locationState;
-    const shown = active ? nearby.within(entries, point, radius) : entries;
+    // Radius filters membership; retain the server's schedule order, not distance order.
+    const inRange = active ? new Map(nearby.within(entries, point, radius).map(entry => [entry.card, entry])) : null;
+    const shown = active ? entries.filter(entry => inRange.has(entry.card)).map(entry => inRange.get(entry.card)) : entries;
     const visibleCards = new Set(shown.map(entry => entry.card));
     const mapped = shown.filter(nearby.hasCoordinates);
     const nearbyEmpty = results.querySelector('[data-near-empty]');
@@ -35,7 +37,7 @@
     nearbyEmpty.hidden = !active || shown.length > 0;
     results.querySelector('[data-results-title]').textContent = active ? '내 주변 ISSUE' : '제주 ISSUE';
     results.querySelector('h2 span').textContent = shown.length + '건';
-    results.querySelector('[data-map-count]').textContent = active ? radius + 'km · 직선거리순' : '지도 위치 ' + mapped.length + '곳';
+    results.querySelector('[data-map-count]').textContent = active ? radius + 'km · 일정 임박순' : '지도 위치 ' + mapped.length + '곳';
     for (const {card} of entries) {
       card.hidden = !visibleCards.has(card);
       markers.get(card)?.setMap(card.hidden ? null : map);

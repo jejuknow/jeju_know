@@ -52,7 +52,7 @@ from analytics import Analytics
 from admin_roles import SUPER, audit, migrate as migrate_admin_roles, require_admin
 from admin_accounts import register_admin_accounts, password_error, valid_username
 from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES, RENAMED_CATEGORIES
-from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule
+from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule, highlights, now as issue_now
 from ad_banners import active_banners, banner_image, migrate as migrate_ads, register_ad_routes
 from contact_inquiries import migrate as migrate_contact, migrate_member_inquiries, register_contact_routes
 from issue_calendar_migration import migrate as migrate_issue_calendar
@@ -680,19 +680,16 @@ def create_app(test_config=None):
     @app.get("/", response_class=HTMLResponse)
     async def home(request: Request):
         conn = connect_db()
-        day = community_today()
-        where, params = public_where(day)
-        news_rows = conn.execute(
-            f"SELECT * FROM news_posts WHERE {where} ORDER BY is_promoted DESC, datetime(created_at) DESC, id DESC LIMIT 5", params
-        ).fetchall()
-        banners = active_banners(conn, day)
+        moment = issue_now()
+        news_rows = highlights(conn, moment)
+        banners = active_banners(conn, community_today())
         collections = [dict(r) for r in conn.execute("SELECT * FROM best_collections WHERE published=1 AND deleted_at IS NULL ORDER BY sort_order,id")]
         initial = initial_places(conn, request.query_params, row_to_place, limit=5)
         conn.close()
         return templates.TemplateResponse(
             request=request,
             name="index.html",
-            context={"news_items": [row_to_news(row, day) for row in news_rows], "collections": collections, "banners": banners, **initial},
+            context={"news_items": [row_to_news(row, moment) for row in news_rows], "collections": collections, "banners": banners, **initial},
         )
 
     @app.get("/place/{slug}", response_class=HTMLResponse)
@@ -772,10 +769,10 @@ def create_app(test_config=None):
 
     @app.get("/news", response_class=HTMLResponse)
     async def news_list(request: Request):
-        day = community_today()
+        moment = issue_now()
         with closing(connect_db()) as conn:
-            rows, selected, link = browse(conn, request.query_params, day)
-        items = [row_to_news(row, day) for row in rows]
+            rows, selected, link = browse(conn, request.query_params, moment)
+        items = [row_to_news(row, moment) for row in rows]
         return templates.TemplateResponse(request=request, name="news_list.html", context={
             "news_items": items, "selected": selected, "active_category": selected["category"],
             "issue_link": link, "periods": PERIODS, "map_count": sum(item["mappable"] for item in items),
@@ -785,13 +782,13 @@ def create_app(test_config=None):
     @app.get("/news/{slug}", response_class=HTMLResponse)
     async def news_detail(request: Request, slug: str):
         conn = connect_db()
-        day = community_today()
-        where, params = public_where(day)
+        moment = issue_now()
+        where, params = public_where(moment)
         row = conn.execute(f"SELECT * FROM news_posts WHERE slug=? AND {where}", [slug, *params]).fetchone()
         conn.close()
         if not row:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
-        item = row_to_news(row, day)
+        item = row_to_news(row, moment)
         return templates.TemplateResponse(request=request, name="news_detail.html", context={"item": item, "seo": issue_metadata(item)})
 
     @app.get("/partnership", response_class=HTMLResponse)

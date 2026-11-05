@@ -124,10 +124,10 @@ class IssueBrowserTest(unittest.TestCase):
                                    ("undated","","","행사•축제",1)]:
             self.issue(slug,a,b,cat,public,1,(33.4,126.5))
         day = date(2026,11,2)
-        with patch("app.community_today",return_value=day), patch("issue_discovery.today",return_value=day):
-            for period,expected in {"all":["running","day-only","weekend","later-month"],
-                      "today":["running","day-only"], "week":["running","day-only","weekend"],
-                      "weekend":["running","weekend"],"month":["running","day-only","weekend","later-month"]}.items():
+        with patch("app.issue_now",return_value=day), patch("issue_discovery.today",return_value=day):
+            for period,expected in {"all":["day-only","running","weekend","later-month"],
+                      "today":["day-only","running"], "week":["day-only","running","weekend"],
+                      "weekend":["running","weekend"],"month":["day-only","running","weekend","later-month"]}.items():
                 page = self.visitor.get("/news",params={"period":period})
                 self.assertEqual([x["slug"] for x in page.context["news_items"]],expected)
                 self.assertEqual(page.context["map_count"],1)
@@ -143,7 +143,7 @@ class IssueBrowserTest(unittest.TestCase):
                 self.assertNotIn("/news/"+slug,sitemap)
                 self.assertEqual(self.visitor.get("/news/"+slug).status_code,404)
             self.assertIn("오늘까지",self.visitor.get("/news/day-only").text)
-        with patch("app.community_today",return_value=date(2026,11,3)):
+        with patch("app.issue_now",return_value=date(2026,11,3)):
             self.assertEqual(self.visitor.get("/news/day-only").status_code,404)
         self.assertEqual(len(self.rows("SELECT * FROM news_posts")),8)
 

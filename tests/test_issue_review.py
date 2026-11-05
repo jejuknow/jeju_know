@@ -66,7 +66,7 @@ class IssueReviewTest(unittest.TestCase):
         self.assertEqual(self.member.post(edit.replace("/edit","/delete"),data={"csrf_token":self.csrf(self.member)}).status_code,403)
         self.assertIn("승인·공개",self.member.get("/account").text)
         tomorrow=today()+timedelta(days=1)
-        with patch("app.community_today",return_value=tomorrow), patch("member_activity.today",return_value=tomorrow):
+        with patch("app.issue_now",return_value=tomorrow), patch("member_activity.today",return_value=tomorrow):
             self.assertEqual(self.visitor.get("/news").context["map_count"],0)
             self.assertEqual(self.visitor.get(slug_url).status_code,404)
             self.assertIn("종료",self.member.get("/account").text)

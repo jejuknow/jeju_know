@@ -1,9 +1,10 @@
 """ISSUE category compatibility, calendar windows and public discovery rules."""
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
+import re
 from urllib.parse import urlencode
 
-from community_migrations import today
+from community_migrations import KST, today
 from user_status import SCHEDULE
 
 # Keep stable keys and read existing records without rewriting their categories.
@@ -39,18 +40,70 @@ VALID_DATES = ("date(event_start,'+0 days')=event_start AND "
                "date(event_end,'+0 days')=event_end AND event_end>=event_start")
 
 
-def public_where(day):
+def now():
+    return datetime.now(KST)
+
+
+def as_moment(value=None):
+    """Use one KST instant per response; explicit dates represent local midnight."""
+    if value is None:
+        return now()
+    if isinstance(value, datetime):
+        return value.astimezone(KST) if value.tzinfo else value.replace(tzinfo=KST)
+    return datetime.combine(value, time.min, KST)
+
+
+def clock_time(value, fallback):
+    # Match the HH:MM fields accepted by the existing registration form.
+    return time.fromisoformat(value) if re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value or "") else fallback
+
+
+def boundary_sql(date_column, time_column, fallback):
+    return (f"{date_column}||' '||CASE WHEN {time_column} GLOB '[0-2][0-9]:[0-5][0-9]' "
+            f"AND {time_column}<'24:00' THEN {time_column}||':00.000000' ELSE '{fallback}' END")
+
+
+START_SQL = boundary_sql("event_start", "start_time", time.min.isoformat(timespec="microseconds"))
+END_SQL = boundary_sql("event_end", "end_time", time.max.isoformat(timespec="microseconds"))
+
+
+def moment_sql(moment):
+    return as_moment(moment).replace(tzinfo=None).isoformat(sep=" ", timespec="microseconds")
+
+
+def public_where(moment=None):
+    moment = as_moment(moment)
     names = [name for label in PUBLIC_CATEGORIES.values() for name in stored_names(label)]
     placeholders = ",".join("?" for _ in names)
-    return (f"approval_status='approved' AND published=1 AND deleted_at IS NULL AND {VALID_DATES} AND event_end>=? "
-            f"AND category IN ({placeholders})", [day.isoformat(), *names])
+    return (f"approval_status='approved' AND published=1 AND deleted_at IS NULL AND {VALID_DATES} "
+            f"AND event_end>=? AND ({END_SQL})>=({START_SQL}) AND ({END_SQL})>=? "
+            f"AND category IN ({placeholders})", [as_moment(moment).date().isoformat(), moment_sql(moment), *names])
 
 
-def schedule(item, day):
+def schedule_order(moment):
+    """Filter first, rank ongoing by end date / upcoming by start date, then limit."""
+    stamp = moment_sql(moment)
+    return (f"CASE WHEN ({START_SQL})<=? THEN 0 ELSE 1 END ASC, "
+            f"CASE WHEN ({START_SQL})<=? THEN event_end ELSE event_start END ASC, "
+            "datetime(created_at) DESC, id DESC", [stamp, stamp])
+
+
+def highlights(conn, moment, limit=5):
+    where, params = public_where(moment)
+    order, order_params = schedule_order(moment)
+    return conn.execute(f"SELECT * FROM news_posts WHERE {where} ORDER BY {order} LIMIT ?",
+                        [*params, *order_params, limit]).fetchall()
+
+
+def schedule(item, moment=None):
+    moment = as_moment(moment)
+    day = moment.date()
     try:
         start = date.fromisoformat(item["event_start"])
         end = date.fromisoformat(item["event_end"])
-        if end < start:
+        begins = datetime.combine(start, clock_time(item.get("start_time"), time.min), KST)
+        ends = datetime.combine(end, clock_time(item.get("end_time"), time.max), KST)
+        if ends < begins:
             raise ValueError
     except (ValueError, TypeError):
         missing = SCHEDULE["undated"].label
@@ -59,9 +112,9 @@ def schedule(item, day):
     label = start.strftime(fmt)
     if start != end:
         label += " - " + end.strftime(fmt)
-    if day < start:
+    if moment < begins:
         key, badge = "upcoming", f"D-{(start-day).days}"
-    elif day > end:
+    elif moment > ends:
         key, badge = "ended", SCHEDULE["ended"].label
     else:
         key = "ongoing"
@@ -69,13 +122,15 @@ def schedule(item, day):
     return {"schedule_key": key, "event_status": SCHEDULE[key].label, "date_badge": badge, "date_label": label}
 
 
-def browse(conn, query, day):
+def browse(conn, query, moment):
+    moment = as_moment(moment)
+    day = moment.date()
     period = query.get("period", "all")
     period = period if period in PERIODS else "all"
     category = query.get("category", "").strip()
     category = PUBLIC_CATEGORIES.get(category, ALIASES.get(category, category))
     region, keyword = query.get("region", "").strip()[:100], query.get("q", "").strip()[:200]
-    clause, params = public_where(day)
+    clause, params = public_where(moment)
     where = [clause]
     if category:
         names = stored_names(category)
@@ -90,9 +145,9 @@ def browse(conn, query, day):
     if bounds := period_bounds(period, day):
         where.append("event_start<=? AND event_end>=?")
         params.extend([bounds[1].isoformat(), bounds[0].isoformat()])
-    rows = conn.execute("SELECT * FROM news_posts WHERE " + " AND ".join(where) +
-                        " ORDER BY is_featured DESC,(event_start>?) ASC,event_start ASC,id DESC",
-                        [*params, day.isoformat()]).fetchall()
+    order, order_params = schedule_order(moment)
+    rows = conn.execute("SELECT * FROM news_posts WHERE " + " AND ".join(where) + " ORDER BY " + order,
+                        [*params, *order_params]).fetchall()
     selected = {"period": period, "category": category, "region": region, "q": keyword,
                 "view": "map" if query.get("view") == "map" else "list"}
 

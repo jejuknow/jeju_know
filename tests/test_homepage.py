@@ -38,7 +38,7 @@ class HomepageTest(unittest.TestCase):
         self.execute("INSERT INTO admins(username,password_hash,role) VALUES (?,?,'super_admin')",('admin',hash_password('test-admin-password')))
         self.client.post('/admin/login',data={'csrf_token':self.token('/admin/login'),'username':'admin','password':'test-admin-password'})
 
-    def test_promoted_first_latest_creation_order_limit_and_visibility(self):
+    def test_same_schedule_uses_creation_order_without_promotion_priority(self):
         self.insert_news('old-featured',featured=1)
         for day in range(2,8):
             self.insert_news(f'normal-{day}',created=f'2026-10-{day:02d}T01:00:00+00:00')
@@ -46,15 +46,14 @@ class HomepageTest(unittest.TestCase):
         self.insert_news('hidden-promotion',promoted=1,published=0)
         self.insert_news('deleted-promotion',promoted=1,deleted='2026-10-08')
         page=self.client.get('/')
-        self.assertEqual([item['slug'] for item in page.context['news_items']],['promotion','normal-7','normal-6','normal-5','normal-4'])
+        self.assertEqual([item['slug'] for item in page.context['news_items']],['normal-7','normal-6','normal-5','normal-4','normal-3'])
         self.assertEqual(page.text.count('class="news-card '),5)
-        self.assertIn('홍보·제휴',page.text)
         self.assertNotIn('hidden-promotion',page.text)
         self.assertNotIn('deleted-promotion',page.text)
         self.assertIn('홍보·제휴',self.client.get('/news/promotion').text)
         self.assertIn('홍보·제휴',self.client.get('/news').text)
         self.execute("UPDATE news_posts SET updated_at='2099-01-01' WHERE slug='normal-2'")
-        self.assertEqual(self.client.get('/').context['news_items'][1]['slug'],'normal-7')
+        self.assertEqual(self.client.get('/').context['news_items'][0]['slug'],'normal-7')
 
     def test_admin_promotion_switch_immediate_and_other_flags_preserved(self):
         self.insert_news('newest',created='2099-01-01 00:00:00')
@@ -69,7 +68,7 @@ class HomepageTest(unittest.TestCase):
         self.assertIn('name="is_promoted" value="1" checked',edit.text)
         payload.pop('is_promoted')
         self.client.post(f"/admin/news/{promoted['id']}/edit",data=payload)
-        self.assertEqual(self.client.get('/').context['news_items'][0]['slug'],'newest')
+        self.assertEqual(self.client.get('/').context['news_items'][0]['slug'],'promoted')
         edited=self.client.get('/news/promoted').context['item']
         self.assertFalse(edited['is_promoted'])
         self.assertTrue(edited['is_featured'] and edited['is_sponsored'])
@@ -97,7 +96,7 @@ class HomepageTest(unittest.TestCase):
         positions=[page.text.index(f'id="{identifier}"') for identifier in ('finder','today','places','pick','collections')]
         self.assertEqual(positions,sorted(positions))
         self.assertIn('<h1>내가 다시 가고 싶은<br><em>제주 기록</em></h1>',page.text)
-        self.assertIn('<span>맛집·카페·가볼 곳부터 제주 소식까지.</span><span>JEJU_KNOW의 추천과 함께 모은 장소 정보를 만나보세요.</span>',page.text)
+        self.assertIn('<span>맛집•카페•행사 부터 제주 소식까지.</span><span>제주노의 추천과 함께 모은 장소 정보를 만나보세요.</span>',page.text)
         self.assertIn('href="/map?pick=current">JEJU_KNOW PICK 보기',page.text)
         self.assertIn('선택사항',page.text)
         self.assertIn('id="allResultsBtn" href="/places"',page.text)
