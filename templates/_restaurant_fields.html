@@ -6,8 +6,13 @@
     <option value="">{{ '기존 분류 유지 / 미분류' if p.get('id') else '선택해주세요' }}</option>
     {% for t in taxonomy.terms if t.parent_id==food.id and not t.is_legacy and (t.selectable or t.id|string==p.get('restaurant_main_id')|string) %}<option value="{{ t.id }}" {% if t.id|string==p.get('restaurant_main_id')|string %}selected{% endif %}>{{ t.name }}{{ ' (비활성 · 기존 분류)' if not t.selectable else '' }}</option>{% endfor %}
   </select></label>
-  <label>맛집 세부유형 (선택)<select name="restaurant_subtype_id"><option value="">대분류만 선택</option>{% for t in taxonomy.terms if t.type=='restaurant_subcategory' and t.parent_id!=food.id and not t.is_legacy and (t.selectable or t.id|string==p.get('restaurant_subtype_id')|string) %}<option data-parent="{{ t.parent_id }}" value="{{ t.id }}" {% if t.id|string==p.get('restaurant_subtype_id')|string %}selected{% endif %}>{{ t.name }}{{ ' (비활성 · 기존 분류)' if not t.selectable else '' }}</option>{% endfor %}</select></label>
-  <p class="form-help span-2">세부유형을 모르면 대분류만 골라도 좋아요. 대표메뉴는 분류와 별도로 입력해주세요.</p>
+  <fieldset class="restaurant-subtypes span-2"><legend>{{ '세부유형' if restaurant_required else '맛집 세부유형' }} (최대 3개) <small data-subtype-count>0/3</small></legend>
+    <p class="form-help">이 장소를 대표하는 음식 유형을 최대 3개 선택해주세요.</p>
+    <div class="restaurant-subtype-choices">
+    {% set selected = p.get('restaurant_subtype_ids', [p.get('restaurant_subtype_id','')]) %}
+    {% for t in taxonomy.terms if t.type=='restaurant_subcategory' and t.parent_id!=food.id and not t.is_legacy and (t.selectable or t.id|string in selected) %}<label class="member-term" data-subtype-parent="{{ t.parent_id }}" {% if t.parent_id|string != p.get('restaurant_main_id')|string %}hidden{% endif %}><input type="checkbox" name="restaurant_subtype_ids" value="{{ t.id }}" {% if t.id|string in selected %}checked{% endif %}>{{ t.name }}{{ ' (비활성 · 기존 분류)' if not t.selectable else '' }}</label>{% endfor %}
+    </div><p class="form-help" data-subtype-empty>대분류를 먼저 선택해주세요.</p><p class="form-help" data-subtype-notice role="status" aria-live="polite"></p>
+  </fieldset>
   {% if p.get('restaurant_ambiguous') %}<div class="span-2"><p class="form-help">기존 분류: {{ p.restaurant_existing_labels }}. 기존 연결을 보존합니다.</p><label class="check"><input type="checkbox" name="restaurant_replace" value="1">기존 분류를 위 선택으로 교체</label></div>{% endif %}
 </div>
 {% endif %}

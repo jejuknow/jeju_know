@@ -69,7 +69,7 @@ class RestaurantTest(unittest.TestCase):
         self.assertIn('고기국수',self.visitor.get('/place/'+p['slug']).text)
         self.assertEqual(self.rows("SELECT * FROM categories WHERE name='고기국수'"),[])
         page=self.member.get(f"/places/{p['id']}/edit").text
-        self.assertIn(f'value="{self.term("food-noodles")["id"]}" selected',page)
+        self.assertIn(f'value="{self.term("food-noodles")["id"]}" checked',page)
         self.assertEqual(self.post(self.other,f"/places/{p['id']}/edit",**self.food()).status_code,403)
         self.assertEqual(self.post(self.member,f"/places/{p['id']}/edit",**self.food(main='food-japanese',child='food-pork-cutlet')).status_code,303)
         self.assertEqual(self.api()[0]['restaurant_label'],'일식 · 돈가스')
@@ -79,7 +79,7 @@ class RestaurantTest(unittest.TestCase):
         for query in ('cuisine=food-japanese&detail=food-ramen','detail=food-ramen'):
             page=self.member.get('/map/register?category=food&'+query).text
             self.assertIn(f'value="{self.term("food-japanese")["id"]}" selected',page)
-            self.assertIn(f'value="{self.term("food-ramen")["id"]}" selected',page)
+            self.assertIn(f'value="{self.term("food-ramen")["id"]}" checked',page)
 
     def test_admin_parent_management_counts_deletion_and_active(self):
         p=self.create_food(child='food-noodles')

@@ -23,13 +23,13 @@ from community_places import (FACT_FIELDS, SUGGESTION_FIELDS, MEMBER_SUGGESTION_
 from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
 from image_limits import MEMBER_PLACE_SLOTS
 from place_taxonomy import linked_ids, save_links
-from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, official_terms
+from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, official_terms, form_values, form_selection
 from admin_settings import catalog, read_settings
 from place_auto_checks import (validate_address, duplicate_matches, inspect as inspect_place,
                                record as record_check, BURST_LIMIT, BURST_SECONDS)
 from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
 from submission_suggestions import (DETAIL_FIELD, INPUT_FIELDS, MEMBER_USAGE_LABELS, MEMBER_USE_OPTIONS, IGNORED_MEMBER_FIELDS,
-                                    parse_proposal, queue_proposal, approve_proposal)
+                                    parse_proposal, queue_proposal, approve_proposal, snapshot, dumps)
 
 
 def register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
@@ -159,9 +159,10 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 if category['slug'] == 'food':
                     main = next((r for r in terms if r['slug'] == query.get('cuisine') and r['parent_id'] == category['id'] and not r['is_legacy']), None)
                     chosen = [r for r in terms if r['id'] in data['term_ids']]
-                    if not main and len(chosen) == 1:
-                        main = chosen[0] if chosen[0]['parent_id'] == category['id'] else next((r for r in terms if r['id'] == chosen[0]['parent_id']), None)
-                    data.update(restaurant_main_id=str(main['id']) if main else '', restaurant_subtype_id=str(chosen[0]['id']) if main and len(chosen)==1 and chosen[0]['parent_id']==main['id'] else '', term_ids=[])
+                    if not main and chosen:
+                        parents = {r['id'] if r['parent_id'] == category['id'] else r['parent_id'] for r in chosen}
+                        main = next((r for r in terms if r['id'] in parents), None) if len(parents) == 1 else None
+                    data.update(restaurant_main_id=str(main['id']) if main else '', restaurant_subtype_ids=[str(r['id']) for r in chosen if main and r['parent_id']==main['id']][:3], term_ids=[])
         return place_form(request, data, new_only=new_only)
 
     @app.get("/places/{place_id}/edit")
@@ -207,19 +208,21 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 data = facts(normalized, conn, allowed_regions, new_only=new_only, existing=existing)
                 if not existing or existing["auto_check_status"] is not None:
                     validate_address(data)
-                restaurant_ids = parse_selection(conn, form, data['category_id'], existing, required=True)
+                restaurant_ids = parse_selection(conn, form, data['category_id'], existing, required=True, member=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
                 _, cafe_proposal = parse_member_features(conn, form, data["category_id"], existing)
                 proposal = combine_proposals(proposal, cafe_proposal)
+                data.update(form_values(form))
                 data.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
-                data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
+                data.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | (RESTAURANT_FIELDS - {"restaurant_subtype_ids", "restaurant_main_id"}) | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
                 data.update(term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isdigit() and len(str(v)) <= 10],
                             closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
             except ValueError as exc:
                 values = {k: str(form.get(k, "")) for k in FACT_FIELDS}
-                values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | RESTAURANT_FIELDS | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
+                values.update({k: form.get(k, "") for k in CONTROL_FIELDS | INPUT_FIELDS | (RESTAURANT_FIELDS - {"restaurant_subtype_ids", "restaurant_main_id"}) | (CAFE_FIELDS - {"cafe_feature_ids", "detail_cafe_visit_times"})})
                 values.update(closed_weekdays=form.getlist("closed_weekdays"), detail_cafe_visit_times=form.getlist("detail_cafe_visit_times"))
                 values.update(id=place_id, term_ids=[int(v) for v in form.getlist("term_ids") if str(v).isascii() and str(v).isdigit() and len(str(v)) <= 10], images=image_store.list("places", place_id) if place_id else [])
+                values.update(form_values(form))
                 values.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
             exact, _ = duplicate_matches(conn, data, place_id)
@@ -245,7 +248,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                                   similar=[p for p in exact if p["published"]], new_only=new_only)
             try:
                 facts(normalized, conn, allowed_regions, new_only=new_only, existing=fresh)
-                restaurant_ids = parse_selection(conn, form, data['category_id'], fresh, required=True)
+                restaurant_ids = parse_selection(conn, form, data['category_id'], fresh, required=True, member=True)
                 proposal = parse_proposal(form, conn, data["category_id"])
                 _, cafe_proposal = parse_member_features(conn, form, data["category_id"], fresh)
                 proposal = combine_proposals(proposal, cafe_proposal)
@@ -352,7 +355,20 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             place = get_place(conn, place_id)
         if not place or not place["published"]:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
-        return render(request, "place_suggestion.html", place=dict(place), **form_options(place["category_id"]))
+        return suggestion_form(request, place)
+
+    def suggestion_form(request, place, form=None, error=None):
+        options = form_options(place['category_id'])
+        food = next((c for c in options['taxonomy']['categories'] if c['slug'] == 'food'), None)
+        fields = dict(MEMBER_SUGGESTION_FIELDS)
+        if food and place['category_id'] == food['id']:
+            fields[DETAIL_FIELD] = '맛집 대분류·세부유형'
+        with closing(connect_db()) as conn:
+            p = {**dict(place), **form_selection(conn, place['id'], place['category_id'])}
+        if form is not None:
+            p.update(form_values(form))
+        return render(request, 'place_suggestion.html', 400 if error else 200, place=dict(place), p=p,
+                      suggestion_fields=fields, submitted=form or {}, error=error, **options)
 
     @app.post("/places/{place_id}/suggest")
     async def suggest_post(request: Request, place_id: int):
@@ -370,15 +386,23 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
             field, reason = str(form.get("field", "")), str(form.get("reason", "")).strip()
             try:
-                value = suggestion_value(conn, field, str(form.get("new_value", "")), member=True)
+                if field == DETAIL_FIELD:
+                    terms = parse_selection(conn, form, place['category_id'], required=True, member=True)
+                    if not terms:
+                        raise ValueError('맛집 대분류·세부유형을 선택해주세요.')
+                    proposal = dict(category_id=place['category_id'], companions=[], term_ids=terms, usage={}, replace_restaurant=True)
+                    value, original = dumps(proposal), snapshot(conn, place, proposal)
+                else:
+                    value = suggestion_value(conn, field, str(form.get("new_value", "")), member=True)
+                    original = original_value(place, field)
                 if not 5 <= len(reason) <= 2000:
                     raise ValueError("확인할 근거를 5~2,000자로 입력해주세요.")
             except ValueError as exc:
-                return render(request, "place_suggestion.html", 400, place=dict(place), error=str(exc), **form_options(place["category_id"]))
+                return suggestion_form(request, place, form, str(exc))
             if field in MEMBER_USAGE_LABELS and value == "미확인":
                 flash(request, "미확인은 기존 이용 정보를 바꾸지 않습니다.")
                 return redirect("/account/suggestions")
-            conn.execute("INSERT INTO place_correction_suggestions(place_id,user_id,field,new_value,original_value,reason) VALUES (?,?,?,?,?,?)", (place_id,current_user(request)["id"],field,value,original_value(place,field),reason))
+            conn.execute("INSERT INTO place_correction_suggestions(place_id,user_id,field,new_value,original_value,reason) VALUES (?,?,?,?,?,?)", (place_id,current_user(request)["id"],field,value,original,reason))
         flash(request, "수정 제안을 보냈습니다. 관리자가 확인하기 전에는 원본 정보가 바뀌지 않습니다.")
         return redirect("/account/suggestions")
 

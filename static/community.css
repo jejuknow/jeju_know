@@ -51,3 +51,5 @@
 .admin-review-detail dd{white-space:pre-line}
 @media(max-width:640px){.member-place-form .span-2{grid-column:1/-1}.member-place-form .form-card{padding:18px 14px}.member-place-form input,.member-place-form select,.member-place-form textarea{font-size:16px}.member-place-form .member-term{padding:8px 11px}.submission-switches{gap:6px 16px}}
 @media(max-width:640px){.member-usage-grid{grid-template-columns:minmax(0,1fr)}}
+
+.restaurant-subtypes{border:0;padding:0;margin:0;min-width:0}.restaurant-subtypes legend{font-weight:700}.restaurant-subtypes small{font-weight:400;color:var(--muted);margin-left:8px}.restaurant-subtype-choices{display:flex;flex-wrap:wrap;gap:8px}.restaurant-subtype-choices [hidden]{display:none!important}.restaurant-subtypes [data-subtype-notice]:empty{display:none}

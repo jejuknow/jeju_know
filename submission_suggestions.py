@@ -78,7 +78,7 @@ def queue_proposal(conn, place, user_id, proposal):
 
 def validate_proposal(conn, place, suggestion):
     proposal = json.loads(suggestion["new_value"])
-    if not isinstance(proposal, dict) or set(proposal) - {"category_id", "companions", "term_ids", "usage", "note", "cafe_details"}:
+    if not isinstance(proposal, dict) or set(proposal) - {"category_id", "companions", "term_ids", "usage", "note", "cafe_details", "replace_restaurant"}:
         raise ValueError("제안 항목을 확인해주세요.")
     if not isinstance(proposal.get("companions"), list) or not isinstance(proposal.get("term_ids"), list) or not isinstance(proposal.get("usage"), dict):
         raise ValueError("제안 형식을 확인해주세요.")
@@ -104,6 +104,12 @@ def validate_proposal(conn, place, suggestion):
     if not isinstance(details, dict):
         raise ValueError("카페 제안 항목을 확인해주세요.")
     category = conn.execute("SELECT slug FROM categories WHERE id=?", (place["category_id"],)).fetchone()
+    if proposal.get('replace_restaurant') and (proposal['replace_restaurant'] is not True or not category or category[0] != 'food' or not data['term_ids']):
+        raise ValueError('맛집 분류 제안을 확인해주세요.')
+    if category and category[0] == 'food' and not proposal.get('replace_restaurant'):
+        from restaurant_taxonomy import validate_link_selection
+        previous = linked_ids(conn, place['id'])
+        validate_link_selection(conn, place['category_id'], sorted(set(previous) | set(data['term_ids'])), previous)
     if category and category[0] == "cafe" and len(data["term_ids"]) > 5:
         raise ValueError("카페 특징은 최대 5개까지 반영할 수 있어요.")
     if details and (not category or category[0] != "cafe"):
@@ -127,7 +133,7 @@ def approve_proposal(conn, place, suggestion):
     for key, value in proposal["usage"].items():
         conn.execute(f"UPDATE places SET {key}=? WHERE id=?", (value, place["id"]))
     if proposal["term_ids"]:
-        save_links(conn, place["id"], sorted(set(linked_ids(conn, place["id"])) | set(proposal["term_ids"])))
+        save_links(conn, place["id"], proposal['term_ids'] if proposal.get('replace_restaurant') else sorted(set(linked_ids(conn, place["id"])) | set(proposal["term_ids"])))
     for key, value in details.items():
         conn.execute(f"UPDATE places SET {key}=? WHERE id=?", (dumps(value) if key == "cafe_visit_times" else value, place["id"]))
     conn.execute("UPDATE places SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (place["id"],))
@@ -143,7 +149,7 @@ def display_proposal(conn, value):
         lines.append("잘 맞는 동행: " + " / ".join(labels.get(c, c) for c in data["companions"]))
     if data.get("term_ids"):
         labels = {r["id"]: r["name"] for r in conn.execute("SELECT id,name FROM categories ORDER BY sort_order,id")}
-        lines.append("장소 특징: " + " / ".join([name for i,name in labels.items() if i in data["term_ids"]] + ["이전 분류" for i in data["term_ids"] if i not in labels]))
+        lines.append(("맛집 분류: " if data.get('replace_restaurant') else "장소 특징: ") + " / ".join([name for i,name in labels.items() if i in data["term_ids"]] + ["이전 분류" for i in data["term_ids"] if i not in labels]))
     lines.extend(USAGE_LABELS.get(k, k) + ": " + v for k,v in data.get("usage", {}).items())
     lines.extend(("추천 시간대" if k == "cafe_visit_times" else FIELD_LABELS.get(k, k)) + ": " + (" / ".join(v) if isinstance(v, list) else v) for k,v in data.get("cafe_details", {}).items())
     return "\n".join(lines) or "미확인"

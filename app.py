@@ -26,7 +26,7 @@ from user_migrations import backup_before_user_migration, migrate_users
 from home_migrations import backup_before_home_migration, migrate_home
 from taxonomy_migrations import backup_before_taxonomy_migration, migrate_taxonomy, TYPES
 from restaurant_migrations import backup_before_restaurants, migrate_restaurants
-from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, validate_parent, usage_count
+from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, form_values, validate_parent, usage_count
 from image_migrations import backup_before_image_migration, migrate_images
 from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedFormRoute
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
@@ -508,7 +508,7 @@ def create_app(test_config=None):
             control_error = str(exc)
         slug = unique_slug(form.get("slug"), existing["id"] if existing else None)
         return form, {
-            **{key: str(form.get(key, '')) for key in RESTAURANT_FIELDS},
+            **form_values(form),
             **parse_details(form, existing),
             "cafe_visit_times": parse_times(form, existing),
             "_control_error": control_error,

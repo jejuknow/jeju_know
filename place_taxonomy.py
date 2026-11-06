@@ -3,7 +3,7 @@ from taxonomy_migrations import json_list, legacy_term_ids
 from community_migrations import today
 from admin_settings import catalog
 from new_visibility import new_clause
-from restaurant_taxonomy import branch_terms, descendants, official_terms
+from restaurant_taxonomy import branch_terms, descendants, official_terms, validate_link_selection
 
 CORE_ORDER = {"food": 0, "cafe": 1, "attraction": 2}
 
@@ -47,6 +47,11 @@ def validate_terms(conn, data, existing=None):
     allowed = selectable | (set(previous) & branch)
     if len(selected) > 100 or not set(selected).issubset(allowed):
         return "선택한 상위 카테고리의 활성 세부 분류를 선택해 주세요."
+    if cafe and cafe[0] == 'food':
+        try:
+            validate_link_selection(conn, data['category_id'], selected, previous)
+        except ValueError as exc:
+            return str(exc)
     data["term_ids"] = selected
     if is_cafe:
         # Hidden legacy/inactive values must survive an unrelated admin form save.
@@ -56,6 +61,10 @@ def validate_terms(conn, data, existing=None):
 
 
 def save_links(conn, place_id, term_ids):
+    term_ids = list(dict.fromkeys(term_ids))
+    place = conn.execute('SELECT p.category_id,c.slug FROM places p JOIN categories c ON c.id=p.category_id WHERE p.id=?', (place_id,)).fetchone()
+    if place and place['slug'] == 'food':
+        validate_link_selection(conn, place['category_id'], term_ids, linked_ids(conn, place_id))
     conn.execute("DELETE FROM place_category_links WHERE place_id=?", (place_id,))
     conn.executemany("INSERT INTO place_category_links(place_id,category_id) VALUES (?,?)", [(place_id, i) for i in term_ids])
 

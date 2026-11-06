@@ -60,9 +60,13 @@ def build_workbook(choices):
                 rule.find(tag('formula1')).text = 'CsvChoice' + str(index)
                 rule.set('allowBlank', '1')
                 # Multiple selections are typed with |; validation is authoritative on the server.
-                rule.set('showErrorMessage', '0' if title in ('카페_특징','잘맞는동행') else '1')
+                rule.set('showErrorMessage', '0' if title in ('카페_특징','잘맞는동행','맛집_세부유형') else '1')
                 rule.set('error', '선택목록에서 현재 값을 확인해주세요.')
                 rule.set('errorTitle', '선택값 확인')
+                if title == '맛집_세부유형':
+                    rule.set('showInputMessage', '1')
+                    rule.set('promptTitle', '세부유형 최대 3개')
+                    rule.set('prompt', '복수 세부유형은 | 로 구분하여 최대 3개까지 입력하세요.')
             changed[name] = ET.tostring(doc, encoding='utf-8', xml_declaration=True)
         for entry in source.infolist():
             target.writestr(entry.filename, changed.get(entry.filename, source.read(entry.filename)))

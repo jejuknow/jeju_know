@@ -57,8 +57,8 @@ class TaxonomyUnificationTest(unittest.TestCase):
                 name = 'term_ids' if client is self.admin else 'cafe_feature_ids'
                 found = re.search(fr'name="{name}" value="{term["id"]}"', page.text) is not None
             else:
-                select = re.search(r'<select name="restaurant_subtype_id".*?</select>', page.text, re.S)[0]
-                found = re.search(fr'<option[^>]*value="{term["id"]}"[^>]*>', select) is not None
+                select = re.search(r'<fieldset class="restaurant-subtypes.*?</fieldset>', page.text, re.S)[0]
+                found = re.search(fr'<input[^>]*value="{term["id"]}"[^>]*>', select) is not None
             self.assertEqual(found, present, path)
         key = '카페_특징' if term['type'] == 'cafe_feature' else '맛집_세부유형'
         self.assertEqual(term['name'] in self.choices()[key], present)

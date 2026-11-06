@@ -55,7 +55,8 @@ def export_csv(headers, rows):
 
 def template_examples(kind):
     return [{'장소명': f'[예시] {KINDS[kind][0]} (실제 정보로 변경)',
-             '영업시간_상태': status, '영업_시작': start, '영업_종료': end}
+             '영업시간_상태': status, '영업_시작': start, '영업_종료': end,
+             **({'비고': '복수 세부유형은 | 로 구분하여 최대 3개까지 입력하세요. 예: 돈가스|우동|소바 (현재 분류 목록 확인)'} if kind == 'restaurant' else {})}
             for status, start, end in [('시간 입력', '09:30', '16:00'), ('미확인', '', '')]]
 
 
@@ -140,14 +141,25 @@ def validate_restaurant_row(conn, raw, category_id, previous):
     if len(parents) != 1:
         raise ValueError('맛집 대분류를 활성 목록과 정확히 일치하게 입력해주세요.')
     parent = parents[0]
-    children = [r for r in rows if r['name'] == raw['맛집_세부유형'] and r['parent_id'] == parent['id']]
-    if raw['맛집_세부유형'] and len(children) != 1:
-        raise ValueError(f"맛집 대분류 '{parent['name']}'과 세부유형 '{raw['맛집_세부유형']}'의 관계가 올바르지 않습니다.")
-    child = str(children[0]['id']) if children else saved.get('restaurant_subtype_id', '')
-    if child and not any(str(r['id']) == child and r['parent_id'] == parent['id'] for r in rows):
+    names = list(dict.fromkeys(v.strip() for v in raw['맛집_세부유형'].split('|') if v.strip()))
+    if len(names) > 3:
+        raise ValueError('맛집 세부유형은 최대 3개까지 입력할 수 있습니다.')
+    children, errors = [], []
+    for name in names:
+        matches = [r for r in rows if r['name'] == name and r['parent_id'] == parent['id']]
+        if len(matches) == 1:
+            children.append(str(matches[0]['id']))
+        elif any(r['name'] == name for r in rows):
+            errors.append(f"맛집 대분류 '{parent['name']}'과 세부유형 '{name}'의 관계가 올바르지 않습니다.")
+        else:
+            errors.append(f"맛집 세부유형 '{name}'은 활성 분류에 없습니다.")
+    if errors:
+        raise ValueError(' '.join(errors))
+    children = children if names else saved.get('restaurant_subtype_ids', [])
+    if any(not any(str(r['id']) == child and r['parent_id'] == parent['id'] for r in rows) for child in children):
         raise ValueError('기존 세부유형과 다른 대분류입니다. 세부유형도 함께 입력하거나 수동 수정해주세요.')
     return parse_selection(conn, {'restaurant_taxonomy_present': '1', 'restaurant_main_id': str(parent['id']),
-                                 'restaurant_subtype_id': child}, category_id, previous or None, required=True)
+                                 'restaurant_subtype_ids': children, 'restaurant_replace': '1' if names else ''}, category_id, previous or None, required=True)
 
 
 def image_reference(conn, value, root):
@@ -276,6 +288,12 @@ def preview_rows(conn, rows, kind, root):
             item['hours_error'] = str(error)
         try:
             prepared = prepare_row(conn, source['raw'], kind, root)
+            if kind == 'restaurant':
+                ids = prepared['terms']
+                if ids is None:
+                    ids = [r[0] for r in conn.execute('SELECT category_id FROM place_category_links WHERE place_id=?', (prepared['previous']['id'],))]
+                terms = official_terms(conn, prepared['data']['category_id'])
+                item['subtypes_display'] = ' · '.join(r['name'] for r in terms if r['id'] in ids and r['parent_id'] != prepared['data']['category_id'])
             data = prepared['data']
             candidates = {r['id']: r for r in duplicates(conn, data, include_private=True)}
             # Same-address candidates count even when the shop names differ.

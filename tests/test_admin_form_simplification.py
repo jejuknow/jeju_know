@@ -36,7 +36,7 @@ class AdminFormSimplificationTest(unittest.TestCase):
                 for field in RETIRED:
                     self.assertNotIn(f'name="{field}"', response.text)
                 for field in ('signature_menu', 'representative_price', 'coffee_taste',
-                              'restaurant_main_id', 'restaurant_subtype_id', 'note', 'companions'):
+                              'restaurant_main_id', 'restaurant_subtype_ids', 'note', 'companions'):
                     self.assertIn(f'name="{field}"', response.text)
                 self.assertEqual(response.text.count('name="signature_menu"'), 1)
                 self.assertLess(response.text.index('name="signature_menu"'), response.text.index('3. 카테고리별 정보'))

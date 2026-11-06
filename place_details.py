@@ -129,6 +129,8 @@ def decorate_details(conn, place):
         place['classification_terms'] = [r for r in place['classification_terms']
                                          if r['type'] == 'restaurant_subcategory' and not r['is_legacy']]
         place.update(form_selection(conn, place['id'], place.get('category_id')))
+        place['restaurant_subtypes'] = [dict(id=r['id'], name=r['name'], slug=r['slug'])
+                                       for r in place['classification_terms'] if r['parent_id'] != place['category_id']]
     terms = [r["name"] for r in place["classification_terms"]]
     # Cafe presentation uses the same managed terms as FIND/MAP. Legacy tags stay stored.
     place["restaurant_label"] = ' · '.join(terms) if place['category_slug'] == 'food' else ''

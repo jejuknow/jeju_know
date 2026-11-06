@@ -144,6 +144,12 @@ def merge_places(conn, source_id, target_id, actor):
     target = conn.execute("SELECT * FROM places WHERE id=?", (target_id,)).fetchone()
     if not source or not target or source_id == target_id or any(r["merged_into_id"] or r["deleted_at"] for r in (source,target)):
         raise ValueError("병합할 두 개의 서로 다른 현재 장소를 선택해주세요.")
+    category = conn.execute('SELECT slug FROM categories WHERE id=?', (target['category_id'],)).fetchone()
+    if source['category_id'] == target['category_id'] and category and category[0] == 'food':
+        from restaurant_taxonomy import validate_link_selection
+        from place_taxonomy import linked_ids
+        previous = linked_ids(conn, target_id)
+        validate_link_selection(conn, target['category_id'], sorted(set(previous) | set(linked_ids(conn, source_id))), previous)
     # Both original rows and their photos remain. Old slugs redirect to the canonical row.
     conn.execute("UPDATE places SET merged_into_id=?,published=0,updated_at=CURRENT_TIMESTAMP WHERE id=? OR merged_into_id=?", (target_id,source_id,source_id))
     conn.execute("UPDATE place_correction_suggestions SET place_id=? WHERE place_id=?", (target_id,source_id))
