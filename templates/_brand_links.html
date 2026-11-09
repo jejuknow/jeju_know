@@ -1,5 +1,5 @@
 {% macro brand_links(settings) -%}
   {% if settings.instagram_url %}<a href="{{ settings.instagram_url }}" target="_blank" rel="noopener noreferrer">인스타그램</a>{% endif %}
   <a href="{{ settings.openchat_url }}" target="_blank" rel="noopener noreferrer">오픈채팅</a>
-  <a href="/contact">문의하기</a>
+  <a href="{{ settings.partnership_kakao_url }}" target="_blank" rel="noopener noreferrer">광고·제휴 문의</a>
 {%- endmacro %}

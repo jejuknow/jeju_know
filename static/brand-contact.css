@@ -18,6 +18,15 @@
 .contact-page { padding-block:clamp(24px,5vw,60px) }
 .contact-card { max-width:700px; margin:auto; padding:clamp(20px,4vw,42px); background:white }
 .contact-card > .primary-inline, .contact-form { margin-top:24px }
+.contact-partnership { margin-block:24px; padding:20px; border-radius:16px; background:#f3f6ff }
+.contact-partnership h2, .contact-form-title { font-size:20px; line-height:1.4 }
+.contact-partnership h2 { margin:0 }
+.contact-partnership p, .contact-partnership-hint p { margin:10px 0 16px; color:var(--muted); line-height:1.7 }
+.contact-form-title { margin:28px 0 8px }
+.contact-partnership .primary-inline { max-width:100%; text-align:center }
+.contact-partnership-hint { padding:14px 16px; border-radius:12px; background:#f3f6ff }
+.contact-partnership-hint p { margin:0 0 8px }
+.contact-partnership-hint a { display:inline-flex; min-height:44px; align-items:center; color:var(--brand); font-weight:700 }
 .contact-form label { display:grid; gap:6px; min-width:0 }
 .contact-form :is(input,textarea,select) { width:100%; min-width:0 }
 .contact-form .contact-privacy { font-size:14px; color:var(--muted); line-height:1.6 }

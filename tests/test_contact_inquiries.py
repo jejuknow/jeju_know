@@ -91,12 +91,19 @@ class ContactTests(unittest.TestCase):
     def test_links_and_seo(self):
         home=self.visitor.get("/").text
         self.assertEqual(home.count('href="https://open.kakao.com/o/gLuLBdVi" target="_blank" rel="noopener noreferrer"'),4)
+        partnership_link = 'href="https://open.kakao.com/o/sxJXaiWi" target="_blank" rel="noopener noreferrer"'
+        self.assertEqual(home.count(partnership_link), 3)  # Header, mobile menu, footer.
+        self.assertIn('href="/contact">홈페이지·기타 문의</a>', home)
+        self.assertIn(partnership_link, self.visitor.get('/partnership').text)
         self.assertLess(home.index('id="collections"'),home.index('id="community-title"'))
         self.assertLess(home.index('id="community-title"'),home.index('<footer'))
         self.assertEqual(self.visitor.get("/contact/sent",follow_redirects=False).status_code,303)
         contact=self.visitor.get("/contact").text
         self.assertIn("<title>문의하기 | JEJU_KNOW</title>",contact)
         self.assertIn('name="robots" content="noindex,follow"',contact)
+        self.assertIn(partnership_link, contact)
+        self.assertIn('홈페이지 및 기타 문의', contact)
+        self.assertIn('method="post" action="/contact"', contact)
         self.assertNotIn("/contact",self.visitor.get("/sitemap.xml").text)
 
     def member(self, username):
