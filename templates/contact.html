@@ -10,8 +10,8 @@
     <h1>문의하기</h1>
     <section class="contact-partnership" aria-labelledby="partnership-contact-title">
       <h2 id="partnership-contact-title">광고·제휴 문의</h2>
-      <p>광고, 제휴, 행사·공간 협업 문의는 카카오 오픈채팅으로 빠르게 상담할 수 있습니다.</p>
-      <a class="primary-inline" href="{{ site_settings.partnership_kakao_url }}" target="_blank" rel="noopener noreferrer">카카오톡으로 문의하기 →</a>
+      <p>광고·제휴 문의는 광고·협업 안내페이지에서 상품과 단가를 확인한 후 문의해주세요.</p>
+      <a class="primary-inline" href="/partnership">광고·협업 안내 보기 →</a>
     </section>
     <h2 class="contact-form-title">홈페이지 및 기타 문의</h2>
     <p>홈페이지 이용, 정보 수정, 기타 문의는 아래 문의폼을 이용해주세요.</p>
@@ -23,8 +23,8 @@
       {% else %}<label>문의 유형 (필수)<select name="inquiry_type" required><option value="">선택해주세요</option>
         {% for kind in types %}<option {% if values.inquiry_type == kind %}selected{% endif %}>{{ kind }}</option>{% endfor %}</select></label>
         <div class="contact-partnership-hint" hidden role="status">
-          <p>광고·제휴 문의는 카카오 오픈채팅에서 더 빠르게 상담할 수 있습니다.</p>
-          <a href="{{ site_settings.partnership_kakao_url }}" target="_blank" rel="noopener noreferrer">카카오톡 문의하기 →</a>
+          <p>광고·제휴 문의는 광고·협업 안내페이지에서 상품과 단가를 확인한 후 문의해주세요.</p>
+          <a href="/partnership">광고·협업 안내 보기 →</a>
         </div>{% endif %}
       <label>이름 또는 닉네임 (필수)<input name="name" required maxlength="{{ limits.name }}" value="{{ values.name }}"></label>
       <label>이메일 (필수)<input type="email" name="email" required autocomplete="email" maxlength="{{ limits.email }}" value="{{ values.email }}"></label>

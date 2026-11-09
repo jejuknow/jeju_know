@@ -16,7 +16,7 @@ PAGES = {
     '/news': ('제주 행사·축제·팝업·이슈 | JEJU_KNOW', '제주 행사·축제, 전시·팝업, 교육·체험과 지역소식을 날짜별로 찾아보세요. 일정, 장소와 공식 출처를 확인할 수 있습니다.'),
     '/best': ('제주 상황별 추천 BEST | JEJU_KNOW', '제주 여행의 동행과 상황에 맞춘 장소 추천 모음을 만나보세요. 모음별 소개와 장소 정보를 확인하고 다음 제주 일정을 준비하세요.'),
     '/places': ('제주 장소 검색 결과 | JEJU_KNOW', '선택한 조건에 맞는 제주 맛집·카페·가볼 곳의 전체 검색 결과입니다. 장소별 소개와 상세 정보를 확인하세요.'),
-    '/partnership': ('광고·제휴 안내 | JEJU_KNOW', 'JEJU_KNOW의 제주 장소·행사 소개와 광고·제휴 안내를 확인하고 협업을 문의하세요.'),
+    '/partnership': ('JEJU_KNOW 광고·협업 | 제주노 광고·제휴 안내', '제주노 JEJU_KNOW의 인스타그램 릴스·피드 및 홈페이지 배너 광고 상품과 단가, 광고·제휴 문의 방법을 확인하세요.'),
 }
 
 
@@ -209,7 +209,7 @@ def sitemap(conn):
                 ET.SubElement(node, 'lastmod').text = value
             except ValueError:
                 pass
-    for path in ('/', '/find', '/map', '/new', '/news', '/best'):
+    for path in ('/', '/find', '/map', '/new', '/news', '/best', '/partnership'):
         add(ORIGIN+path)
     for table,prefix,extra in [('places','/place/',' AND merged_into_id IS NULL AND COALESCE(is_example,0)=0'), ('best_collections','/best/',''), ('news_posts','/news/','')]:
         where, params = public_where(today()) if table == 'news_posts' else ('published=1 AND deleted_at IS NULL'+extra, [])

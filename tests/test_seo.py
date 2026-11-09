@@ -32,7 +32,7 @@ class SeoTest(unittest.TestCase):
                   for category in ('cafe', 'food', 'attraction')]
         self.execute("UPDATE places SET one_line=name || '의 실제 소개', new_override='show'")
         titles, descriptions = set(), set()
-        for path in ('/', '/find', '/map', '/new', '/news', '/best'):
+        for path in ('/', '/find', '/map', '/new', '/news', '/best', '/partnership'):
             response = self.visitor.get(path)
             self.assertEqual(response.status_code, 200, path)
             html = response.text
@@ -126,6 +126,7 @@ class SeoTest(unittest.TestCase):
         root = ET.fromstring(response.content)
         ns = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
         entries = {node.find('s:loc', ns).text: node.findtext('s:lastmod', namespaces=ns) for node in root}
+        self.assertIn(ORIGIN + '/partnership', entries)
         self.assertEqual(entries[ORIGIN + '/place/' + public['slug']], '2026-10-01')
         self.assertIsNone(entries[ORIGIN + '/best/seo-best'])
         self.assertNotIn('/place/' + example['slug'], response.text)

@@ -1,8 +1,82 @@
 {% extends "base.html" %}
-{% block title %}광고·제휴 | JEJU_KNOW{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/partnership.css?v=20261109">{% endblock %}
 {% block body %}
 <main class="partnership-page">
-  <section class="partnership-hero"><div class="wrap"><p class="kicker light">PARTNERSHIP</p><h1>제주에서 알리고 싶은 이야기를<br>JEJU_KNOW 방식으로 소개합니다.</h1><p>단순 배너보다 장소·행사·콘텐츠 맥락 안에서 자연스럽게 발견되는 홍보를 목표로 합니다. 유료 콘텐츠는 일반 추천과 구분해 표시합니다.</p><a class="partnership-instagram" href="{{ site_settings.partnership_kakao_url }}" target="_blank" rel="noopener noreferrer">광고·제휴 문의하기 →</a>{% if site_settings.instagram_url %} <a class="partnership-instagram" href="{{ site_settings.instagram_url }}" target="_blank" rel="noopener noreferrer">Instagram DM →</a>{% endif %}</div></section>
-  <section class="wrap partnership-options"><div class="section-head"><div><p class="kicker">MONETIZATION READY</p><h2>첫 수익화는 3가지 형태가 적합합니다.</h2></div></div><div class="monetize-grid"><article><span>01</span><h3>행사·소식 프로모션</h3><p>일반 제주 소식 카드 안에서 ‘광고·협찬’으로 명확히 표시해 상단 또는 추천 영역에 노출합니다.</p></article><article><span>02</span><h3>장소 소개 콘텐츠</h3><p>JEJU_KNOW의 실제 기준과 맞는 공간만 별도 협업 콘텐츠로 제작하고, 일반 PICK과 구분합니다.</p></article><article><span>03</span><h3>인스타그램 연계 패키지</h3><p>웹 상세 링크 + 인스타그램 숏폼/게시물을 묶는 방식으로 향후 상품화할 수 있습니다.</p></article></div><div class="monetize-note"><strong>지금은 가격표·결제 기능을 넣지 않았습니다.</strong><p>방문자와 실제 문의량이 쌓이기 전에 결제·회원 기능을 추가하면 운영 부담만 커집니다. 우선 관리자에서 ‘광고·협찬’ 여부를 표시하고 문의를 받는 구조로 시작합니다.</p></div></section>
+  <section class="partnership-hero">
+    <div class="wrap">
+      <p class="kicker">JEJU_KNOW PARTNERSHIP</p>
+      <h1><span>JEJU_KNOW</span> <span>광고·협업</span></h1>
+      <div class="partnership-intro">
+        <p>제주의 맛집, 카페, 여행지, 신상 매장과 다양한 로컬 소식을 소개하는 제주노(JEJU_KNOW)입니다.</p>
+        <p>브랜드와 공간의 매력을 제주노만의 콘텐츠로 전달합니다.</p>
+      </div>
+      <a class="primary-inline partnership-cta" href="{{ site_settings.partnership_kakao_url }}" target="_blank" rel="noopener noreferrer">카카오톡으로 광고·제휴 문의하기</a>
+      <p class="partnership-helper">광고 상품과 기본 단가는 아래에서 확인할 수 있습니다.</p>
+    </div>
+  </section>
+
+  <div class="wrap partnership-content">
+    <section aria-labelledby="partnership-products-title">
+      <h2 id="partnership-products-title">광고 상품 및 단가</h2>
+      <div class="partnership-products">
+        <article class="partnership-product">
+          <p class="kicker">Instagram Reels</p>
+          <h3>인스타그램 릴스</h3>
+          <p class="partnership-price">100,000원</p>
+          <ul><li>릴스 1편</li><li>스토리 무료 동시 게시</li></ul>
+        </article>
+        <article class="partnership-product">
+          <p class="kicker">Instagram Feed</p>
+          <h3>인스타그램 피드</h3>
+          <p class="partnership-price">100,000원</p>
+          <ul><li>피드 1건</li><li>스토리 무료 동시 게시</li></ul>
+        </article>
+        <article class="partnership-product">
+          <p class="kicker">Website Banner</p>
+          <h3>홈페이지 배너 광고</h3>
+          <p class="partnership-price">100,000원 <span>/ 1일</span></p>
+          <ul><li>JEJU_KNOW 홈페이지 내 배너 노출</li></ul>
+          <p class="partnership-product-note">노출 위치, 집행 시간, 이미지 규격은 사전 협의합니다.</p>
+        </article>
+      </div>
+    </section>
+
+    <div class="partnership-details">
+      <section aria-labelledby="partnership-guide-title">
+        <h2 id="partnership-guide-title">광고·협업 안내</h2>
+        <ul class="partnership-checklist">
+          <li>릴스 또는 피드 광고 진행 시 스토리를 추가 비용 없이 함께 게시합니다.</li>
+          <li>홈페이지 배너 광고는 1일 단위로 진행합니다.</li>
+          <li>배너 노출 위치, 집행 시간 및 이미지 규격은 사전 협의합니다.</li>
+          <li>단순 체험 및 제품 제공 협찬은 별도 검토합니다.</li>
+          <li>사진·영상의 2차 활용 및 추가 제작은 별도 협의합니다.</li>
+          <li>광고·협찬 콘텐츠에는 관련 기준에 따라 광고 사실을 표시합니다.</li>
+          <li>최종 견적 및 세금 처리 조건은 협의 후 확정합니다.</li>
+        </ul>
+      </section>
+      <section class="partnership-preparation" aria-labelledby="partnership-prepare-title">
+        <h2 id="partnership-prepare-title">문의 전 준비해주세요</h2>
+        <p>아래 내용을 함께 보내주시면 더 원활하게 상담할 수 있습니다.</p>
+        <ul class="partnership-checklist">
+          <li>브랜드 또는 업체명</li>
+          <li>희망 광고 상품</li>
+          <li>희망 일정</li>
+          <li>홍보할 장소 / 제품 / 행사</li>
+          <li>간단한 홍보 내용</li>
+          <li>참고 링크 또는 SNS</li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="partnership-closing" aria-labelledby="partnership-closing-title">
+      <h2 id="partnership-closing-title">JEJU_KNOW와 함께하고 싶으신가요?</h2>
+      <p>광고·제휴·행사·공간·콘텐츠 협업 문의를 카카오톡으로 보내주세요.</p>
+      <a class="primary-inline partnership-cta" href="{{ site_settings.partnership_kakao_url }}" target="_blank" rel="noopener noreferrer">카카오톡으로 광고·제휴 문의하기</a>
+      <div class="partnership-contact-links">
+        {% if site_settings.instagram_url %}<a href="{{ site_settings.instagram_url }}" target="_blank" rel="noopener noreferrer">Instagram @jeju_know</a>{% endif %}
+        <a href="https://www.jeju-know.com/">Website www.jeju-know.com</a>
+      </div>
+    </section>
+  </div>
 </main>
 {% endblock %}
