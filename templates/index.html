@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_home_banner.html" import banner %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261102-banners">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261109-issue-spacing">{% endblock %}
 {% from '_user_status.html' import schedule_badge %}
 {% block body %}
 <main id="top">
@@ -52,8 +52,8 @@
 
   {% if site_settings.home_issue %}<section class="section wrap news-home" id="today">
     <div class="section-head editorial-section-head">
-      <div><p class="kicker">JEJU_KNOW TODAY</p><h2>제주 이슈</h2><p class="section-copy">{{ news_categories|join(', ') }} 소식을 JEJU_KNOW와 사용자들이 함께 전합니다.</p></div>
-      <a class="text-btn" href="{{ url_for('news_list') }}">제주 이슈 전체보기 →</a>
+      <div class="news-home-intro"><p class="kicker">JEJU_KNOW TODAY</p><h2>제주 이슈</h2><p class="section-copy">제주의 행사·축제부터 전시·팝업, 교육·체험, 지역소식까지 모아 전합니다.</p></div>
+      <a class="text-btn news-home-more" href="{{ url_for('news_list') }}" aria-label="제주 이슈 전체보기"><span class="news-home-more-prefix">제주 이슈 </span>전체보기 →</a>
     </div>
     {% if news_items %}
     <div class="news-grid home-news-grid">

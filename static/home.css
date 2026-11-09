@@ -56,6 +56,7 @@
 @media(max-width:360px){.hero-board-card{padding:16px 13px}.hero-board-card strong{font-size:17px}}
 @media(prefers-reduced-motion:reduce){.hero-board-card{transition:none}.hero-board-card:hover{transform:none}}
 #pick,#today{scroll-margin-top:90px}
+.news-home-more:focus-visible{outline:3px solid var(--brand);outline-offset:3px}
 .preference-group #preferenceChips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
 .preference-group #preferenceChips .chip{min-width:0;padding:10px 6px}
 .home-news-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;align-items:stretch}
@@ -101,7 +102,14 @@
 @media(max-width:640px){
  .hero-story .hero-subtitle{font-size:14px;letter-spacing:-.35px}.hero-story{padding:30px 22px}
  .preference-group #preferenceChips{display:flex;flex-wrap:wrap;gap:8px}.preference-group #preferenceChips .chip{flex:0 1 calc(33.333% - 6px);padding:10px 5px}
- .news-home .section-head{align-items:flex-start;flex-direction:column;gap:16px}
+ /* Avoid the shared 200px flex basis becoming an intro height on mobile. */
+ .news-home .section-head{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"kicker kicker" "title more" "copy copy";align-items:center;gap:0 12px}
+ .news-home-intro{display:contents}
+ .news-home-intro .kicker{grid-area:kicker;margin:0}
+ .news-home-intro h2{grid-area:title;line-height:1.5}
+ .news-home-intro .section-copy{grid-area:copy;margin:8px 0 0}
+ .news-home-more{grid-area:more;display:inline-flex;align-items:center;min-height:44px;padding:8px 0;border:0;border-radius:6px;background:transparent;font-size:14px;white-space:nowrap}
+ .news-home-more-prefix{display:none}
  .home-news-grid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:14px;max-width:100%;gap:14px}
  .home-news-grid .news-card{scroll-snap-align:start}.home-news-grid .news-thumb{height:172px}
  .compact-place-grid{grid-template-columns:1fr;gap:12px}.compact-place-card{flex-direction:row}.compact-place-visual{width:100px;height:auto;min-height:128px}.compact-place-body{padding:14px;min-width:0}.compact-place-body h3{font-size:16px}.compact-place-reason{margin-bottom:8px}
