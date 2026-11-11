@@ -39,12 +39,26 @@ CHOICES = {'주차': ('parking_status', {x: x for x in USE_OPTIONS}),
            '공개여부': ('published', {'공개': 1, '비공개': 0}),
            'NEW_노출': ('new_override', {'자동': 'auto', '노출': 'show', '숨김': 'hide'})}
 PHOTO_FIELDS = ['대표사진', '추가사진1', '추가사진2', '추가사진3']
+# Operational exports omit identifiers/photos. The optional original-hours cell
+# preserves existing free text which cannot be represented by a single time range.
+EXPORT_HEADERS = {kind: [h for h in headers if h not in ['place_id', *PHOTO_FIELDS]] + ['영업시간_원문']
+                  for kind, headers in HEADERS.items()}
+
+
+def formula_cell(text):
+    return text.lstrip().startswith(('=', '+', '-', '@')) or text.startswith(('\t', '\r', '\n'))
+
+
+def unescape_csv_cell(text):
+    if text.startswith("'") and (formula_cell(text[1:]) or text[1:].startswith("'")):
+        return text[1:]
+    return text
 
 
 def export_csv(headers, rows):
     def safe(value):
         text = str(value if value is not None else '')
-        return "'" + text if text.lstrip().startswith(('=', '+', '-', '@')) or text.startswith(('\t', '\r', '\n')) else text
+        return "'" + text if formula_cell(text) or text.startswith("'") else text
     output = io.StringIO(newline='')
     writer = csv.writer(output)
     writer.writerow(headers)
@@ -79,7 +93,8 @@ def parse_csv(raw, filename, mime, kind):
         other = 'restaurant' if kind == 'cafe' else 'cafe'
         if set(HEADERS[other]) - set(HEADERS[kind]) & set(header):
             raise ValueError(f'{KINDS[other][0]} CSV 파일로 보입니다. {KINDS[other][0]} CSV 등록 메뉴에서 업로드해주세요.')
-        allowed_headers = (set(HEADERS[kind]), set(HEADERS[kind]) - {'영업시간_상태'})
+        allowed_headers = (set(HEADERS[kind]), set(HEADERS[kind]) - {'영업시간_상태'},
+                           set(EXPORT_HEADERS[kind]), set(HEADERS[kind]) | {'영업시간_원문'})
         if len(set(header)) != len(header) or set(header) not in allowed_headers:
             missing = ', '.join(x for x in HEADERS[kind] if x not in header)
             extra = ', '.join(x for x in header if x not in HEADERS[kind])
@@ -92,7 +107,8 @@ def parse_csv(raw, filename, mime, kind):
                 raise ValueError(f'{reader.line_num}행: 열 개수가 템플릿과 다릅니다.')
             if any(len(v) > 4000 or any(ord(c) < 32 and c not in '\r\n\t' for c in v) for v in values):
                 raise ValueError(f'{reader.line_num}행: 셀은 4,000자 이하이고 허용된 문자여야 합니다.')
-            rows.append({'line': reader.line_num, 'raw': {**dict.fromkeys(HEADERS[kind], ''), **dict(zip(header, (v.strip() for v in values)))}})
+            rows.append({'line': reader.line_num, 'raw': {**dict.fromkeys(HEADERS[kind], ''),
+                         **dict(zip(header, (unescape_csv_cell(v.strip()) for v in values)))}})
             if len(rows) > MAX_ROWS:
                 raise ValueError('한 번에 최대 500개 장소를 등록할 수 있습니다.')
     except csv.Error:
@@ -202,13 +218,17 @@ def normalize_common_fields(conn, raw, kind, previous, root):
         patch['region'] = exact_catalog(conn, 'region', raw['지역'])
     if raw['잘맞는동행']:
         patch['companions'] = json.dumps([exact_catalog(conn, 'companion', v) for v in split_values(raw['잘맞는동행'])], ensure_ascii=False)
-    hours = csv_business_hours(raw, previous)
+    hours = import_business_hours(raw, previous)
     if hours is not None:
         patch['business_hours'] = hours
     if raw['휴무일']:
-        mode = {'미확인': 'unknown', '연중무휴': 'everyday'}.get(raw['휴무일'], 'days')
-        pairs = [('closed_present', '1'), ('closed_mode', mode)] + [('closed_weekdays', v) for v in split_values(raw['휴무일'])]
-        patch['closed_days'] = normalize_controls(FormData(pairs))['closed_days']
+        days = split_values(raw['휴무일'])
+        if raw['휴무일'] in ('미확인', '연중무휴') or all(d in '월화수목금토일' and len(d) == 1 for d in days):
+            mode = {'미확인': 'unknown', '연중무휴': 'everyday'}.get(raw['휴무일'], 'days')
+            pairs = [('closed_present', '1'), ('closed_mode', mode)] + [('closed_weekdays', v) for v in days]
+            patch['closed_days'] = normalize_controls(FormData(pairs))['closed_days']
+        else:
+            patch['closed_days'] = validate_detail_value('closed_days', raw['휴무일'])
     if raw['오픈연도'] or raw['오픈월']:
         patch['opened_year'], patch['opened_month'] = opening(raw['오픈연도'] or previous.get('opened_year'), raw['오픈월'] or previous.get('opened_month'))
     if raw['위도'] or raw['경도']:
@@ -216,7 +236,7 @@ def normalize_common_fields(conn, raw, kind, previous, root):
     data = {'published': 0, 'new_override': 'auto', 'verification_status': 'unverified',
             'category': category['name'], 'category_id': category['id'], 'emoji': '☕' if kind == 'cafe' else '🍚', **previous, **patch}
     for field, title in (('name', '장소명'), ('region', '지역'), ('address', '주소')):
-        if not data.get(field):
+        if not data.get(field) and not previous:
             raise ValueError(f"필수값 '{title}'가 없습니다.")
     if data.get('latitude') is None or data.get('longitude') is None:
         warnings.append('지도 위치 미등록: 주소 검색을 시도하거나 좌표 없이 등록할 수 있습니다.')
@@ -261,7 +281,16 @@ def state_hash(conn):
     return digest.hexdigest()
 
 
-def prepare_row(conn, raw, kind, root, target=None):
+def import_business_hours(raw, previous=None):
+    original = raw.get('영업시간_원문', '')
+    if original:
+        if any(raw.get(h) for h in ('영업시간_상태', '영업_시작', '영업_종료')):
+            raise ValueError('영업시간 원문과 시간 입력 열 중 한 방식만 입력해주세요.')
+        return validate_detail_value('business_hours', original)
+    return csv_business_hours(raw, previous)
+
+
+def prepare_row(conn, raw, kind, root, target=None, *, match_existing=False):
     previous = {}
     if target or raw['place_id']:
         value = str(target or raw['place_id'])
@@ -271,6 +300,15 @@ def prepare_row(conn, raw, kind, root, target=None):
         if not row:
             raise ValueError('place_id에 해당하는 현재 장소가 없습니다.')
         previous = dict(row)
+    elif match_existing and raw['장소명']:
+        # Preview only: a unique, exact name/address match supplies existing values
+        # for validation. Saving still requires the administrator's explicit target.
+        matches = conn.execute('''SELECT p.* FROM places p JOIN categories c ON c.id=p.category_id
+            WHERE p.name=? AND p.address=? AND c.slug=? AND c.type='place'
+            AND p.deleted_at IS NULL AND p.merged_into_id IS NULL LIMIT 2''',
+            (raw['장소명'], raw['주소'], KINDS[kind][1])).fetchall()
+        if len(matches) == 1:
+            previous = dict(matches[0])
     data, patch, warnings, pick, photos = normalize_common_fields(conn, raw, kind, previous, root)
     terms = (validate_cafe_row if kind == 'cafe' else validate_restaurant_row)(conn, raw, data['category_id'], previous)
     return dict(data=data, patch=patch, warnings=warnings, pick=pick, photos=photos, terms=terms, previous=previous)
@@ -281,13 +319,13 @@ def preview_rows(conn, rows, kind, root):
     for source in rows:
         item = {'line': source['line'], 'raw': source['raw'], 'errors': [], 'warnings': [], 'duplicates': [], 'status': '정상', 'default_action': 'create'}
         try:
-            hours = csv_business_hours(source['raw'], bool(source['raw'].get('place_id')))
+            hours = import_business_hours(source['raw'], bool(source['raw'].get('place_id')))
             item['hours_status'] = '기존 값 유지' if hours is None else '시간 입력' if hours else '미확인'
             item['hours_display'] = hours or ''
         except ValueError as error:
             item['hours_error'] = str(error)
         try:
-            prepared = prepare_row(conn, source['raw'], kind, root)
+            prepared = prepare_row(conn, source['raw'], kind, root, match_existing=True)
             if kind == 'restaurant':
                 ids = prepared['terms']
                 if ids is None:

@@ -89,7 +89,7 @@ def admin_context(request, conn):
                "role":ROLE_LABELS[actor["role"]], "dedicated":bool(actor.get("id"))}
     path = request.url.path
     if path.startswith('/admin/imports'):
-        section, title, active = '장소 관리', 'CSV 일괄 등록', 'imports'
+        section, title, active = '장소 관리', 'CSV 관리', 'imports'
     elif path.startswith("/admin/categories") or path.startswith("/admin/classifications/"):
         section = "분류 관리"
         key = path.rsplit("/", 1)[-1] if "/classifications/" in path else request.query_params.get("type", "place")

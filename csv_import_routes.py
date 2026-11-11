@@ -6,6 +6,7 @@ import secrets
 import time
 from contextlib import closing
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -15,6 +16,8 @@ from auth_security import current_user
 from csv_place_import import (MAX_BYTES, HEADERS, KINDS, parse_csv, preview_rows,
                               state_hash, export_csv, save_rows, choice_lists, template_examples)
 from community_places import coordinates
+from community_migrations import today
+from csv_place_export import export_places
 
 TTL = 3600
 
@@ -78,7 +81,8 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
             'kakao_map_key': app.state.kakao_map_key, **context})
 
     def file_response(raw, filename, mime='text/csv; charset=utf-8'):
-        return Response(raw, media_type=mime, headers={'Content-Disposition': f'attachment; filename="{filename}"',
+        fallback = filename if filename.isascii() else 'JEJU_KNOW-places.csv'
+        return Response(raw, media_type=mime, headers={'Content-Disposition': f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{quote(filename)}',
             'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
 
     @app.get('/admin/imports', response_class=HTMLResponse)
@@ -107,6 +111,20 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
             return response
         kind_check(kind)
         return render(request, kind)
+
+    @app.get('/admin/imports/{kind}/export.csv')
+    def download(request: Request, kind: str):
+        if response := guard(request):
+            return response
+        kind_check(kind)
+        day = today()
+        with closing(connect_db()) as conn:
+            # A consistent snapshot and a database-enforced read-only boundary.
+            # No activity-log INSERT: downloading must not mutate the database.
+            conn.execute('PRAGMA query_only = ON')
+            conn.execute('BEGIN')
+            content = export_places(conn, kind, on_date=day)
+        return file_response(content, f'JEJU_KNOW_{KINDS[kind][0]}_{day.isoformat()}.csv')
 
     @app.post('/admin/imports/{kind}/preview')
     async def preview(request: Request, kind: str):
@@ -161,7 +179,8 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
         except ValueError as error:
             return HTMLResponse(str(error), status_code=400)
         rows = [{**row['raw'], '오류사유': '; '.join(row['errors'])} for row in stage['rows'] if row['errors']]
-        return file_response(export_csv(HEADERS[kind] + ['오류사유'], rows), kind + '-errors.csv')
+        optional = ['영업시간_원문'] if any('영업시간_원문' in r['raw'] for r in stage['rows']) else []
+        return file_response(export_csv(HEADERS[kind] + optional + ['오류사유'], rows), kind + '-errors.csv')
 
     @app.post('/admin/imports/{kind}/preview/{token}/coordinates')
     async def geocoded(request: Request, kind: str, token: str):
@@ -207,6 +226,7 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
             row['raw'].update({'영업시간_상태': status,
                                '영업_시작': '' if status == '미확인' else str(form.get('hours_start', ''))[:80],
                                '영업_종료': '' if status == '미확인' else str(form.get('hours_end', ''))[:80]})
+            row['raw'].pop('영업시간_원문', None)
             with closing(connect_db()) as conn:
                 conn.execute('BEGIN')
                 if state_hash(conn) != stage['state_hash'] or conn.execute('SELECT 1 FROM csv_import_runs WHERE token=?', (token,)).fetchone():
