@@ -3,6 +3,25 @@
   'use strict';
   const root = document.getElementById('restaurantTaxonomy');
   if (!root) return;
+  root.querySelectorAll('[data-taxonomy-slug]').forEach(settings => {
+    const edit = settings.querySelector('[data-slug-edit]');
+    if (!edit) return;
+    const input = settings.querySelector('[data-slug-input]');
+    const warning = settings.querySelector('[data-slug-confirm]');
+    const confirmation = warning.querySelector('input');
+    function syncSlug() {
+      input.readOnly = !edit.checked;
+      warning.hidden = !edit.checked;
+      if (!edit.checked) {
+        input.value = input.defaultValue;
+        confirmation.checked = false;
+      }
+      confirmation.required = edit.checked && input.value.trim().toLowerCase() !== input.defaultValue;
+    }
+    edit.addEventListener('change', syncSlug);
+    input.addEventListener('input', syncSlug);
+    syncSlug();
+  });
   const groups = [...root.querySelectorAll('[data-taxonomy-group]')];
   const opened = () => groups.filter(g => g.open).map(g => g.dataset.taxonomyGroup).join(',');
   let restoring = false;
@@ -33,7 +52,17 @@
     }
     restoring = false;
   }
+  const validationError = document.querySelector('.flash.error');
+  if (validationError) {
+    const url = new URL(location.href);
+    url.hash = '';
+    history.replaceState(null, '', url);
+  }
   restore();
+  if (validationError) {
+    validationError.setAttribute('role', 'alert');
+    requestAnimationFrame(() => validationError.scrollIntoView({block: 'center'}));
+  }
   groups.forEach(g => g.addEventListener('toggle', remember));
   for (const [selector, value] of [['[data-taxonomy-expand]', true], ['[data-taxonomy-collapse]', false]]) {
     root.querySelector(selector)?.addEventListener('click', () => {

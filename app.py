@@ -1100,8 +1100,8 @@ def create_app(test_config=None):
                 raise ValueError
         except ValueError:
             order = -1
-        if not name or len(name) > 40 or name == "전체" or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) or len(slug) > 80 or order < 0:
-            flash(request, "이름(1~40자, ‘전체’ 제외), 영문 슬러그(소문자·숫자·하이픈), 순서(0~9999)를 확인해 주세요.", "error")
+        if not name or len(name) > 40 or name == "전체" or order < 0:
+            flash(request, "이름(1~40자, ‘전체’ 제외), 순서(0~9999)를 확인해 주세요.", "error")
             return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
         kind = str(form.get("type", "place"))
         return_url = admin_return(form, "/admin/categories")
@@ -1117,14 +1117,21 @@ def create_app(test_config=None):
                 if kind not in TYPES:
                     return HTMLResponse("분류 유형을 확인해 주세요.", status_code=400)
                 parent_id = validate_parent(conn, kind, form.get('parent_id'), original)
+                if kind == 'restaurant_subcategory':
+                    from taxonomy_slugs import restaurant_slug
+                    slug = restaurant_slug(conn, form, name, parent_id, original)
+                elif not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) or len(slug) > 80:
+                    raise ValueError('영문 슬러그(소문자·숫자·하이픈, 1~80자)를 확인해 주세요.')
                 policy = str(form.get('member_policy', original['member_policy'] if original else 'review'))
                 if kind == 'cafe_feature' and policy not in ('review', 'admin'):
                     raise ValueError('회원 선택 권한은 제안 가능 또는 관리자 전용으로 선택해주세요.')
                 if category_id is None:
                     category_id = conn.execute("INSERT INTO categories(name,slug,sort_order,is_active,type,parent_id,member_policy) VALUES (?,?,?,?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1"), kind, parent_id, policy)).lastrowid
                 else:
-                    # The stable slug survives renaming so shared map URLs continue to work.
+                    # Name edits keep the stable slug; restaurant changes require explicit confirmation.
                     conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), parent_id, category_id))
+                    if kind == 'restaurant_subcategory' and slug != original['slug']:
+                        conn.execute('UPDATE categories SET slug=? WHERE id=?', (slug, category_id))
                     if kind == 'cafe_feature':
                         conn.execute('UPDATE categories SET member_policy=? WHERE id=?', (policy, category_id))
                     if original['is_legacy'] and form.get('adopt_legacy') == '1':

@@ -1,7 +1,7 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_classification_editor.html' import editor with context %}
 {% from 'admin/_ui.html' import badge %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-slugs">{% endblock %}
 {% macro controls(item, group) %}
   {% set target = taxonomy_path~'?open='~group.id~'#taxonomy-'~item.id %}
   <details class="admin-inline-editor" id="edit-taxonomy-{{ item.id }}"><summary class="mini-btn">수정</summary><div class="admin-review-detail">{{ editor(item, return_to=target) }}</div></details>
@@ -24,14 +24,14 @@
   {% for group in groups %}{% set parent = group.parent %}
   <details class="admin-panel taxonomy-group" id="restaurant-{{ parent.id }}" data-taxonomy-group="{{ parent.id }}" {% if group.opened %}open{% endif %}>
     <summary><strong>{{ parent.name }}</strong><span>세부유형 {{ group.total }}개{% if q and group.children|length!=group.total %} · 검색 {{ group.children|length }}개{% endif %}</span>{{ badge('ON' if parent.is_active else 'OFF','success' if parent.is_active else 'neutral') }}{% if parent.is_legacy %}<small>기존 값 보존</small>{% endif %}</summary>
-    <div class="taxonomy-parent" id="taxonomy-{{ parent.id }}"><div><strong>대분류 관리</strong><span>노출 순서 {{ parent.sort_order }} · 사용 장소 {{ parent.place_count }}곳</span><small class="text-token">{{ parent.slug }}</small></div><div class="taxonomy-actions">{{ controls(parent,parent) }}</div></div>
+    <div class="taxonomy-parent" id="taxonomy-{{ parent.id }}"><div><strong>대분류 관리</strong><span>노출 순서 {{ parent.sort_order }} · 사용 장소 {{ parent.place_count }}곳</span></div><div class="taxonomy-actions">{{ controls(parent,parent) }}</div></div>
     {% if group.children %}<div class="admin-data-wrap" tabindex="0" role="region" aria-label="{{ parent.name }} 세부유형 목록"><table class="admin-data-table"><thead><tr><th>이름</th><th>활성</th><th>노출 순서</th><th>사용 장소 수</th><th>관리</th></tr></thead><tbody>
-    {% for item in group.children %}<tr id="taxonomy-{{ item.id }}"><td class="admin-cell-title"><strong>{{ item.name }}</strong><small class="text-token">{{ item.slug }}{% if item.is_legacy %} · 기존 값 보존{% endif %}</small></td><td>{{ badge('ON' if item.is_active else 'OFF','success' if item.is_active else 'neutral') }}</td><td>{{ item.sort_order }}</td><td>{{ item.place_count }}곳</td><td class="admin-cell-actions">{{ controls(item,parent) }}</td></tr>{% endfor %}
+    {% for item in group.children %}<tr id="taxonomy-{{ item.id }}"><td class="admin-cell-title"><strong>{{ item.name }}</strong>{% if item.is_legacy %}<small>기존 값 보존</small>{% endif %}</td><td>{{ badge('ON' if item.is_active else 'OFF','success' if item.is_active else 'neutral') }}</td><td>{{ item.sort_order }}</td><td>{{ item.place_count }}곳</td><td class="admin-cell-actions">{{ controls(item,parent) }}</td></tr>{% endfor %}
     </tbody></table></div>{% else %}<p class="admin-empty">등록된 세부유형이 없습니다.</p>{% endif %}
     {% if group.can_add %}<details class="taxonomy-add" id="add-child-{{ parent.id }}" {% if new_parent==parent.id|string %}open{% endif %}><summary>+ {{ parent.name }} 세부유형 추가</summary><div class="admin-editor-body">{{ editor(parent_id=parent.id, return_to=taxonomy_path~'?open='~parent.id~'&new='~parent.id~'#add-child-'~parent.id) }}</div></details>{% elif parent.is_legacy %}<p class="taxonomy-note">기존 값 보존 항목입니다. 세부유형 추가 전 수정에서 분류 전환 여부를 확인해주세요.</p>{% endif %}
   </details>
   {% else %}<section class="admin-panel admin-empty">{{ '일치하는 맛집 유형이 없습니다.' if q else '등록된 맛집 대분류가 없습니다.' }}</section>{% endfor %}
   <details class="admin-panel admin-add-panel" id="addClassification" {% if new_parent==food_id|string %}open{% endif %}><summary>+ 대분류 추가</summary><div class="admin-editor-body">{{ editor(parent_id=food_id, return_to=taxonomy_path~'?new='~food_id~'#addClassification') }}</div></details>
 </div>
-<script src="/static/admin-restaurant.js?v=20261111" defer></script>
+<script src="/static/admin-restaurant.js?v=20261111-slugs" defer></script>
 {% endblock %}

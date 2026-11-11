@@ -66,7 +66,7 @@ class RestaurantAdminTest(unittest.TestCase):
         japanese = self.term('food-japanese')['id']
         korean = self.term('food-korean')['id']
         page = self.admin.get(PATH).text
-        add = page.split(f'id="add-child-{japanese}"')[1].split('</details>')[0]
+        add = page.split(f'id="add-child-{japanese}"')[1].split('</form>')[0]
         self.assertIn(f'value="{japanese}" selected',add)
         payload = dict(name='점검 유형',slug='qa-subtype',type='restaurant_subcategory',
                        parent_id=japanese,sort_order=72,is_active='1',
