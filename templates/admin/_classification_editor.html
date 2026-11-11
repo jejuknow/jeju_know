@@ -19,7 +19,7 @@
   <label>노출 순서<input type="number" name="sort_order" value="{{ item.sort_order if item else (next_orders.get(parent_id or food_id,1) if kind=='restaurant_subcategory' else next_order) }}" min="1" max="9999" {% if not item %}data-order-new{% endif %}>
     {% if not item %}<small>기본은 마지막 순서입니다. 중간 번호를 입력하면 뒤 항목이 자동으로 이동합니다.</small>{% endif %}
   </label>
-  {% if item and item.core_protected and item.is_active %}<input type="hidden" name="is_active" value="1"><p class="taxonomy-note">핵심 카테고리는 서비스 연결을 위해 활성 상태를 유지합니다.</p>
+  {% if item and item.activation_locked %}<input type="hidden" name="is_active" value="1"><p class="taxonomy-note">{{ item.activation_reason }}</p>
   {% else %}<label class="check"><input type="checkbox" name="is_active" value="1" {% if not item or item.is_active %}checked{% endif %}>활성</label>{% endif %}
   <button class="primary-inline">{{ '저장' if item else '추가하기' }}</button>
 </form>

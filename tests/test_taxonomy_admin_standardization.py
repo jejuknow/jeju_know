@@ -123,11 +123,10 @@ class TaxonomyStandardizationTest(unittest.TestCase):
             self.post(self.admin,f'/admin/categories/{item_id}/edit',**data,slug_change_confirm='1')
             self.assertEqual(self.rows('SELECT slug FROM categories WHERE id=?',(item_id,))[0]['slug'],data['slug'])
 
-    def test_core_categories_protected_and_custom_category_toggle_available(self):
+    def test_core_delete_slug_protected_and_unused_category_toggle_available(self):
         before=self.rows('SELECT * FROM categories ORDER BY id')
         for slug in ('food','cafe','attraction'):
             item_id=self.category[slug]
-            self.assertEqual(self.toggle('place',item_id,0).status_code,400)
             self.post(self.admin,f'/admin/categories/{item_id}/delete')
             self.post(self.admin,f'/admin/categories/{item_id}/edit',name='changed',type='place',is_active='1',
                 slug_edit='1',slug='changed-'+slug,original_slug=slug,slug_change_confirm='1')

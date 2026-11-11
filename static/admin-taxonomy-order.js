@@ -38,7 +38,7 @@
         });
         own(row, '[data-order-drag]').forEach(button => { button.disabled = busy || stale || searching || !complete; });
         own(row, '[data-taxonomy-active]').forEach(button => {
-          button.disabled = busy || stale || (button.hasAttribute('data-active-protected') && button.getAttribute('aria-checked') === 'true');
+          button.disabled = busy || stale || Boolean(states[group.dataset.orderGroup]?.items.find(r => String(r.id) === row.dataset.orderItem)?.activation_locked);
         });
       });
     });
@@ -59,9 +59,15 @@
       own(row, '[data-order-number]').forEach(node => { node.textContent = record.sort_order; });
       own(row, '[data-taxonomy-active]').forEach(button => {
         const enabled = Boolean(record.is_active);
+        button.hidden = Boolean(record.activation_locked);
         button.setAttribute('aria-checked', String(enabled));
         button.setAttribute('aria-label', button.dataset.itemName + (enabled ? ' 비활성화' : ' 활성화'));
         button.querySelector('b').textContent = enabled ? 'ON' : 'OFF';
+      });
+      own(row, '[data-activation-lock]').forEach(label => {
+        label.hidden = !record.activation_locked;
+        label.title = record.activation_reason || '';
+        label.querySelector('b').textContent = record.activation_label || '';
       });
       if (row.matches('[data-taxonomy-group]')) {
         const badge = row.querySelector(':scope > summary .admin-badge');

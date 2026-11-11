@@ -1,13 +1,13 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_classification_editor.html' import editor with context %}
 {% from 'admin/_taxonomy_inline.html' import order,toggle with context %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-standard">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-activation">{% endblock %}
 {% block admin_content %}
 <div class="taxonomy-admin" data-taxonomy-admin data-searching="{{ 'true' if q else 'false' }}" data-reorder-url="{{ taxonomy_path }}/reorder" data-active-url="{{ taxonomy_path }}/{id}/active">
   <script type="application/json" id="taxonomyOrderStates">{{ order_states|tojson }}</script>
   <div class="taxonomy-live-status" role="status" aria-live="polite" data-taxonomy-status hidden></div>
   <p class="admin-page-description">사용 중인 분류는 삭제할 수 없습니다. 비활성화해도 기존 장소 정보는 보존됩니다.</p>
-  {% if kind=='place' %}<p class="taxonomy-order-hint">맛집·카페·가볼 곳은 서비스 핵심 카테고리로 비활성화와 슬러그 변경을 제한합니다. 순서와 표시 이름은 수정할 수 있습니다.</p>{% endif %}
+  {% if kind=='place' %}<p class="taxonomy-order-hint">사용 장소 수는 공개·비공개·검토 중 장소를 포함하며, 삭제·병합된 장소는 제외합니다. 숫자를 누르면 연결된 장소를 확인할 수 있습니다.</p><p class="taxonomy-order-hint">사용 장소가 0곳이고 필수 시스템 의존성이 없으면 ON/OFF를 변경할 수 있습니다. 사용 중인 카테고리는 연결된 장소를 먼저 확인해주세요. 맛집·카페·가볼 곳의 삭제와 슬러그 변경은 계속 제한하며, 이름과 순서는 수정할 수 있습니다.</p>{% endif %}
   <form method="get" action="{{ taxonomy_path }}" class="admin-filters"><div class="admin-search-row">
     <label class="admin-search-input">{{ kind_label }} 검색<input type="search" name="q" value="{{ q }}" maxlength="200" placeholder="이름으로 검색"></label>
     <button class="primary-inline">검색</button><a class="secondary-btn" href="{{ taxonomy_path }}">초기화</a>
@@ -21,12 +21,12 @@
       {% for item in items %}<tr id="taxonomy-{{ item.id }}" data-order-item="{{ item.id }}">
         <td>{{ order(item) }}</td>
         <td class="admin-cell-title"><strong>{{ item.name }}</strong>{% if kind=='cafe_feature' %}<small>{{ '관리자 전용' if item.member_policy=='admin' else '회원 제안 가능' }}</small>{% if item.is_legacy %}<small>기존 값 보존 · 신규 선택 제외</small>{% endif %}{% endif %}</td>
-        <td>{{ toggle(item) }}</td><td>{{ item.place_count }}곳</td>
+        <td>{{ toggle(item) }}</td><td>{% if kind=='place' %}<a href="/admin/places?category={{ item.slug|urlencode }}" aria-label="{{ item.name }} 사용 장소 {{ item.place_count }}곳 확인">{{ item.place_count }}곳</a>{% else %}{{ item.place_count }}곳{% endif %}</td>
         <td class="admin-cell-actions"><details class="admin-inline-editor" id="edit-taxonomy-{{ item.id }}"><summary class="mini-btn">수정</summary><div class="admin-review-detail">{{ editor(item, return_to=taxonomy_path~'#taxonomy-'~item.id) }}</div></details>
           <form method="post" action="{{ taxonomy_path if is_catalog else '/admin/categories/'~item.id~'/delete' }}" data-confirm="사용하지 않는 ‘{{ item.name }}’ 분류를 삭제하시겠습니까?" data-confirm-word="삭제">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ taxonomy_path }}#taxonomy-{{ item.id }}">
             {% if is_catalog %}<input type="hidden" name="action" value="delete"><input type="hidden" name="value" value="{{ item.value }}">{% endif %}
-            <button class="mini-btn danger" {% if item.place_count or item.child_count or item.core_protected %}disabled title="현재 사용 중인 분류 또는 핵심 카테고리는 삭제할 수 없습니다."{% endif %}>{{ '삭제 불가' if item.place_count or item.child_count or item.core_protected else '삭제' }}</button>
+            <button class="mini-btn danger" {% if item.delete_count or item.child_count or item.core_protected %}disabled title="기존 장소 연결이 남아 있는 분류 또는 핵심 카테고리는 삭제할 수 없습니다."{% endif %}>{{ '삭제 불가' if item.delete_count or item.child_count or item.core_protected else '삭제' }}</button>
           </form>
         </td>
       </tr>{% else %}<tr><td colspan="5" class="admin-empty">조건에 맞는 분류가 없습니다.</td></tr>{% endfor %}
@@ -35,5 +35,5 @@
   <details class="admin-panel admin-add-panel" id="addClassification" {% if new_parent %}open{% endif %}><summary>+ {{ kind_label }} 추가</summary><div class="admin-editor-body">{{ editor() }}</div></details>
 </div>
 <script src="/static/admin-restaurant.js?v=20261111-standard" defer></script>
-<script src="/static/admin-taxonomy-order.js?v=20261111-standard" defer></script>
+<script src="/static/admin-taxonomy-order.js?v=20261111-activation" defer></script>
 {% endblock %}

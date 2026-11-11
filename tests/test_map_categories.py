@@ -71,7 +71,13 @@ class MapCategoryTest(unittest.TestCase):
         self.assertIn('제주 빵집', self.client.get('/place/map-cafe').text)
         blocked = self.post(f"/admin/categories/{category['id']}/delete")
         self.assertIn('현재 1개 장소에서 사용 중인 카테고리입니다.', blocked.text)
-        self.post(f"/admin/categories/{category['id']}/edit", name='제주 빵집', slug='bakery', sort_order='4')
+        blocked = self.post(f"/admin/categories/{category['id']}/edit", name='제주 빵집', slug='bakery', sort_order='4')
+        self.assertIn('현재 1곳의 장소에서 사용 중인 카테고리입니다.', blocked.text)
+        self.assertEqual(self.category('bakery')['is_active'], 1)
+        # Legacy inactive relations remain supported, although new OFF requests
+        # with a live place are now rejected by the activation policy.
+        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+            conn.execute('UPDATE categories SET is_active=0 WHERE id=?', (category['id'],))
         self.assertNotIn('bakery', self.client.get('/api/categories').text)
         self.assertNotIn('제주 빵집', self.client.get('/admin/places/new').text)
         self.assertNotIn('data-category="bakery"', self.client.get('/map').text)

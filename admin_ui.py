@@ -202,8 +202,6 @@ class AdminUI:
             if f.get(param) in allowed:
                 where.append("p." + column + "=?")
                 args.append(f[param])
-        if f.get("category"):
-            where.append("c.slug=?"); args.append(f["category"][:80])
         if f.get("region"):
             where.append("p.region=?"); args.append(f["region"][:40])
         if mode == "community":
@@ -223,6 +221,11 @@ class AdminUI:
                 where.append("p.opened_year=?")
                 args.append(year)
         with closing(self.db()) as conn:
+            if f.get("category"):
+                from place_category_policy import usage_filter
+                category = conn.execute("SELECT id FROM categories WHERE type='place' AND slug=?", (f['category'][:80],)).fetchone()
+                clause, values = usage_filter(conn, category['id']) if category else ('0=1', [])
+                where.append('(' + clause + ')'); args.extend(values)
             select = "p.*,u.nickname,(SELECT count(*) FROM place_correction_suggestions s WHERE s.place_id=p.id AND s.status='pending') AS pending_count"
             order = "p.updated_at DESC,p.id DESC"
             if mode == "community":

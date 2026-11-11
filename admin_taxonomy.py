@@ -4,6 +4,7 @@ import uuid
 
 from admin_settings import catalog, catalog_usage, write_setting
 from restaurant_taxonomy import usage_count
+from place_category_policy import activation_policy
 from taxonomy_order import (CATALOGS, CORE_SLUGS, catalog_id, compact, flat_location,
                             flat_parent, position, siblings, state)
 
@@ -15,6 +16,9 @@ def flat_view(conn, kind, query):
         row['place_count'] = catalog_usage(conn, kind, row['value']) if kind in CATALOGS else usage_count(conn, row['id'])
         row['child_count'] = 0 if kind in CATALOGS else conn.execute('SELECT count(*) FROM categories WHERE parent_id=?', (row['id'],)).fetchone()[0]
         row['core_protected'] = kind == 'place' and row['slug'] in CORE_SLUGS
+        row['delete_count'] = row['place_count']  # Retain historical references for deletion safety.
+        if kind == 'place':
+            row.update(activation_policy(conn, row))
     q = query.get('q', '').strip()[:200]
     return dict(items=[r for r in rows if q.casefold() in r['name'].casefold()], total=len(rows), q=q,
                 order_states={kind: state(conn, parent, kind)}, next_orders={parent: len(rows) + 1},

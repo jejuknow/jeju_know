@@ -1131,7 +1131,7 @@ def create_app(test_config=None):
                 from taxonomy_order import protect_active
                 slug = category_slug(conn, form, name, parent_id, original, kind)
                 if original:
-                    protect_active(dict(original), form.get('is_active') == '1')
+                    protect_active(conn, dict(original), form.get('is_active') == '1')
                 policy = str(form.get('member_policy', original['member_policy'] if original else 'review'))
                 if kind == 'cafe_feature' and policy not in ('review', 'admin'):
                     raise ValueError('회원 선택 권한은 제안 가능 또는 관리자 전용으로 선택해주세요.')
@@ -1247,6 +1247,10 @@ def create_app(test_config=None):
             flash(request, str(exc), "error")
             return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": None, "legacy_image_url": data["image_url"], "images": []}, "mode": "new", **form_options()}, status_code=400)
         with plan.transaction() as conn:
+            from place_category_policy import selection_error
+            if error := selection_error(conn, data['category_id']):
+                plan.discard()
+                return HTMLResponse(error, status_code=400)
             cursor = conn.execute(
                 """
                 INSERT INTO places (
@@ -1317,6 +1321,11 @@ def create_app(test_config=None):
             flash(request, str(exc), "error")
             return templates.TemplateResponse(request=request, name="admin_place_form.html", context={"place": {**data, "id": place_id, "legacy_image_url": data["image_url"], "images": image_store.list("places", place_id)}, "mode": "edit", "return_to": admin_return(form, "/admin/places"), **form_options()}, status_code=400)
         with plan.transaction() as conn:
+            from place_category_policy import selection_error
+            fresh = conn.execute('SELECT category_id FROM places WHERE id=?', (place_id,)).fetchone()
+            if error := selection_error(conn, data['category_id'], fresh['category_id'] if fresh else None):
+                plan.discard()
+                return HTMLResponse(error, status_code=400)
             conn.execute(
                 """
                 UPDATE places SET

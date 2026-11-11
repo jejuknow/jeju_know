@@ -8,6 +8,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from sqlite_migrations import verified_migration
 from admin_settings import catalog, write_setting
+from place_category_policy import activation_policy, protect_active
 
 KIND = 'restaurant_subcategory'
 VERSION = '20261111_taxonomy_order'
@@ -34,11 +35,6 @@ def flat_parent(conn, kind):
     raise ValueError('분류 그룹을 확인해주세요.')
 
 
-def protect_active(row, active):
-    if row.get('type') == 'place' and row['slug'] in CORE_SLUGS and row['is_active'] and not active:
-        raise ValueError('맛집·카페·가볼 곳은 서비스 핵심 카테고리이므로 비활성화할 수 없습니다.')
-
-
 def flat_location(kind, item_id=None):
     return '/admin/classifications/' + kind + ('#taxonomy-' + str(item_id) if item_id is not None else '#taxonomyList')
 
@@ -56,7 +52,8 @@ def state(conn, parent_id, kind=KIND):
     rows = siblings(conn, parent_id, kind)
     version = hashlib.sha256(json.dumps(rows, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return dict(parent_id=parent_id, version=version,
-                items=[dict(id=r['id'], sort_order=r['sort_order'], is_active=r['is_active']) for r in rows])
+                items=[dict(id=r['id'], sort_order=r['sort_order'], is_active=r['is_active'],
+                            **(activation_policy(conn, r) if kind == 'place' else {})) for r in rows])
 
 
 def renumber(conn, ids, kind=KIND):
@@ -165,7 +162,7 @@ def register_routes(app, connect_db, guard, csrf):
                     if active not in ('0', '1'):
                         raise ValueError('활성 값은 ON 또는 OFF만 사용할 수 있습니다.')
                     check_version(state(conn, parent_id, kind), form.get('version'))
-                    protect_active(row, active == '1')
+                    protect_active(conn, row, active == '1')
                     if kind in CATALOGS:
                         items = catalog(conn, kind, True)
                         for item in items:

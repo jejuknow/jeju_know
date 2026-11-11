@@ -13,3 +13,5 @@
 @media(max-width:700px){.taxonomy-admin .taxonomy-order-controls button{min-width:44px;min-height:44px}.taxonomy-admin .taxonomy-toggle{min-height:44px}.taxonomy-live-status{width:max-content;max-width:calc(100vw - 32px)}}
 @media(max-width:700px){.taxonomy-toolbar .row-actions{display:flex;flex-wrap:wrap;gap:8px}.taxonomy-toolbar button{min-height:40px}.taxonomy-group>summary{padding:16px}.taxonomy-parent{padding:16px}.taxonomy-parent span{display:block;margin:6px 0 0}.taxonomy-group>summary>span{margin-left:8px}.taxonomy-jumps a{min-height:40px}.taxonomy-actions{width:100%}.taxonomy-actions .admin-inline-editor[open]{width:100%}.taxonomy-admin .admin-data-table td{padding:12px}.taxonomy-admin .admin-data-table .admin-cell-actions{display:table-cell}.taxonomy-admin .admin-data-table .admin-inline-editor[open]{width:auto}}
 .taxonomy-toggle[data-active-protected]:disabled{cursor:not-allowed}
+.taxonomy-locked{display:inline-flex;align-items:center;gap:4px;padding:7px 10px;border:1px solid var(--border,#e3e6ee);border-radius:8px;background:#f4f5f8;color:#515b70;font-size:12px;white-space:nowrap}
+.taxonomy-locked[hidden],.taxonomy-toggle[hidden]{display:none}
