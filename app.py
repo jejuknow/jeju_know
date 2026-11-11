@@ -350,6 +350,8 @@ def create_app(test_config=None):
         migrate_correction_resolution(app.state.database)
         from user_place_auto_publish_migration import migrate as migrate_auto_publish
         migrate_auto_publish(app.state.database)
+        from taxonomy_order import migrate as migrate_taxonomy_order
+        migrate_taxonomy_order(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -1095,12 +1097,13 @@ def create_app(test_config=None):
         name = str(form.get("name", "")).strip()
         slug = str(form.get("slug", "")).strip().lower()
         try:
-            order = int(str(form.get("sort_order", "0")))
-            if not 0 <= order <= 9999:
+            raw_order = str(form.get("sort_order", "")).strip()
+            order = int(raw_order) if raw_order else None
+            if order is not None and not 0 <= order <= 9999:
                 raise ValueError
         except ValueError:
             order = -1
-        if not name or len(name) > 40 or name == "전체" or order < 0:
+        if not name or len(name) > 40 or name == "전체" or (order is not None and order < 0):
             flash(request, "이름(1~40자, ‘전체’ 제외), 순서(0~9999)를 확인해 주세요.", "error")
             return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
         kind = str(form.get("type", "place"))
@@ -1117,6 +1120,9 @@ def create_app(test_config=None):
                 if kind not in TYPES:
                     return HTMLResponse("분류 유형을 확인해 주세요.", status_code=400)
                 parent_id = validate_parent(conn, kind, form.get('parent_id'), original)
+                requested_order = order
+                if order is None:
+                    order = original['sort_order'] if original else 0
                 if kind == 'restaurant_subcategory':
                     from taxonomy_slugs import restaurant_slug
                     slug = restaurant_slug(conn, form, name, parent_id, original)
@@ -1140,6 +1146,9 @@ def create_app(test_config=None):
                         aliases = list(dict.fromkeys([*parse_json_list(original["legacy_aliases"]), original["name"]]))
                         conn.execute("UPDATE categories SET legacy_aliases=? WHERE id=?", (json.dumps(aliases, ensure_ascii=False), category_id))
                     conn.execute("UPDATE places SET category=? WHERE category_id=?", (name, category_id))
+                if kind == 'restaurant_subcategory':
+                    from taxonomy_order import position
+                    position(conn, category_id, parent_id, requested_order, original)
             flash(request, "카테고리를 저장했습니다. 방문자 화면에 바로 반영됩니다.")
             if kind == 'restaurant_subcategory':
                 from admin_restaurant_taxonomy import saved_location
@@ -1169,10 +1178,12 @@ def create_app(test_config=None):
         form = await request.form()
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
+        return_url = admin_return(form, "/admin/categories")
         conn = connect_db()
         try:
             with conn:
                 conn.execute("BEGIN IMMEDIATE")
+                original = conn.execute('SELECT * FROM categories WHERE id=?', (category_id,)).fetchone()
                 count = usage_count(conn, category_id)
                 children = conn.execute("SELECT COUNT(*) FROM categories WHERE parent_id=?", (category_id,)).fetchone()[0]
                 if count:
@@ -1181,10 +1192,20 @@ def create_app(test_config=None):
                     flash(request, "하위 분류가 있는 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
                 else:
                     conn.execute("DELETE FROM categories WHERE id=?", (category_id,))
+                    if original and original['type'] == 'restaurant_subcategory':
+                        from taxonomy_order import compact, siblings
+                        from admin_restaurant_taxonomy import saved_location
+                        compact(conn, original['parent_id'])
+                        food_id = conn.execute("SELECT id FROM categories WHERE slug='food'").fetchone()[0]
+                        remaining = siblings(conn, original['parent_id'])
+                        target = original['parent_id'] if original['parent_id'] != food_id else (
+                            remaining[min(max(original['sort_order'] - 1, 0), len(remaining) - 1)]['id'] if remaining else None)
+                        if target is not None:
+                            return_url = saved_location(return_url, target, food_id, food_id)
                     flash(request, "사용하지 않는 카테고리를 삭제했습니다.")
         finally:
             conn.close()
-        return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
+        return RedirectResponse(return_url, status_code=303)
 
     @app.get("/admin/places/new", response_class=HTMLResponse)
     async def admin_place_new_get(request: Request):
@@ -1373,6 +1394,8 @@ def create_app(test_config=None):
     app.state.analytics = Analytics(app, str(database_path), secret_key, admin_guard, templates)
     from csv_import_routes import register_csv_routes
     register_csv_routes(app, templates, connect_db, admin_guard, require_csrf, flash)
+    from taxonomy_order import register_routes as register_taxonomy_order_routes
+    register_taxonomy_order_routes(app, connect_db, admin_guard, require_csrf)
     app.state.admin_ui.register()
     return app
 

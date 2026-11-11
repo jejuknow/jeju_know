@@ -1,7 +1,8 @@
 {% extends 'admin/base.html' %}
 {% from 'admin/_classification_editor.html' import editor with context %}
 {% from 'admin/_ui.html' import badge %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-slugs">{% endblock %}
+{% from 'admin/_taxonomy_inline.html' import order, toggle with context %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-order">{% endblock %}
 {% macro controls(item, group) %}
   {% set target = taxonomy_path~'?open='~group.id~'#taxonomy-'~item.id %}
   <details class="admin-inline-editor" id="edit-taxonomy-{{ item.id }}"><summary class="mini-btn">수정</summary><div class="admin-review-detail">{{ editor(item, return_to=target) }}</div></details>
@@ -11,7 +12,9 @@
   </form>
 {% endmacro %}
 {% block admin_content %}
-<div class="restaurant-taxonomy" id="restaurantTaxonomy">
+<div class="restaurant-taxonomy" id="restaurantTaxonomy" data-searching="{{ 'true' if q else 'false' }}">
+  <script type="application/json" id="taxonomyOrderStates">{{ order_states|tojson }}</script>
+  <div class="taxonomy-live-status" role="status" aria-live="polite" data-taxonomy-status hidden></div>
   <p class="admin-page-description">대분류와 세부유형을 관리합니다. 사용 중인 분류는 삭제할 수 없으며, 비활성화해도 기존 장소 정보는 보존됩니다.</p>
   <form method="get" action="{{ taxonomy_path }}" class="admin-filters"><div class="admin-search-row">
     <label class="admin-search-input">유형명 검색<input type="search" name="q" value="{{ q }}" maxlength="200" placeholder="대분류 또는 세부유형 이름"></label>
@@ -21,17 +24,21 @@
   <div class="taxonomy-toolbar"><p>전체 유형 <strong>{{ total }}개</strong> · 대분류 {{ group_count }}개 <small>기존 값 보존 항목 포함 · 요약 숫자는 비활성 포함 전체 세부유형 수입니다.</small></p><div class="row-actions"><button type="button" class="secondary-btn" data-taxonomy-expand>전체 펼치기</button><button type="button" class="secondary-btn" data-taxonomy-collapse>전체 접기</button></div></div>
   <nav class="taxonomy-jumps" aria-label="대분류 빠른 이동">{% for group in groups %}<a class="secondary-btn" data-taxonomy-jump="{{ group.parent.id }}" href="{{ taxonomy_path }}?{{ {'q':q,'open':group.parent.id}|urlencode }}#restaurant-{{ group.parent.id }}">{{ group.parent.name }} <strong>{{ group.total }}</strong>{% if group.parent.is_legacy %}<small>기존 값</small>{% endif %}</a>{% endfor %}</nav>
   {% if q %}<p class="taxonomy-search-result" role="status">‘{{ q }}’ 검색 결과 · {{ groups|length }}개 그룹 <small>일치하는 세부유형만 표시하며, 대분류 이름이 일치하면 전체 세부유형을 표시합니다.</small></p>{% endif %}
+  {% if q %}<p class="taxonomy-order-hint">순서 변경은 검색을 초기화한 후 사용할 수 있습니다.</p>{% else %}<p class="taxonomy-order-hint">☰ 손잡이를 끌거나 ↑ ↓ 버튼으로 같은 그룹 안의 순서를 변경하세요. 변경사항은 바로 저장됩니다.</p>{% endif %}
+  <div data-order-group="{{ food_id }}">
   {% for group in groups %}{% set parent = group.parent %}
-  <details class="admin-panel taxonomy-group" id="restaurant-{{ parent.id }}" data-taxonomy-group="{{ parent.id }}" {% if group.opened %}open{% endif %}>
+  <details class="admin-panel taxonomy-group" id="restaurant-{{ parent.id }}" data-taxonomy-group="{{ parent.id }}" data-order-item="{{ parent.id }}" {% if group.opened %}open{% endif %}>
     <summary><strong>{{ parent.name }}</strong><span>세부유형 {{ group.total }}개{% if q and group.children|length!=group.total %} · 검색 {{ group.children|length }}개{% endif %}</span>{{ badge('ON' if parent.is_active else 'OFF','success' if parent.is_active else 'neutral') }}{% if parent.is_legacy %}<small>기존 값 보존</small>{% endif %}</summary>
-    <div class="taxonomy-parent" id="taxonomy-{{ parent.id }}"><div><strong>대분류 관리</strong><span>노출 순서 {{ parent.sort_order }} · 사용 장소 {{ parent.place_count }}곳</span></div><div class="taxonomy-actions">{{ controls(parent,parent) }}</div></div>
-    {% if group.children %}<div class="admin-data-wrap" tabindex="0" role="region" aria-label="{{ parent.name }} 세부유형 목록"><table class="admin-data-table"><thead><tr><th>이름</th><th>활성</th><th>노출 순서</th><th>사용 장소 수</th><th>관리</th></tr></thead><tbody>
-    {% for item in group.children %}<tr id="taxonomy-{{ item.id }}"><td class="admin-cell-title"><strong>{{ item.name }}</strong>{% if item.is_legacy %}<small>기존 값 보존</small>{% endif %}</td><td>{{ badge('ON' if item.is_active else 'OFF','success' if item.is_active else 'neutral') }}</td><td>{{ item.sort_order }}</td><td>{{ item.place_count }}곳</td><td class="admin-cell-actions">{{ controls(item,parent) }}</td></tr>{% endfor %}
+    <div class="taxonomy-parent" id="taxonomy-{{ parent.id }}"><div><strong>대분류 관리</strong><span>사용 장소 {{ parent.place_count }}곳</span></div>{{ order(parent) }}{{ toggle(parent) }}<div class="taxonomy-actions">{{ controls(parent,parent) }}</div></div>
+    {% if group.children %}<div class="admin-data-wrap" tabindex="0" role="region" aria-label="{{ parent.name }} 세부유형 목록"><table class="admin-data-table"><thead><tr><th>순서</th><th>이름</th><th>활성</th><th>사용 장소 수</th><th>관리</th></tr></thead><tbody data-order-group="{{ parent.id }}">
+    {% for item in group.children %}<tr id="taxonomy-{{ item.id }}" data-order-item="{{ item.id }}"><td>{{ order(item) }}</td><td class="admin-cell-title"><strong>{{ item.name }}</strong>{% if item.is_legacy %}<small>기존 값 보존</small>{% endif %}</td><td>{{ toggle(item) }}</td><td>{{ item.place_count }}곳</td><td class="admin-cell-actions">{{ controls(item,parent) }}</td></tr>{% endfor %}
     </tbody></table></div>{% else %}<p class="admin-empty">등록된 세부유형이 없습니다.</p>{% endif %}
     {% if group.can_add %}<details class="taxonomy-add" id="add-child-{{ parent.id }}" {% if new_parent==parent.id|string %}open{% endif %}><summary>+ {{ parent.name }} 세부유형 추가</summary><div class="admin-editor-body">{{ editor(parent_id=parent.id, return_to=taxonomy_path~'?open='~parent.id~'&new='~parent.id~'#add-child-'~parent.id) }}</div></details>{% elif parent.is_legacy %}<p class="taxonomy-note">기존 값 보존 항목입니다. 세부유형 추가 전 수정에서 분류 전환 여부를 확인해주세요.</p>{% endif %}
   </details>
   {% else %}<section class="admin-panel admin-empty">{{ '일치하는 맛집 유형이 없습니다.' if q else '등록된 맛집 대분류가 없습니다.' }}</section>{% endfor %}
+  </div>
   <details class="admin-panel admin-add-panel" id="addClassification" {% if new_parent==food_id|string %}open{% endif %}><summary>+ 대분류 추가</summary><div class="admin-editor-body">{{ editor(parent_id=food_id, return_to=taxonomy_path~'?new='~food_id~'#addClassification') }}</div></details>
 </div>
-<script src="/static/admin-restaurant.js?v=20261111-slugs" defer></script>
+<script src="/static/admin-restaurant.js?v=20261111-order" defer></script>
+<script src="/static/admin-taxonomy-order.js?v=20261111-order" defer></script>
 {% endblock %}

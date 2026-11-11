@@ -1,0 +1,11 @@
+{% macro order(item) %}
+<div class="taxonomy-order-controls" aria-label="{{ item.name }} 순서">
+  <button type="button" class="taxonomy-drag" data-order-drag aria-label="{{ item.name }} 끌어서 순서 변경" title="끌어서 순서 변경 · 위아래 버튼으로도 이동할 수 있습니다" {% if q %}disabled{% endif %}>☰</button>
+  <strong data-order-number>{{ item.sort_order }}</strong>
+  <button type="button" class="mini-btn" data-order-step="-1" aria-label="{{ item.name }} 위로 이동" {% if q or item.sort_order==1 %}disabled{% endif %}>↑</button>
+  <button type="button" class="mini-btn" data-order-step="1" aria-label="{{ item.name }} 아래로 이동" {% if q or item.sort_order==next_orders.get(item.parent_id,1)-1 %}disabled{% endif %}>↓</button>
+</div>
+{% endmacro %}
+{% macro toggle(item) %}
+<button type="button" role="switch" class="taxonomy-toggle" data-taxonomy-active data-item-id="{{ item.id }}" data-item-name="{{ item.name }}" aria-checked="{{ 'true' if item.is_active else 'false' }}" aria-label="{{ item.name }} {{ '비활성화' if item.is_active else '활성화' }}"><span aria-hidden="true"></span><b>{{ 'ON' if item.is_active else 'OFF' }}</b></button>
+{% endmacro %}

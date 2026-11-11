@@ -1,5 +1,6 @@
 """Read-only restaurant administration tree and local return locations."""
 from urllib.parse import parse_qs, urlencode, urlsplit
+from taxonomy_order import state
 
 PATH = '/admin/classifications/restaurant_subcategory'
 
@@ -47,7 +48,11 @@ def view(conn, rows, query):
                            opened=(bool(q) and 'open' not in query) or str(parent['id']) in opened))
     if groups and not q and 'open' not in query:
         groups[0]['opened'] = True
+    parent_ids = {food_id, *(r['id'] for r in roots)}
+    order_states = {p: state(conn, p) for p in parent_ids if p is not None}
+    next_orders = {p: len(s['items']) + 1 for p, s in order_states.items()}
     return dict(groups=groups, total=len(items), group_count=len(roots), q=q,
+                order_states=order_states, next_orders=next_orders,
                 food_id=food_id, restaurant_parents=([food] if food else []) + [
                     r for r in roots if r['parent_id'] == food_id and not r['is_legacy']],
                 new_parent=query.get('new', ''), taxonomy_path=PATH)
