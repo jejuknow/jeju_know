@@ -1104,6 +1104,7 @@ def create_app(test_config=None):
             flash(request, "이름(1~40자, ‘전체’ 제외), 영문 슬러그(소문자·숫자·하이픈), 순서(0~9999)를 확인해 주세요.", "error")
             return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
         kind = str(form.get("type", "place"))
+        return_url = admin_return(form, "/admin/categories")
         conn = connect_db()
         try:
             with conn:
@@ -1120,7 +1121,7 @@ def create_app(test_config=None):
                 if kind == 'cafe_feature' and policy not in ('review', 'admin'):
                     raise ValueError('회원 선택 권한은 제안 가능 또는 관리자 전용으로 선택해주세요.')
                 if category_id is None:
-                    conn.execute("INSERT INTO categories(name,slug,sort_order,is_active,type,parent_id,member_policy) VALUES (?,?,?,?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1"), kind, parent_id, policy))
+                    category_id = conn.execute("INSERT INTO categories(name,slug,sort_order,is_active,type,parent_id,member_policy) VALUES (?,?,?,?,?,?,?)", (name, slug, order, int(form.get("is_active") == "1"), kind, parent_id, policy)).lastrowid
                 else:
                     # The stable slug survives renaming so shared map URLs continue to work.
                     conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), parent_id, category_id))
@@ -1133,13 +1134,17 @@ def create_app(test_config=None):
                         conn.execute("UPDATE categories SET legacy_aliases=? WHERE id=?", (json.dumps(aliases, ensure_ascii=False), category_id))
                     conn.execute("UPDATE places SET category=? WHERE category_id=?", (name, category_id))
             flash(request, "카테고리를 저장했습니다. 방문자 화면에 바로 반영됩니다.")
+            if kind == 'restaurant_subcategory':
+                from admin_restaurant_taxonomy import saved_location
+                food_id = conn.execute("SELECT id FROM categories WHERE slug='food'").fetchone()[0]
+                return_url = saved_location(return_url, category_id, parent_id, food_id)
         except sqlite3.IntegrityError:
             flash(request, "같은 상위 분류에서 사용 중인 이름 또는 중복 슬러그입니다.", "error")
         except ValueError as exc:
             flash(request, str(exc), "error")
         finally:
             conn.close()
-        return RedirectResponse(admin_return(form, "/admin/categories"), status_code=303)
+        return RedirectResponse(return_url, status_code=303)
 
     @app.post("/admin/categories/new")
     async def admin_category_new(request: Request):

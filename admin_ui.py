@@ -329,6 +329,11 @@ class AdminUI:
         if kind not in KINDS: return HTMLResponse("분류를 찾을 수 없습니다.", status_code=404)
         with closing(self.db()) as conn:
             all_categories = [dict(r) for r in conn.execute('SELECT * FROM categories ORDER BY sort_order,id')]
+            if kind == 'restaurant_subcategory':
+                from admin_restaurant_taxonomy import view
+                return self.render(request, 'restaurant_classifications.html',
+                                   kind=kind, is_catalog=False,
+                                   **view(conn, all_categories, request.query_params))
             food = next((r for r in all_categories if r['slug']=='food'), None)
             restaurant_parents = ([food] + [r for r in all_categories if r['parent_id']==food['id'] and not r['is_legacy']]) if food else []
             if kind in TYPES:
@@ -337,8 +342,6 @@ class AdminUI:
                 for item in items:
                     item['place_count'] = usage_count(conn,item['id'])
                     item['parent_name'] = by_id.get(item['parent_id'],{}).get('name','')
-                if kind == 'restaurant_subcategory':
-                    items.sort(key=lambda r: (r['is_legacy'], by_id[r['parent_id']]['sort_order'] if r['parent_id']!=food['id'] else r['sort_order'], r['parent_id'] if r['parent_id']!=food['id'] else r['id'], 0 if r['parent_id']==food['id'] else 1, r['sort_order'], r['id']))
             else:
                 items = [{**i, "name": i["label"], "place_count": catalog_usage(conn, kind, i["value"]), "child_count": 0} for i in catalog(conn, kind, True)]
         q = request.query_params.get("q", "").strip()[:200]
