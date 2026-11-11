@@ -5,11 +5,8 @@ from admin_settings import catalog
 from new_visibility import new_clause
 from restaurant_taxonomy import branch_terms, descendants, official_terms, validate_link_selection
 
-CORE_ORDER = {"food": 0, "cafe": 1, "attraction": 2}
-
-
 def navigation_order(categories):
-    return sorted(categories, key=lambda c: (0 if c["slug"] in CORE_ORDER else 1, c["sort_order"], c["id"]))
+    return sorted(categories, key=lambda c: (c["sort_order"], c["id"]))
 
 
 def taxonomy(conn, regions, companions, include_inactive=False):

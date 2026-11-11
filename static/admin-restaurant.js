@@ -1,7 +1,7 @@
-/* Restaurant-only disclosure state; all mutations use existing guarded routes. */
+/* Shared slug controls and taxonomy location state; writes use guarded routes. */
 (() => {
   'use strict';
-  const root = document.getElementById('restaurantTaxonomy');
+  const root = document.querySelector('[data-taxonomy-admin]');
   if (!root) return;
   root.querySelectorAll('[data-taxonomy-slug]').forEach(settings => {
     const edit = settings.querySelector('[data-slug-edit]');
@@ -26,7 +26,7 @@
   const opened = () => groups.filter(g => g.open).map(g => g.dataset.taxonomyGroup).join(',');
   let restoring = false;
   function remember() {
-    if (restoring) return;
+    if (restoring || !groups.length) return;
     const url = new URL(location.href);
     url.searchParams.set('open', opened());
     const target = document.getElementById(url.hash.slice(1));
@@ -83,7 +83,7 @@
   }));
   root.addEventListener('submit', event => {
     const form = event.target;
-    if (form.method !== 'post') return;
+    if (form.method !== 'post' || !groups.length) return;
     const next = form.elements.namedItem('next');
     if (!next) return;
     const url = new URL(next.value, location.origin);

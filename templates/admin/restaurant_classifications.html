@@ -2,7 +2,7 @@
 {% from 'admin/_classification_editor.html' import editor with context %}
 {% from 'admin/_ui.html' import badge %}
 {% from 'admin/_taxonomy_inline.html' import order, toggle with context %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-order">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-standard">{% endblock %}
 {% macro controls(item, group) %}
   {% set target = taxonomy_path~'?open='~group.id~'#taxonomy-'~item.id %}
   <details class="admin-inline-editor" id="edit-taxonomy-{{ item.id }}"><summary class="mini-btn">수정</summary><div class="admin-review-detail">{{ editor(item, return_to=target) }}</div></details>
@@ -12,7 +12,7 @@
   </form>
 {% endmacro %}
 {% block admin_content %}
-<div class="restaurant-taxonomy" id="restaurantTaxonomy" data-searching="{{ 'true' if q else 'false' }}">
+<div class="restaurant-taxonomy taxonomy-admin" id="restaurantTaxonomy" data-taxonomy-admin data-searching="{{ 'true' if q else 'false' }}">
   <script type="application/json" id="taxonomyOrderStates">{{ order_states|tojson }}</script>
   <div class="taxonomy-live-status" role="status" aria-live="polite" data-taxonomy-status hidden></div>
   <p class="admin-page-description">대분류와 세부유형을 관리합니다. 사용 중인 분류는 삭제할 수 없으며, 비활성화해도 기존 장소 정보는 보존됩니다.</p>
@@ -39,6 +39,6 @@
   </div>
   <details class="admin-panel admin-add-panel" id="addClassification" {% if new_parent==food_id|string %}open{% endif %}><summary>+ 대분류 추가</summary><div class="admin-editor-body">{{ editor(parent_id=food_id, return_to=taxonomy_path~'?new='~food_id~'#addClassification') }}</div></details>
 </div>
-<script src="/static/admin-restaurant.js?v=20261111-order" defer></script>
-<script src="/static/admin-taxonomy-order.js?v=20261111-order" defer></script>
+<script src="/static/admin-restaurant.js?v=20261111-standard" defer></script>
+<script src="/static/admin-taxonomy-order.js?v=20261111-standard" defer></script>
 {% endblock %}

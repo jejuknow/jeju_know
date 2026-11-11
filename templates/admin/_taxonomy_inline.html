@@ -7,5 +7,5 @@
 </div>
 {% endmacro %}
 {% macro toggle(item) %}
-<button type="button" role="switch" class="taxonomy-toggle" data-taxonomy-active data-item-id="{{ item.id }}" data-item-name="{{ item.name }}" aria-checked="{{ 'true' if item.is_active else 'false' }}" aria-label="{{ item.name }} {{ '비활성화' if item.is_active else '활성화' }}"><span aria-hidden="true"></span><b>{{ 'ON' if item.is_active else 'OFF' }}</b></button>
+<button type="button" role="switch" class="taxonomy-toggle" data-taxonomy-active data-item-id="{{ item.id }}" data-item-name="{{ item.name }}" {% if item.core_protected %}data-active-protected title="서비스 연결에 필요한 기본 카테고리입니다" {% if item.is_active %}disabled{% endif %}{% endif %} aria-checked="{{ 'true' if item.is_active else 'false' }}" aria-label="{{ item.name }} {{ '비활성화' if item.is_active else '활성화' }}"><span aria-hidden="true"></span><b>{{ 'ON' if item.is_active else 'OFF' }}</b></button>
 {% endmacro %}

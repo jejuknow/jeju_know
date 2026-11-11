@@ -1,4 +1,39 @@
-{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge,pager,page_size %}
+{% extends 'admin/base.html' %}
 {% from 'admin/_classification_editor.html' import editor with context %}
-{% block admin_content %}<p class="admin-page-description">사용 중인 분류는 삭제할 수 없습니다. 비활성화해도 기존 장소 정보는 보존됩니다.</p><form method="get" class="admin-filters"><div class="admin-search-row"><label class="admin-search-input">이름 검색<input type="search" name="q" value="{{ filters.get('q','') }}" maxlength="200"></label>{% if request.url.path=='/admin/categories' %}<input type="hidden" name="type" value="{{ kind }}">{% endif %}{{ page_size(pagination.size) }}<button class="primary-inline">검색</button><a class="secondary-btn" href="/admin/classifications/{{ kind }}">초기화</a><a class="primary-inline admin-create" href="#addClassification">+ {{ kind_label }} 추가</a></div></form>
-<section class="admin-panel"><div class="admin-data-wrap"><table class="admin-data-table"><thead><tr><th>번호</th><th>이름</th><th>활성</th><th>노출 순서</th><th>사용 장소 수</th><th>관리</th></tr></thead><tbody>{% for item in items %}<tr><td data-label="번호">{{ pagination.offset+loop.index if is_catalog else item.id }}</td><td data-label="이름" class="admin-cell-title"><strong>{{ '↳ ' if kind=='restaurant_subcategory' and item.parent_id!=food_id else '' }}{{ item.name }}</strong>{% if kind=='restaurant_subcategory' %}<small>{{ item.parent_name }}{% if item.is_legacy %} · 기존 값 보존{% elif item.parent_id==food_id %} · 대분류{% else %} · 세부유형{% endif %}</small>{% endif %}{% if kind=="cafe_feature" %}<small>{{ "관리자 전용" if item.member_policy=="admin" else "회원 제안 가능" }}</small>{% endif %}{% if kind=="cafe_feature" and item.is_legacy %}<small>기존 값 보존 · 신규 선택 제외</small>{% endif %}<small class="text-token">{{ item.value if is_catalog else item.slug }}</small></td><td data-label="활성">{{ badge('ON' if item.is_active else 'OFF','success' if item.is_active else 'neutral') }}</td><td data-label="순서">{{ item.sort_order }}</td><td data-label="사용 장소">{{ item.place_count }}곳</td><td data-label="관리" class="admin-cell-actions"><details class="admin-inline-editor"><summary class="mini-btn">수정</summary><div class="admin-review-detail">{{ editor(item) }}</div></details><form method="post" action="{{ '/admin/classifications/'~kind if is_catalog else '/admin/categories/'~item.id~'/delete' }}" data-confirm="사용하지 않는 ‘{{ item.name }}’ 분류를 삭제하시겠습니까?" data-confirm-word="삭제"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="/admin/classifications/{{ kind }}">{% if is_catalog %}<input type="hidden" name="action" value="delete"><input type="hidden" name="value" value="{{ item.value }}">{% endif %}<button class="mini-btn danger" {% if item.place_count or item.child_count %}disabled title="현재 {{ item.place_count }}개 장소에서 사용 중입니다. 수정에서 비활성화할 수 있습니다."{% endif %}>{{ '삭제 불가' if item.place_count or item.child_count else '삭제' }}</button></form></td></tr>{% else %}<tr><td colspan="6" class="admin-empty">조건에 맞는 분류가 없습니다.</td></tr>{% endfor %}</tbody></table></div>{{ pager(pagination) }}</section><details class="admin-panel admin-add-panel" id="addClassification"><summary>+ {{ kind_label }} 추가</summary><div class="admin-editor-body">{{ editor() }}</div></details>{% endblock %}
+{% from 'admin/_taxonomy_inline.html' import order,toggle with context %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261111-standard">{% endblock %}
+{% block admin_content %}
+<div class="taxonomy-admin" data-taxonomy-admin data-searching="{{ 'true' if q else 'false' }}" data-reorder-url="{{ taxonomy_path }}/reorder" data-active-url="{{ taxonomy_path }}/{id}/active">
+  <script type="application/json" id="taxonomyOrderStates">{{ order_states|tojson }}</script>
+  <div class="taxonomy-live-status" role="status" aria-live="polite" data-taxonomy-status hidden></div>
+  <p class="admin-page-description">사용 중인 분류는 삭제할 수 없습니다. 비활성화해도 기존 장소 정보는 보존됩니다.</p>
+  {% if kind=='place' %}<p class="taxonomy-order-hint">맛집·카페·가볼 곳은 서비스 핵심 카테고리로 비활성화와 슬러그 변경을 제한합니다. 순서와 표시 이름은 수정할 수 있습니다.</p>{% endif %}
+  <form method="get" action="{{ taxonomy_path }}" class="admin-filters"><div class="admin-search-row">
+    <label class="admin-search-input">{{ kind_label }} 검색<input type="search" name="q" value="{{ q }}" maxlength="200" placeholder="이름으로 검색"></label>
+    <button class="primary-inline">검색</button><a class="secondary-btn" href="{{ taxonomy_path }}">초기화</a>
+    <a class="primary-inline admin-create" href="{{ taxonomy_path }}?new=1#addClassification">+ {{ kind_label }} 추가</a>
+  </div></form>
+  <div class="taxonomy-toolbar"><p>전체 <strong>{{ total }}개</strong>{% if q %} · 검색 {{ items|length }}개{% endif %}<small>비활성 항목과 기존 값 보존 항목을 포함합니다.</small></p></div>
+  <p class="taxonomy-order-hint">{{ '순서 변경은 검색을 초기화한 후 사용할 수 있습니다.' if q else '☰ 손잡이를 끌거나 ↑ ↓ 버튼으로 순서를 변경하세요. 변경사항은 바로 저장됩니다.' }}</p>
+  <section class="admin-panel" id="taxonomyList"><div class="admin-data-wrap" tabindex="0" role="region" aria-label="{{ kind_label }} 목록"><table class="admin-data-table">
+    <thead><tr><th>순서</th><th>이름</th><th>활성</th><th>사용 장소 수</th><th>관리</th></tr></thead>
+    <tbody data-order-group="{{ kind }}">
+      {% for item in items %}<tr id="taxonomy-{{ item.id }}" data-order-item="{{ item.id }}">
+        <td>{{ order(item) }}</td>
+        <td class="admin-cell-title"><strong>{{ item.name }}</strong>{% if kind=='cafe_feature' %}<small>{{ '관리자 전용' if item.member_policy=='admin' else '회원 제안 가능' }}</small>{% if item.is_legacy %}<small>기존 값 보존 · 신규 선택 제외</small>{% endif %}{% endif %}</td>
+        <td>{{ toggle(item) }}</td><td>{{ item.place_count }}곳</td>
+        <td class="admin-cell-actions"><details class="admin-inline-editor" id="edit-taxonomy-{{ item.id }}"><summary class="mini-btn">수정</summary><div class="admin-review-detail">{{ editor(item, return_to=taxonomy_path~'#taxonomy-'~item.id) }}</div></details>
+          <form method="post" action="{{ taxonomy_path if is_catalog else '/admin/categories/'~item.id~'/delete' }}" data-confirm="사용하지 않는 ‘{{ item.name }}’ 분류를 삭제하시겠습니까?" data-confirm-word="삭제">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ taxonomy_path }}#taxonomy-{{ item.id }}">
+            {% if is_catalog %}<input type="hidden" name="action" value="delete"><input type="hidden" name="value" value="{{ item.value }}">{% endif %}
+            <button class="mini-btn danger" {% if item.place_count or item.child_count or item.core_protected %}disabled title="현재 사용 중인 분류 또는 핵심 카테고리는 삭제할 수 없습니다."{% endif %}>{{ '삭제 불가' if item.place_count or item.child_count or item.core_protected else '삭제' }}</button>
+          </form>
+        </td>
+      </tr>{% else %}<tr><td colspan="5" class="admin-empty">조건에 맞는 분류가 없습니다.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></section>
+  <details class="admin-panel admin-add-panel" id="addClassification" {% if new_parent %}open{% endif %}><summary>+ {{ kind_label }} 추가</summary><div class="admin-editor-body">{{ editor() }}</div></details>
+</div>
+<script src="/static/admin-restaurant.js?v=20261111-standard" defer></script>
+<script src="/static/admin-taxonomy-order.js?v=20261111-standard" defer></script>
+{% endblock %}

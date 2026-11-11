@@ -28,13 +28,13 @@ class TaxonomyTest(unittest.TestCase):
     def term(self, slug):
         return next(t for t in self.config()['terms'] if t['slug'] == slug)
 
-    def test_existing_ten_names_core_order_and_shared_pages(self):
+    def test_existing_names_db_order_and_shared_pages(self):
         seed = json.loads(SEED_PATH.read_text(encoding='utf-8'))
         self.assertEqual([t['name'] for t in self.config()['terms'] if t['type']=='cafe_feature'], [name for _,name in FEATURES])
         self.assertEqual(len([t for t in self.config()['terms'] if t['type']=='restaurant_subcategory' and not t['is_legacy']]),61)
         self.setup_admin_and_login()
         self.post('/admin/categories/new',name='직접 분류',slug='custom',sort_order='0',is_active='1')
-        self.assertEqual([t['slug'] for t in self.config()['categories']][:3],['food','cafe','attraction'])
+        self.assertEqual([t['slug'] for t in self.config()['categories']],['custom','food','cafe','attraction'])
         for url in ('/','/map','/places','/admin/categories','/admin/places/new'):
             self.assertEqual(self.client.get(url).status_code,200)
         home=self.client.get('/').text

@@ -334,20 +334,9 @@ class AdminUI:
                 return self.render(request, 'restaurant_classifications.html',
                                    kind=kind, is_catalog=False,
                                    **view(conn, all_categories, request.query_params))
-            food = next((r for r in all_categories if r['slug']=='food'), None)
-            restaurant_parents = ([food] + [r for r in all_categories if r['parent_id']==food['id'] and not r['is_legacy']]) if food else []
-            if kind in TYPES:
-                items = [dict(r) for r in conn.execute("SELECT c.*,(SELECT count(*) FROM places p WHERE p.category_id=c.id)+(SELECT count(*) FROM place_category_links l WHERE l.category_id=c.id) AS place_count,(SELECT count(*) FROM categories child WHERE child.parent_id=c.id) AS child_count FROM categories c WHERE c.type=? ORDER BY c.sort_order,c.id", (kind,))]
-                by_id = {r['id']:r for r in all_categories}
-                for item in items:
-                    item['place_count'] = usage_count(conn,item['id'])
-                    item['parent_name'] = by_id.get(item['parent_id'],{}).get('name','')
-            else:
-                items = [{**i, "name": i["label"], "place_count": catalog_usage(conn, kind, i["value"]), "child_count": 0} for i in catalog(conn, kind, True)]
-        q = request.query_params.get("q", "").strip()[:200]
-        if q: items = [i for i in items if q.casefold() in i["name"].casefold()]
-        page = paginate(request, len(items))
-        return self.render(request, "classifications.html", kind=kind, kind_label=KINDS[kind], items=items[page["offset"]:page["offset"]+page["size"]], pagination=page, is_catalog=kind not in TYPES, restaurant_parents=restaurant_parents, food_id=food['id'] if food else None)
+            from admin_taxonomy import flat_view
+            context = flat_view(conn, kind, request.query_params)
+        return self.render(request, 'classifications.html', kind=kind, kind_label=KINDS[kind], **context)
 
     def best(self, request):
         if response := self.guard(request): return response
@@ -403,32 +392,18 @@ class AdminUI:
             form = await self.checked(request)
             if form is None: return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
             if kind not in ("region", "companion", "cafe_focus"): return HTMLResponse("분류를 확인해주세요.", status_code=400)
-            value, label, action = str(form.get("value", "")).strip(), str(form.get("name", "")).strip(), form.get("action")
-            if action not in ("new", "edit", "delete") or not value or len(value)>40 or len(label)>40 or any(c in value for c in '\n\r,<>'):
-                return HTMLResponse("분류 이름과 식별자를 확인해주세요.", status_code=400)
-            if kind == "cafe_focus" and not re.fullmatch(r"[a-z][a-z0-9-]{0,39}", value):
-                return HTMLResponse("카페 성향 식별자는 영문 소문자로 입력해주세요.", status_code=400)
-            with closing(self.db()) as conn, conn:
-                conn.execute("BEGIN IMMEDIATE")
-                items = catalog(conn, kind, True)
-                old = next((i for i in items if i["value"] == value), None)
-                if (action == "new" and old) or (action != "new" and not old):
-                    return HTMLResponse("중복되거나 없는 분류입니다.", status_code=409)
-                if action == "delete":
-                    if catalog_usage(conn, kind, value): return HTMLResponse("사용 중인 분류는 삭제할 수 없습니다. 비활성화를 이용해주세요.", status_code=409)
-                    items.remove(old)
-                else:
-                    if not label or label in ("전체", "상관없음") or any(i["label"] == label and i["value"] != value for i in items):
-                        return HTMLResponse("중복되지 않는 표시 이름을 입력해주세요.", status_code=400)
-                    order = integer(form.get("sort_order"), -1, 0, 9999)
-                    if order < 0: return HTMLResponse("순서를 확인해주세요.", status_code=400)
-                    item = dict(value=value, label=label, sort_order=order, is_active=form.get("is_active")=="1")
-                    if old: items[items.index(old)] = item
-                    else: items.append(item)
-                write_setting(conn, "taxonomy:" + kind, items)
-                audit(conn,request,"분류 변경","분류",None,kind)
+            from admin_taxonomy import save_catalog as save_items, CatalogConflict
+            try:
+                with closing(self.db()) as conn, conn:
+                    conn.execute('BEGIN IMMEDIATE')
+                    target = save_items(conn, kind, form)
+                    audit(conn,request,'분류 변경','분류',None,kind)
+            except CatalogConflict as exc:
+                return HTMLResponse(str(exc), status_code=409)
+            except ValueError as exc:
+                return HTMLResponse(str(exc), status_code=400)
             self.flash(request, "분류를 저장했습니다. 기존 장소의 값과 공유 URL은 유지됩니다.")
-            return RedirectResponse("/admin/classifications/" + kind, 303)
+            return RedirectResponse(target, 303)
 
         @app.get("/admin/settings/{section}")
         async def settings_get(request: Request, section: str):

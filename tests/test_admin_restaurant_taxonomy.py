@@ -129,11 +129,13 @@ class RestaurantAdminTest(unittest.TestCase):
         self.assertFalse(self.rows('SELECT id FROM categories WHERE id=?',(unused,)))
         self.assertEqual(len(self.rows('SELECT * FROM place_category_links WHERE place_id=?',(place['id'],))),4)
 
-    def test_other_classifications_keep_existing_pagination_and_editor(self):
+    def test_other_classifications_share_flat_controls_and_keep_editor(self):
         for kind in ('region','place','cafe_feature','companion'):
             response=self.admin.get('/admin/classifications/'+kind)
             self.assertEqual(response.status_code,200)
-            self.assertIn('admin-pagination',response.text)
+            self.assertNotIn('admin-pagination',response.text)
+            self.assertIn('data-taxonomy-admin',response.text)
+            self.assertIn('admin-inline-editor',response.text)
             self.assertNotIn('restaurantTaxonomy',response.text)
         alias=self.admin.get('/admin/categories?type=restaurant_subcategory')
         self.assertIn('restaurantTaxonomy',alias.text)

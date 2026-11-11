@@ -1,7 +1,7 @@
-/* Restaurant siblings only; guarded server writes are authoritative. */
+/* Shared taxonomy controls; guarded server writes are authoritative. */
 (() => {
   'use strict';
-  const root = document.getElementById('restaurantTaxonomy');
+  const root = document.querySelector('[data-taxonomy-admin]');
   if (!root) return;
   const states = JSON.parse(document.getElementById('taxonomyOrderStates').textContent);
   const searching = root.dataset.searching === 'true';
@@ -37,7 +37,9 @@
             (button.dataset.orderStep === '-1' ? index === 0 : index === rows.length - 1);
         });
         own(row, '[data-order-drag]').forEach(button => { button.disabled = busy || stale || searching || !complete; });
-        own(row, '[data-taxonomy-active]').forEach(button => { button.disabled = busy || stale; });
+        own(row, '[data-taxonomy-active]').forEach(button => {
+          button.disabled = busy || stale || (button.hasAttribute('data-active-protected') && button.getAttribute('aria-checked') === 'true');
+        });
       });
     });
     root.setAttribute('aria-busy', String(busy));
@@ -47,12 +49,12 @@
     if (group === groups[0]) {
       const nav = root.querySelector('.taxonomy-jumps');
       current.items.forEach(record => {
-        const link = nav.querySelector('[data-taxonomy-jump="' + record.id + '"]');
+        const link = nav?.querySelector('[data-taxonomy-jump="' + record.id + '"]');
         if (link) nav.append(link);
       });
     }
     items(group).forEach(row => {
-      const record = current.items.find(item => item.id === Number(row.dataset.orderItem));
+      const record = current.items.find(item => String(item.id) === row.dataset.orderItem);
       if (!record) return;
       own(row, '[data-order-number]').forEach(node => { node.textContent = record.sort_order; });
       own(row, '[data-taxonomy-active]').forEach(button => {
@@ -122,8 +124,9 @@
     next.forEach(item => group.append(item));
     next.forEach((item, i) => own(item, '[data-order-number]').forEach(node => { node.textContent = i + 1; }));
     if (focus instanceof HTMLElement) focus.focus({preventScroll: true});
-    persist(group, '/admin/categories/reorder', {
-      parent_id: group.dataset.orderGroup, ordered_ids: JSON.stringify(next.map(item => Number(item.dataset.orderItem)))
+    persist(group, root.dataset.reorderUrl || '/admin/categories/reorder', {
+      parent_id: group.dataset.orderGroup, ordered_ids: JSON.stringify(next.map(row =>
+        states[group.dataset.orderGroup].items.find(item => String(item.id) === row.dataset.orderItem).id))
     }, () => { original.forEach(item => group.append(item)); renderState(group); });
   }
   root.addEventListener('click', event => {
@@ -137,7 +140,8 @@
       const row = toggle.closest('[data-order-item]'), group = row.closest('[data-order-group]');
       const active = toggle.getAttribute('aria-checked') !== 'true';
       toggle.setAttribute('aria-checked', String(active)); toggle.querySelector('b').textContent = active ? 'ON' : 'OFF';
-      persist(group, '/admin/categories/' + toggle.dataset.itemId + '/active', {is_active: active ? '1' : '0'}, () => renderState(group));
+      const path = root.dataset.activeUrl?.replace('{id}', encodeURIComponent(toggle.dataset.itemId)) || '/admin/categories/' + toggle.dataset.itemId + '/active';
+      persist(group, path, {is_active: active ? '1' : '0'}, () => renderState(group));
     }
   });
   function clearDrag() {
@@ -183,7 +187,7 @@
   root.addEventListener('keydown', event => { if (event.key === 'Escape') clearDrag(); });
   root.querySelectorAll('[data-order-new]').forEach(input => {
     const parent = input.form.elements.namedItem('parent_id');
-    parent.addEventListener('change', () => { input.value = (states[parent.value]?.items.length || 0) + 1; });
+    parent?.addEventListener('change', () => { input.value = (states[parent.value]?.items.length || 0) + 1; });
   });
   groups.forEach(renderState);
   controls();

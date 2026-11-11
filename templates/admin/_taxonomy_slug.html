@@ -5,11 +5,13 @@
     <input type="hidden" name="original_slug" value="{{ item.slug }}">
     <label>슬러그<input name="slug" value="{{ item.slug }}" maxlength="80" readonly data-slug-input></label>
     <small>현재 {{ item.place_count }}곳에서 사용 중 · 하위 분류 {{ item.child_count }}개. 장소 연결과 부모 관계는 DB ID로 유지됩니다.</small>
+    {% if item.core_protected %}<p>서비스 연결에 필요한 기본 카테고리의 슬러그는 변경할 수 없습니다.</p>{% else %}
     <label class="check"><input type="checkbox" name="slug_edit" value="1" data-slug-edit>슬러그 직접 수정</label>
     <div class="taxonomy-slug-warning" data-slug-confirm hidden>
       <p>슬러그를 변경하면 기존 필터·URL·CSV 연동에 영향을 줄 수 있습니다. 필요한 경우에만 변경해주세요.</p>
       <label class="check"><input type="checkbox" name="slug_change_confirm" value="1">연결에 미치는 영향을 확인했으며 슬러그 변경에 동의합니다.</label>
     </div>
+    {% endif %}
   {% else %}
     <label>슬러그 (선택)<input name="slug" maxlength="80" placeholder="비워두면 서버에서 자동 생성"></label>
     <small>이름만 입력해도 저장할 수 있습니다. 직접 지정할 때만 영문 소문자·숫자·하이픈을 사용해주세요.</small>

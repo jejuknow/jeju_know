@@ -352,6 +352,8 @@ def create_app(test_config=None):
         migrate_auto_publish(app.state.database)
         from taxonomy_order import migrate as migrate_taxonomy_order
         migrate_taxonomy_order(app.state.database)
+        from taxonomy_order import standardize
+        standardize(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -1116,6 +1118,8 @@ def create_app(test_config=None):
                 if category_id and not original:
                     return HTMLResponse("카테고리를 찾을 수 없습니다.", status_code=404)
                 if original:
+                    if form.get('type') and form['type'] != original['type']:
+                        raise ValueError('기존 분류의 유형은 변경할 수 없습니다.')
                     kind = original['type']
                 if kind not in TYPES:
                     return HTMLResponse("분류 유형을 확인해 주세요.", status_code=400)
@@ -1123,11 +1127,11 @@ def create_app(test_config=None):
                 requested_order = order
                 if order is None:
                     order = original['sort_order'] if original else 0
-                if kind == 'restaurant_subcategory':
-                    from taxonomy_slugs import restaurant_slug
-                    slug = restaurant_slug(conn, form, name, parent_id, original)
-                elif not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) or len(slug) > 80:
-                    raise ValueError('영문 슬러그(소문자·숫자·하이픈, 1~80자)를 확인해 주세요.')
+                from taxonomy_slugs import category_slug
+                from taxonomy_order import protect_active
+                slug = category_slug(conn, form, name, parent_id, original, kind)
+                if original:
+                    protect_active(dict(original), form.get('is_active') == '1')
                 policy = str(form.get('member_policy', original['member_policy'] if original else 'review'))
                 if kind == 'cafe_feature' and policy not in ('review', 'admin'):
                     raise ValueError('회원 선택 권한은 제안 가능 또는 관리자 전용으로 선택해주세요.')
@@ -1136,7 +1140,7 @@ def create_app(test_config=None):
                 else:
                     # Name edits keep the stable slug; restaurant changes require explicit confirmation.
                     conn.execute("UPDATE categories SET name=?,sort_order=?,is_active=?,parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (name, order, int(form.get("is_active") == "1"), parent_id, category_id))
-                    if kind == 'restaurant_subcategory' and slug != original['slug']:
+                    if slug != original['slug']:
                         conn.execute('UPDATE categories SET slug=? WHERE id=?', (slug, category_id))
                     if kind == 'cafe_feature':
                         conn.execute('UPDATE categories SET member_policy=? WHERE id=?', (policy, category_id))
@@ -1146,14 +1150,16 @@ def create_app(test_config=None):
                         aliases = list(dict.fromkeys([*parse_json_list(original["legacy_aliases"]), original["name"]]))
                         conn.execute("UPDATE categories SET legacy_aliases=? WHERE id=?", (json.dumps(aliases, ensure_ascii=False), category_id))
                     conn.execute("UPDATE places SET category=? WHERE category_id=?", (name, category_id))
-                if kind == 'restaurant_subcategory':
-                    from taxonomy_order import position
-                    position(conn, category_id, parent_id, requested_order, original)
+                from taxonomy_order import position
+                position(conn, category_id, parent_id, requested_order, original, kind)
             flash(request, "카테고리를 저장했습니다. 방문자 화면에 바로 반영됩니다.")
             if kind == 'restaurant_subcategory':
                 from admin_restaurant_taxonomy import saved_location
                 food_id = conn.execute("SELECT id FROM categories WHERE slug='food'").fetchone()[0]
                 return_url = saved_location(return_url, category_id, parent_id, food_id)
+            else:
+                from taxonomy_order import flat_location
+                return_url = flat_location(kind, category_id)
         except sqlite3.IntegrityError:
             flash(request, "같은 상위 분류에서 사용 중인 이름 또는 중복 슬러그입니다.", "error")
         except ValueError as exc:
@@ -1186,22 +1192,31 @@ def create_app(test_config=None):
                 original = conn.execute('SELECT * FROM categories WHERE id=?', (category_id,)).fetchone()
                 count = usage_count(conn, category_id)
                 children = conn.execute("SELECT COUNT(*) FROM categories WHERE parent_id=?", (category_id,)).fetchone()[0]
-                if count:
+                from taxonomy_order import CORE_SLUGS
+                if original and original['type'] == 'place' and original['slug'] in CORE_SLUGS:
+                    flash(request, "서비스 연결에 필요한 기본 카테고리는 삭제할 수 없습니다.", "error")
+                elif count:
                     flash(request, f"현재 {count}개 장소에서 사용 중인 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
                 elif children:
                     flash(request, "하위 분류가 있는 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
                 else:
                     conn.execute("DELETE FROM categories WHERE id=?", (category_id,))
-                    if original and original['type'] == 'restaurant_subcategory':
+                    if original:
                         from taxonomy_order import compact, siblings
+                        compact(conn, original['parent_id'], original['type'])
+                    if original and original['type'] == 'restaurant_subcategory':
                         from admin_restaurant_taxonomy import saved_location
-                        compact(conn, original['parent_id'])
                         food_id = conn.execute("SELECT id FROM categories WHERE slug='food'").fetchone()[0]
                         remaining = siblings(conn, original['parent_id'])
                         target = original['parent_id'] if original['parent_id'] != food_id else (
                             remaining[min(max(original['sort_order'] - 1, 0), len(remaining) - 1)]['id'] if remaining else None)
                         if target is not None:
                             return_url = saved_location(return_url, target, food_id, food_id)
+                    elif original:
+                        from taxonomy_order import flat_location
+                        remaining = siblings(conn, original['parent_id'], original['type'])
+                        target = remaining[min(max(original['sort_order'] - 1, 0), len(remaining) - 1)]['id'] if remaining else None
+                        return_url = flat_location(original['type'], target)
                     flash(request, "사용하지 않는 카테고리를 삭제했습니다.")
         finally:
             conn.close()
