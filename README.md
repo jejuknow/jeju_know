@@ -11,12 +11,12 @@
 - 관리자 로그인: `/admin/login`
 - 장소 등록 / 조회 / 수정 / 삭제(CRUD)
 - 공개/비공개 즉시 전환
-- 저장 시 승인 절차 없이 즉시 반영
+- 관리자가 공개로 저장한 콘텐츠는 즉시 반영; 회원 등록 장소/ISSUE는 검토 후 공개
 - 삭제 시 확인창 후 즉시 삭제
 - JEJUNO PICK 설정
 - 예시 데이터 여부 표시
 - 주차/반려동물/아이동반/무장애를 `가능/불가/제한/미확인`으로 구분
-- 비밀번호는 PBKDF2 해시로 저장
+- 비밀번호는 Argon2id 해시로 저장 (기존 PBKDF2는 정상 로그인 시 전환)
 - 관리자 POST 작업에 간단한 CSRF 보호 적용
 
 ## 실행 방법 (Windows 기준)
@@ -57,7 +57,7 @@ Vercel을 계속 사용하려면 SQLite 파일 대신 서버리스 환경에 맞
 
 ## 공개/삭제 정책
 
-이 프로젝트에는 승인 상태가 없습니다.
+회원 등록 장소/ISSUE는 승인 전 공개되지 않습니다. 아래 항목은 관리자 작업 기준입니다.
 
 - 관리자 폼에서 `공개` 체크 후 저장 → 즉시 공개
 - 목록에서 `공개/비공개` 버튼 → 즉시 전환
@@ -136,3 +136,11 @@ www 없는 호스트가 앱에 도달하면 GET/HEAD는 경로와 query를 보�
 JSON-LD에는 실제 저장 정보만 사용합니다. 장소는 Restaurant/CafeOrCoffeeShop/TouristAttraction/Place, 날짜·행사장명·주소가 모두 있는 행사/전시/체험 ISSUE는 Event로 표시합니다. 시간이 없으면 날짜만 표시하며, 임의 별점·리뷰·가격·주최자는 만들지 않습니다. 검색 노출이나 리치 결과는 검색엔진의 판단이며, 소유 확인/색인 완료와 코드 배포 완료는 별개입니다.
 
 검증: `python -m unittest discover -s tests -p test_seo.py` (app import 전 `JEJUNO_DATA_DIR`를 테스트 전용 경로로 지정). [Google robots 규칙](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag), [Google Event 규칙](https://developers.google.com/search/docs/appearance/structured-data/event), [네이버 SEO 기본 가이드](https://searchadvisor.naver.com/guide/seo-basic-intro).
+
+## 운영 보안 설정
+
+- `JEJUNO_ENV` 기본값은 `production`입니다. 미설정 또는 `development` 이외 값에서는 `/docs`, `/redoc`, `/openapi.json` 라우트가 생성되지 않습니다. 로컬 문서가 필요한 경우에만 실행 환경에 `JEJUNO_ENV=development`를 설정합니다. `.env.example` 파일 자체가 자동 로드되는 것은 아닙니다.
+- `/admin/setup`은 활성 여부와 관계없이 관리자가 한 명이라도 있으면 GET/POST 모두 로그인 페이지로 이동합니다. 최초 생성은 SQLite `BEGIN IMMEDIATE` 안에서 존재 여부를 재확인하여 동시 bootstrap을 방지합니다.
+- 관리자 로그인은 기존 SQLite/HMAC rate limiter를 사용합니다. `app.py`의 `ADMIN_LOGIN_LIMIT=10`, `ADMIN_LOGIN_WINDOW_SECONDS=900`이 IP·아이디별 시도 한도와 `Retry-After`의 단일 기준입니다. 15분 고정 구간에서 모든 시도를 집계하며, 제한 후 시도는 만료를 연장하지 않습니다. 재배포 후에도 유지되고 기간 만료 후 정상 로그인할 수 있습니다.
+- 성공 로그인도 구간 카운터를 초기화하지 않습니다. 다른 계정의 성공으로 IP 보호를 우회하지 않도록 기존 정책을 유지합니다. 계정 자체를 영구 잠그지 않으며 2FA는 현재 구현하지 않았습니다.
+- Kakao 브라우저 키는 `KAKAO_MAP_JS_KEY` 환경변수로만 지정합니다. 실제 허용 도메인은 Kakao Developers 콘솔에서 별도로 확인해야 하며 코드만으로 보장할 수 없습니다.

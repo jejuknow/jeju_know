@@ -61,6 +61,8 @@ from issue_review import migrate as migrate_issue_review, candidates, submission
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = BASE_DIR / "data"
+ADMIN_LOGIN_LIMIT = 10
+ADMIN_LOGIN_WINDOW_SECONDS = 15 * 60
 
 REGIONS = [
     "제주시", "애월", "한림", "한경", "구좌", "조천", "성산", "표선",
@@ -155,7 +157,14 @@ def create_app(test_config=None):
         secret_key = secrets.token_urlsafe(48)
         secret_path.write_text(secret_key, encoding="utf-8")
 
-    app = FastAPI(title="JEJU_KNOW")
+    # Fail closed unless this is explicitly a development environment.
+    docs_enabled = os.environ.get("JEJUNO_ENV", "production").strip().lower() == "development"
+    app = FastAPI(
+        title="JEJU_KNOW",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+    )
     app.router.route_class = ClosedFormRoute
     app.state.database = str(database_path)
     app.state.testing = bool(test_config.get("TESTING"))
@@ -863,8 +872,13 @@ def create_app(test_config=None):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
         username = str(form.get("username", "")).strip()
         password = str(form.get("password", ""))
-        if rate_limited(connect_db, secret_key, "admin-login", [("ip", request.client.host if request.client else "unknown"), ("username", username[:200])]):
-            return HTMLResponse("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", status_code=429, headers={"Retry-After": "900"})
+        if rate_limited(
+            connect_db, secret_key, "admin-login",
+            [("ip", request.client.host if request.client else "unknown"), ("username", username[:200])],
+            limit=ADMIN_LOGIN_LIMIT, window=ADMIN_LOGIN_WINDOW_SECONDS,
+        ):
+            return HTMLResponse("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", status_code=429,
+                                headers={"Retry-After": str(ADMIN_LOGIN_WINDOW_SECONDS)})
         conn = connect_db()
         admin = conn.execute("SELECT * FROM admins WHERE username=?", (username,)).fetchone()
         conn.close()
