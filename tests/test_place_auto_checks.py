@@ -15,7 +15,7 @@ import test_community
 from user_place_auto_publish_migration import migrate, VERSION
 
 
-class AutoPublishTest(unittest.TestCase):
+class PlaceChecksModerationTest(unittest.TestCase):
     setUp = test_community.CommunityTest.setUp
     tearDown = test_community.CommunityTest.tearDown
     rows = test_community.CommunityTest.rows
@@ -38,21 +38,23 @@ class AutoPublishTest(unittest.TestCase):
                                   files={'image_0':('photo.png',image.getvalue(),'image/png')}, follow_redirects=False)
         self.assertEqual(result.status_code,303,result.text)
         row = self.rows('SELECT * FROM places')[0]
-        self.assertEqual((row['auto_check_status'], row['published'], row['verification_status']),('normal',1,'unverified'))
+        self.assertEqual((row['auto_check_status'], row['published'], row['verification_status']),('normal',0,'unverified'))
+        self.assertEqual(self.api(),[])
+        self.assertEqual(self.post(self.admin,f"/admin/places/{row['id']}/toggle-published").status_code,303)
         self.assertEqual(self.api()[0]['status_label'],'사용자 등록')
         self.assertFalse(self.api()[0]['is_pick'])
         self.assertEqual(row['parking_status'],'미확인')
         self.assertEqual(row['business_hours'],'')
         self.assertEqual(self.rows('SELECT * FROM best_collection_places'),[])
-        log = self.rows('SELECT * FROM admin_activity_logs')[-1]
-        self.assertEqual(log['action'],'사용자 장소 자동 선공개')
+        log = self.rows("SELECT * FROM admin_activity_logs WHERE actor_member_id IS NOT NULL")[-1]
+        self.assertNotEqual(log['action'],'사용자 장소 자동 선공개')
         self.assertEqual(log['admin_id'],None)
         self.assertEqual(log['actor_member_id'],row['submitted_by_user_id'])
 
     def test_review_without_photo_and_near_similar(self):
         self.place(name='제주 바람 카페')
         p=self.place(name='제주 바람 카페점')
-        self.assertEqual((p['auto_check_status'],p['published']),('review',1))
+        self.assertEqual((p['auto_check_status'],p['published']),('review',0))
         self.assertEqual(set(json.loads(p['auto_check_reason'])),{'photo','similar'})
 
     def test_address_and_coordinate_boundary(self):
@@ -69,6 +71,7 @@ class AutoPublishTest(unittest.TestCase):
 
     def test_exact_alias_and_private_duplicate(self):
         p=self.place(name='Cafe 바람')
+        self.post(self.admin,f"/admin/places/{p['id']}/toggle-published")
         r=self.create(name='  CAFE  바람 ',address='제주 제주시 테스트로 123',duplicate_ack='1')
         self.assertEqual(r.status_code,409)
         self.assertIn('/place/'+p['slug'],r.text)
@@ -98,9 +101,9 @@ class AutoPublishTest(unittest.TestCase):
         self.assertEqual(self.rows('SELECT published FROM places WHERE id=?',(held['id'],))[0]['published'],0)
         self.assertEqual(self.post(self.member,f"/places/{held['id']}/edit",**self.form(name=held['name'])).status_code,303)
         self.assertEqual(self.rows('SELECT published FROM places WHERE id=?',(held['id'],))[0]['published'],0)
-        self.assertEqual(self.api()[0]['id'],p['id'])
+        self.assertEqual(self.api(),[])
 
-    def test_edit_rechecks_new_places_but_preserves_legacy_and_admin_hide(self):
+    def test_edit_rechecks_all_places_and_preserves_admin_hide(self):
         p=self.place()
         r=self.post(self.member,f"/places/{p['id']}/edit",**self.form(latitude='',longitude=''))
         self.assertEqual(r.status_code,303)
@@ -110,7 +113,7 @@ class AutoPublishTest(unittest.TestCase):
         self.assertEqual(self.api(),[])  # Fixing coordinates does not undo a hold/hide.
         self.execute("UPDATE places SET auto_check_status=NULL,auto_check_reason=NULL,auto_checked_at=NULL,published=1")
         self.post(self.member,f"/places/{p['id']}/edit",**self.form(latitude='',longitude='',address='이전 주소'))
-        self.assertEqual(len(self.api()),1)  # No retrospective policy changes to legacy places.
+        self.assertEqual(self.api(),[])  # Legacy edits also require a fresh admin review.
 
     def test_admin_queue_counts_sort_filters_and_settings(self):
         review=self.place(name='검사 확인 필요')
@@ -122,7 +125,7 @@ class AutoPublishTest(unittest.TestCase):
         filtered=self.admin.get('/admin/community?auto_check=hold').text
         self.assertIn(hold['name'],filtered);self.assertNotIn(review['name'],filtered)
         self.assertIn('장소 확인 우선',self.admin.get('/admin').text)
-        self.assertIn('사용자 장소 자동 선공개',self.admin.get('/admin/settings/general').text)
+        self.assertIn('검토 대기로 저장',self.admin.get('/admin/settings/general').text)
         from admin_ui import counters
         with closing(sqlite3.connect(self.database)) as conn:
             self.assertEqual(counters(conn)['auto'],{'normal':0,'review':1,'hold':1})

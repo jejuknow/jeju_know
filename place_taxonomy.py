@@ -72,7 +72,7 @@ def public_search(conn, category="", q="", region="", companion="", detail="", c
     # Retired orientation filters are never reinterpreted as specific cafe features.
     if focus:
         return []
-    clauses, params = ["p.published=1", "p.deleted_at IS NULL", "p.merged_into_id IS NULL"], []
+    clauses, params = ["p.published=1", "COALESCE(p.is_example,0)=0", "p.deleted_at IS NULL", "p.merged_into_id IS NULL"], []
     if pick not in ("", "current") or new not in ("", "current"):
         return []
     now = today()

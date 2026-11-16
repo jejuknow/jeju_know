@@ -24,7 +24,7 @@ from image_uploads import FORM_BYTES, ImageError, ImagePlan, optimize_upload
 from image_limits import MEMBER_PLACE_SLOTS
 from place_taxonomy import linked_ids, save_links
 from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, official_terms, form_values, form_selection
-from admin_settings import catalog, read_settings
+from admin_settings import catalog
 from place_auto_checks import (validate_address, duplicate_matches, inspect as inspect_place,
                                record as record_check, BURST_LIMIT, BURST_SECONDS)
 from submission_fields import CONTROL_FIELDS, TIME_OPTIONS, WEEKDAYS, controls, normalize_controls
@@ -78,7 +78,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
     @app.get("/new")
     async def new_page(request: Request, category: str = ""):
         with closing(connect_db()) as conn:
-            initial = initial_places(conn, request.query_params, row_to_place, new='current')
+            initial = initial_places(conn, request.query_params, row_to_place, limit=50, new='current')
         return render(request, "new_places.html", selected_category=category if category in ("cafe","food") else "", **initial)
 
     @app.get("/pick")
@@ -104,14 +104,11 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             if not collection:
                 return HTMLResponse("추천 모음을 찾을 수 없습니다.", status_code=404)
             rows = conn.execute("""SELECT p.* FROM best_collection_places b JOIN places p ON p.id=b.place_id
-                WHERE b.collection_id=? AND p.published=1 AND p.deleted_at IS NULL AND p.merged_into_id IS NULL ORDER BY b.sort_order,p.id""", (collection["id"],)).fetchall()
+                WHERE b.collection_id=? AND p.published=1 AND COALESCE(p.is_example,0)=0 AND p.deleted_at IS NULL AND p.merged_into_id IS NULL ORDER BY b.sort_order,p.id""", (collection["id"],)).fetchall()
         return render(request, "best.html", collection=dict(collection), places=[row_to_place(r, public=True) for r in rows], seo=collection_metadata(dict(collection)))
 
     def place_form(request, data=None, *, status=200, error=None, similar=None, new_only=False):
-        with closing(connect_db()) as conn:
-            auto_publish = read_settings(conn)["user_place_auto_publish"] is True
         return render(request, "member_place_form.html", status, place=data, error=error,
-                      auto_publish=auto_publish,
                       similar=similar or [], new_only=new_only, hours_ui=controls(data or {}),
                       time_options=TIME_OPTIONS, weekdays=WEEKDAYS, usage_labels=MEMBER_USAGE_LABELS,
                       **form_options(data.get("category_id") if data else None))
@@ -273,23 +270,13 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 save_links(conn, place_id, restaurant_ids)
             queue_proposal(conn, get_place(conn, place_id), user_id, proposal)
             plan.apply(conn, place_id)
-            published = bool(fresh and fresh["published"])
-            state = None
-            if not fresh or fresh["auto_check_status"] is not None:
-                has_photo = bool(conn.execute("SELECT 1 FROM images WHERE place_id=? LIMIT 1", (place_id,)).fetchone()
-                                 or (fresh and fresh["image_url"]))
-                state, reasons = inspect_place(data, similar=bool(similar), has_photo=has_photo,
-                    enabled=True if fresh else read_settings(conn)["user_place_auto_publish"] is True)
-                # A member edit can hide newly unsafe content, never undo an administrator's hide.
-                published = state != "hold" and (not fresh or bool(fresh["published"]))
-                conn.execute("UPDATE places SET published=? WHERE id=?", (int(published), place_id))
-                record_check(conn, place_id, state, reasons, published)
-        if not published:
-            message = "장소는 저장되었지만 추가 확인이 필요해 지도에는 아직 표시되지 않습니다. JEJU_KNOW 확인 후 공개될 수 있습니다."
-        elif state == "review":
-            message = "장소가 등록되었습니다. 현재 사용자 등록 장소로 표시되며, 일부 정보는 JEJU_KNOW에서 추가 확인할 예정입니다."
-        else:
-            message = "장소 수정사항을 저장했습니다." if fresh else "장소가 등록되었습니다. 사용자 등록 장소로 지도에 표시됩니다. JEJU_KNOW 확인 후 정보가 업데이트될 수 있습니다."
+            # Automated checks only prioritize review. A member never grants publication.
+            has_photo = bool(conn.execute("SELECT 1 FROM images WHERE place_id=? LIMIT 1", (place_id,)).fetchone())
+            state, reasons = inspect_place(data, similar=bool(similar), has_photo=has_photo, enabled=True)
+            published = False
+            conn.execute("UPDATE places SET published=0 WHERE id=?", (place_id,))
+            record_check(conn, place_id, state, reasons, False)
+        message = "등록한 내용은 관리자 확인 후 공개됩니다." if not fresh else "수정 내용을 저장했습니다. 관리자 확인 후 공개됩니다."
         flash(request, message + (" 세부 정보는 관리자 확인 후 반영됩니다." if proposal else ""))
         destination = "/place/" + slug if published else "/account/places#activity-" + str(place_id)
         # Fetch must not consume the flash on a followed redirect before browser navigation.

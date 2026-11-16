@@ -64,7 +64,7 @@ def public_items(conn, ranking):
     # Filter at the SQL boundary: hidden names/images/reasons never reach public HTML or SEO.
     return [dict(r) for r in conn.execute("""SELECT p.*,i.id AS ranking_item_id,i.reason AS ranking_reason,
         i.sort_order AS editorial_order FROM restaurant_ranking_items i JOIN places p ON p.id=i.place_id
-        JOIN categories c ON c.id=p.category_id WHERE i.ranking_id=? AND p.published=1 AND """ + LIVE + """
+        JOIN categories c ON c.id=p.category_id WHERE i.ranking_id=? AND p.published=1 AND COALESCE(p.is_example,0)=0 AND """ + LIVE + """
         AND c.slug='food' AND c.type='place'
         AND EXISTS(SELECT 1 FROM place_category_links l WHERE l.place_id=p.id AND l.category_id=?)
         ORDER BY i.sort_order,i.id""", (ranking['id'],ranking['subtype_taxonomy_id']))]

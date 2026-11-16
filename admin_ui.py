@@ -424,7 +424,7 @@ class AdminUI:
             if section == "home": values = {key: form.get(key)=="1" for key in DEFAULTS if key.startswith("home_")}
             elif section == "general":
                 values = {key: str(form.get(key, "")).strip() for key in ("site_name", "instagram_url", "site_description")}
-                values["user_place_auto_publish"] = form.get("user_place_auto_publish") == "1"
+                values["user_place_auto_publish"] = False  # Publication requires an administrator review.
                 if not values["site_name"] or len(values["site_name"])>40 or len(values["site_description"])>300 or len(values["instagram_url"])>2000 or not safe_external_url(values["instagram_url"]):
                     return HTMLResponse("사이트 이름·소개·링크를 확인해주세요.", status_code=400)
             else: return HTMLResponse("설정을 찾을 수 없습니다.", status_code=404)

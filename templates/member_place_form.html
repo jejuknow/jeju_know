@@ -4,7 +4,7 @@
 {% set p=place or {} %}
 {% block body %}<main class="admin-wide admin-main narrow">
 <p><a class="text-btn" href="/map">← MAP으로 돌아가기</a></p><p class="kicker">MAP · {{ 'NEW' if new_only else 'COMMUNITY' }}</p><h1>{{ '내 장소 수정' if p.get('id') else '신상 장소 알려주기' if new_only else '장소 알려주기' }}</h1>
-<p class="section-copy">{% if auto_publish %}기본 자동검사를 통과한 장소는 ‘사용자 등록’으로 먼저 공개됩니다. 추가 확인이 필요한 경우 공개가 보류될 수 있습니다.{% else %}등록한 장소는 기본 자동검사 후 운영자가 확인하여 공개합니다.{% endif %} 자동검사는 JEJU_KNOW의 정보 확인이나 추천을 의미하지 않습니다.</p>
+<p class="section-copy">등록한 내용은 관리자 확인 후 공개됩니다. 내 활동에서 검토 상태를 확인할 수 있습니다.</p>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
 {% if similar %}<section class="form-card duplicate-warning"><h2>이미 등록된 장소입니다.</h2>{% for item in similar %}<p><a href="/place/{{ item.slug }}" target="_blank" rel="noopener">{{ item.name }} →</a> {{ item.address or item.region }} <a href="/places/{{ item.id }}/suggest">정보 바로잡기 →</a></p>{% endfor %}<p>기존 장소가 맞다면 상세페이지에서 수정 제안을 이용해주세요.</p></section>{% endif %}
 <form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form member-place-form" data-member-place-form data-photo-prepare="/api/place-photos/prepare">
@@ -17,7 +17,7 @@
 {% set restaurant_required = true %}{% include "_restaurant_fields.html" %}{% include "_member_place_terms.html" %}{% include "_submission_basic.html" %}
 <label>오픈 연도{{ ' *' if new_only else ' (선택)' }}<input type="number" name="opened_year" min="1900" max="{{ current_year }}" {% if new_only %}required{% endif %} value="{{ p.get('opened_year') or '' }}" placeholder="예: {{ current_year }}"></label>
 <label>오픈 월 (선택)<select name="opened_month"><option value="">월 미확인</option>{% for n in range(1,13) %}<option value="{{ n }}" {% if p.get('opened_month')|string==n|string %}selected{% endif %}>{{ n }}월</option>{% endfor %}</select></label>
-</div><p class="form-help">모르는 정보는 미확인으로 남습니다. NEW에는 오픈 연월이 확인된 카페·맛집이 오픈 월부터 6개 달 동안 자동 표시됩니다. 오픈 월을 모르면 자동 노출되지 않습니다.</p>
+</div><p class="form-help">모르는 정보는 미확인으로 남습니다. NEW에는 오픈 연월이 확인된 카페·맛집이 현재 월 기준 6개월 이내(경계 월 포함)에 자동 표시됩니다. 오픈 월을 모르면 자동 노출되지 않습니다.</p>
 <label>한줄 소개 (선택)<textarea name="one_line" rows="3" maxlength="600">{{ p.get('one_line','') }}</textarea></label>
 <label>홈페이지·Instagram (선택)<input type="url" name="website_url" maxlength="2000" value="{{ p.get('website_url','') }}"></label>
 <p id="locationFeedback" class="form-help location-feedback" role="status" aria-live="polite">{{ '위치 확인됨 · 지도에서 확인하거나 수정할 수 있어요.' if p.get('latitude') is not none and p.get('longitude') is not none else '주소를 입력하면 지도 위치를 자동으로 찾습니다.' }}</p>
