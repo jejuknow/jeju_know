@@ -287,7 +287,7 @@
     filters.activeChips(document.getElementById('mapActiveFilters'),state,taxonomy,item=>{filters.removeFilter(state,item.key,item.value);query.value=state.q;renderDetails();search();});
     updateFilterSummary();
     try {
-      const response=await fetch('/api/places?'+params,{signal:pending.signal,headers:{Accept:'application/json'}});
+      const response=await fetch('/api/places?'+params+'&view=map',{signal:pending.signal,headers:{Accept:'application/json'}});
       if(!response.ok) throw new Error('장소를 불러오지 못했습니다. 다시 검색해 주세요.');
       const places=await response.json();if(request!==sequence)return;
       searchFailed=false;state.places=places;render();

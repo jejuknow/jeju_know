@@ -703,11 +703,11 @@ def create_app(test_config=None):
         conn = connect_db()
         row = conn.execute("SELECT * FROM places WHERE slug=? AND deleted_at IS NULL", (slug,)).fetchone()
         if row and row["merged_into_id"]:
-            target = conn.execute("SELECT slug FROM places WHERE id=? AND published=1 AND deleted_at IS NULL", (row["merged_into_id"],)).fetchone()
+            target = conn.execute("SELECT slug FROM places WHERE id=? AND published=1 AND COALESCE(is_example,0)=0 AND deleted_at IS NULL", (row["merged_into_id"],)).fetchone()
             conn.close()
             return RedirectResponse("/place/" + target["slug"], status_code=301) if target else HTMLResponse("장소를 찾을 수 없습니다.",status_code=404)
         conn.close()
-        if not row or not row["published"]:
+        if not row or not row["published"] or row["is_example"]:
             return HTMLResponse("장소를 찾을 수 없습니다.", status_code=404)
         place = row_to_place(row, public=True)
         from urllib.parse import quote
@@ -726,19 +726,23 @@ def create_app(test_config=None):
         return PlainTextResponse('User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nDisallow: /api/\nSitemap: https://www.jeju-know.com/sitemap.xml\n')
 
     @app.get("/api/places")
-    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = "", focus: str = "", cuisine: str = ""):
+    async def api_places(category: str = "", q: str = "", region: str = "", companion: str = "", detail: str = "", condition: str = "", pick: str = "", new: str = "", focus: str = "", cuisine: str = "", page: int = 1, limit: int = 50, view: str = "list"):
+        from public_places import summary
+        if page < 1 or not 1 <= limit <= 100 or view not in ("list", "map"):
+            return JSONResponse({"detail": "page는 1 이상, limit는 1~100, view는 list 또는 map이어야 합니다."}, status_code=422)
         conn = connect_db()
         try:
             rows = public_search(conn, category, q, region, companion, detail, condition, pick, new, focus, cuisine)
-            places = [row_to_place(row, public=True) for row in rows]
             if pick == "current":
-                places.sort(key=lambda p: (p["pick_order"],p["id"]))
-            # Private submitter IDs and internal moderator identities are never public API fields.
-            for place in places:
-                for key in ("submitted_by_user_id","verified_by","deleted_at","merged_into_id","admin_import_note",
-                            "auto_check_status","auto_check_reason","auto_checked_at"):
-                    place.pop(key, None)
-            return JSONResponse(places, headers={"Cache-Control": "no-store"})
+                period = community_today()
+                orders = dict(conn.execute("SELECT place_id,sort_order FROM place_pick_periods WHERE year=? AND month=? AND is_active=1", (period.year,period.month)))
+                rows.sort(key=lambda p: (orders.get(p['id'],0),p['id']))
+            total = len(rows)
+            # MAP needs the complete coordinate set for existing bounds/nearby behavior,
+            # but never full detail records or image galleries. Lists are paginated.
+            selected = rows if view == "map" else rows[(page-1)*limit:page*limit]
+            places = [summary(row_to_place(row, public=True), map_view=view=="map") for row in selected]
+            return JSONResponse(places, headers={"Cache-Control": "no-store", "X-Total-Count": str(total)})
         finally:
             conn.close()
 
@@ -755,7 +759,7 @@ def create_app(test_config=None):
     @app.get("/places", response_class=HTMLResponse)
     async def place_list(request: Request):
         with closing(connect_db()) as conn:
-            initial = initial_places(conn, request.query_params, row_to_place)
+            initial = initial_places(conn, request.query_params, row_to_place, limit=50)
         return templates.TemplateResponse(request=request, name="place_list.html", context=initial)
 
     @app.get("/api/categories")
@@ -767,7 +771,7 @@ def create_app(test_config=None):
         if request.query_params.get("register") == "1":
             return RedirectResponse("/map/register?" + str(request.query_params), status_code=303)
         with closing(connect_db()) as conn:
-            initial = initial_places(conn, request.query_params, row_to_place)
+            initial = initial_places(conn, request.query_params, row_to_place, limit=50)
         return templates.TemplateResponse(request=request, name="map.html", context={
             "categories": navigation_order(place_categories()), "taxonomy": get_taxonomy(), "kakao_map_key": app.state.kakao_map_key,
             **initial,

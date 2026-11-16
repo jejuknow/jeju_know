@@ -59,7 +59,10 @@ def initial_places(conn, query, decorate, *, limit=None, **overrides):
     args.update(overrides)
     rows = public_search(conn, **args)
     if args['pick'] == 'current':
-        rows.sort(key=lambda p: (p['pick_order'], p['id']))
+        from community_migrations import today as service_today
+        period = service_today()
+        orders = dict(conn.execute('SELECT place_id,sort_order FROM place_pick_periods WHERE year=? AND month=? AND is_active=1', (period.year,period.month)))
+        rows.sort(key=lambda p: (orders.get(p['id'],0), p['id']))
     return {'initial_places': [decorate(row, public=True) for row in rows[:limit]], 'initial_total': len(rows)}
 
 

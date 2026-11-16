@@ -175,6 +175,17 @@ class ServerSessionMiddleware:
                 headers["X-Content-Type-Options"] = "nosniff"
                 headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
                 headers["Content-Security-Policy"] = "object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+                # Start source restrictions in report-only mode: existing inline code,
+                # Kakao map tiles and user-provided external pictures must keep working.
+                headers["Content-Security-Policy-Report-Only"] = (
+                    "default-src 'self'; script-src 'self' 'unsafe-inline' https://dapi.kakao.com https://*.daumcdn.net https://*.kakao.com; "
+                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; "
+                    "font-src 'self' data:; connect-src 'self' https://*.kakao.com https://*.daum.net https://*.daumcdn.net; "
+                    "frame-src 'self' https://*.daum.net https://*.kakao.com; worker-src 'self' blob:; form-action 'self'"
+                )
+                headers["Permissions-Policy"] = "geolocation=(self), camera=(), microphone=()"
+                if self.secure and scope.get('scheme') == 'https' and connection.url.hostname in ('www.jeju-know.com', 'jeju-know.com'):
+                    headers["Strict-Transport-Security"] = "max-age=31536000"
                 if "text/html" in headers.get("content-type", "") or scope["path"].startswith(("/account", "/admin")):
                     headers["Cache-Control"] = "no-store"
                 rotate = scope.get("rotate_session", False)

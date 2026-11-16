@@ -41,16 +41,16 @@ async function renderResults(scroll=false,updateUrl=true,track=true){
   $('placeGrid').hidden=true;$('emptyState').hidden=true;$('relaxations').hidden=true;
   $('placeGrid').setAttribute('aria-busy','true');$('allResultsBtn').hidden=true;
   try{
-    const response=await fetch('/api/places?'+query,{signal:pending.signal,headers:{Accept:'application/json'}});
+    const response=await fetch('/api/places?'+query+'&limit=5',{signal:pending.signal,headers:{Accept:'application/json'}});
     if(!response.ok)throw new Error('장소 검색 실패');
-    const places=await response.json();if(request!==requestId)return;
+    const places=await response.json();const total=Number(response.headers.get('X-Total-Count')||places.length);if(request!==requestId)return;
     // Only completed, explicit searches count. Initial render/history/retry do not.
     if(track)window.JejuAnalytics?.search(search.fromParams(query));
     $('placeGrid').innerHTML=places.slice(0,5).map(p=>cards.placeCard(p,(p.region_label||search.regionLabel(p.region)))).join('');
     $('placeGrid').hidden=!places.length;$('emptyState').hidden=!!places.length;
-    $('allResultsBtn').hidden=places.length<5;$('allResultsBtn').href='/places?'+query;
-    $('allResultsBtn').textContent=`전체 결과 ${places.length}곳 보기 →`;
-    $('resultSummary').textContent=labels.length?`${labels.join(' · ')} 조건에 맞는 장소 ${places.length}곳을 찾았어요.`:`현재 공개된 장소 ${places.length}곳을 보여드리고 있어요.`;
+    $('allResultsBtn').hidden=total<=5;$('allResultsBtn').href='/places?'+query;
+    $('allResultsBtn').textContent=`전체 결과 ${total}곳 보기 →`;
+    $('resultSummary').textContent=labels.length?`${labels.join(' · ')} 조건에 맞는 장소 ${total}곳을 찾았어요.`:`현재 공개된 장소 ${total}곳을 보여드리고 있어요.`;
     $('emptyConditions').textContent='현재 선택: '+(labels.join(' · ')||'전체');
     if(places.length<=2)loadSuggestions(query,request);
     if(scroll)$('places').scrollIntoView({behavior:'smooth',block:'start'});
@@ -99,7 +99,7 @@ async function boot(){
     const config=await fetch('/api/place-taxonomy');
     if(!config.ok)throw new Error('데이터 로딩 실패');
     taxonomy=await config.json();
-    if($('pickGrid'))fetch('/api/places?pick=current').then(r=>{if(!r.ok)throw new Error();return r.json();}).then(all=>{
+    if($('pickGrid'))fetch('/api/places?pick=current&limit=3').then(r=>{if(!r.ok)throw new Error();return r.json();}).then(all=>{
       const picks=all.filter(p=>p.is_pick).slice(0,3);
       $('pickGrid').innerHTML=picks.length?picks.map(p=>cards.pickCard(p,(p.region_label||search.regionLabel(p.region)))).join(''):'<p>아직 공개된 JEJU_KNOW PICK이 없습니다.</p>';
     }).catch(()=>{$('pickGrid').textContent='PICK 정보를 불러오지 못했습니다.';});

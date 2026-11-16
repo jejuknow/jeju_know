@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 import re
+import secrets
 import sqlite3
 import time
 import uuid
@@ -149,7 +150,8 @@ class Analytics:
         test = request.cookies.get(TEST_COOKIE)=='1'
         if request.query_params.get('analytics_test') in ('0','1'):
             test = request.query_params['analytics_test']=='1'
-        data = dict(path=request.url.path,page=str(uuid.uuid4()),csrf=request.session['csrf_token'],test=test)
+        nonce = request.session.setdefault('analytics_nonce', secrets.token_urlsafe(32))
+        data = dict(path=request.url.path,page=str(uuid.uuid4()),nonce=nonce,test=test)
         return self.signer.dumps(data)
 
     async def collect(self, request: Request):
@@ -163,7 +165,7 @@ class Analytics:
             token = request.headers.get('x-analytics-token','')
             if len(token)>2000: raise ValueError()
             page = self.signer.loads(token,max_age=86400)
-            if not hmac.compare_digest(str(page['csrf']),str(request.session.get('csrf_token',''))) or not public_path(page['path']):
+            if not hmac.compare_digest(str(page['nonce']),str(request.session.get('analytics_nonce',''))) or not public_path(page['path']):
                 return Response(status_code=403)
             size = 0; chunks = []
             async for chunk in request.stream():
