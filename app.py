@@ -801,6 +801,14 @@ def create_app(test_config=None):
     async def partnership(request: Request):
         return templates.TemplateResponse(request=request, name="partnership.html", context={})
 
+    @app.get("/privacy", response_class=HTMLResponse)
+    async def privacy(request: Request):
+        return templates.TemplateResponse(request=request, name="privacy.html", context={})
+
+    @app.get("/terms", response_class=HTMLResponse)
+    async def terms(request: Request):
+        return templates.TemplateResponse(request=request, name="terms.html", context={})
+
     @app.get("/admin/setup", response_class=HTMLResponse)
     async def admin_setup_get(request: Request):
         if admin_exists():

@@ -1,0 +1,6 @@
+.legal-page{max-width:920px;padding-top:36px;padding-bottom:48px}
+.legal-document{line-height:1.7;word-break:keep-all;overflow-wrap:anywhere}
+.legal-document h1{margin:8px 0 20px}.legal-document h2{font-size:1.2rem;margin:32px 0 12px}
+.legal-document p,.legal-document li{margin-bottom:12px}.legal-document ul{padding-left:24px}
+.legal-document a,.contact-privacy a,.member-help a{text-decoration:underline;text-underline-offset:3px;color:var(--primary,#4163ff)}
+@media(max-width:640px){.legal-page{padding-top:20px;padding-bottom:28px}.legal-document{padding:22px 18px;font-size:15px}}

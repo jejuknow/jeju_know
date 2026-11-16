@@ -9,6 +9,8 @@ ORIGIN = 'https://www.jeju-know.com'
 DEFAULT_IMAGE = ORIGIN + '/static/images/brand/default-og.png'
 FILTER_PAGES = {'/', '/find', '/map', '/places', '/new', '/news'}
 PAGES = {
+    '/privacy': ('개인정보처리방침 | JEJU_KNOW', 'JEJU_KNOW의 개인정보 수집 항목, 이용 목적, 보관 상태 및 이용자 권리 안내입니다.'),
+    '/terms': ('이용약관 | JEJU_KNOW', 'JEJU_KNOW의 회원계정, 사용자 콘텐츠 및 서비스 이용 안내입니다.'),
     '/': ('JEJU_KNOW | 제주노의 맛집·카페·행사 추천', '제주노가 기록한 제주 맛집, 카페, 가볼 곳과 행사·이슈를 지역·취향·동행에 맞게 찾아보세요.'),
     '/find': ('제주 취향 장소 찾기 | JEJU_KNOW', '제주 지역, 장소 종류, 동행과 카페·맛집 특징을 선택해 취향에 맞는 장소를 찾아보세요. 검색한 장소는 지도에서도 확인할 수 있습니다.'),
     '/map': ('제주 맛집·카페 지도 | JEJU_KNOW', '제주 맛집과 카페, 가볼 곳의 위치를 지도에서 살펴보세요. 지역과 카테고리로 탐색하고 장소별 정보와 추천 이유를 확인하세요.'),
