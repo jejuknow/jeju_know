@@ -1,0 +1,17 @@
+{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/place-duplicates.css?v=1">{% endblock %}
+{% block admin_content %}
+<p class="admin-page-description">자동으로 중복 가능성이 있는 장소를 찾았습니다. 삭제 또는 병합은 자동으로 처리하지 않습니다.</p>
+<nav class="admin-tabs" aria-label="중복 의심 등급"><a href="/admin/places/duplicates" {% if selected=='all' %}aria-current="page"{% endif %}>전체 {{ group_count }}그룹</a>{% for value,label in levels.items() %}<a href="?level={{ value }}" {% if selected==value %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}<a href="?level=ignored" {% if selected=='ignored' %}aria-current="page"{% endif %}>별개 장소 제외 {{ ignored|length }}쌍</a></nav>
+{% if selected=='ignored' %}
+<section class="admin-panel duplicate-group"><h2>별개 장소로 확인한 조합</h2><p>장소 정보는 그대로 보존됩니다. 비교 화면에서 제외를 해제할 수 있습니다.</p>{% for pair in ignored %}<article><h3>{{ pair.left_name }} / {{ pair.right_name }}</h3><p>#{{ pair.place_low }} / #{{ pair.place_high }} · {{ pair.actor }} · {{ pair.ignored_at }}</p><a class="secondary-btn" href="/admin/places/duplicates/compare/{{ pair.place_low }}/{{ pair.place_high }}">비교 · 제외 해제</a></article>{% else %}<p class="admin-empty">별개 장소로 확인한 조합이 없습니다.</p>{% endfor %}</section>
+{% else %}
+{% for group in groups %}<section class="admin-panel duplicate-group" id="group-{{ group.id }}">
+<div class="admin-panel-heading"><h2>{{ group.places[0].name }} <small>{{ group.places|length }}곳</small></h2>{{ badge(group.label,'warning') }}</div>
+<div class="duplicate-members">{% for p in group.places %}<article>{% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }} 대표사진" loading="lazy">{% endif %}<h3><a href="/admin/places/{{ p.id }}/edit">{{ p.name }}</a></h3><p>#{{ p.id }} · {{ p.category }} · {{ '공개' if p.published else '비공개' }}</p><p>{{ p.address or '주소 없음' }}</p></article>{% endfor %}</div>
+<h3>장소별 비교 근거</h3><p class="form-help">그룹에 함께 있어도 모든 장소가 서로 같은 것은 아닙니다. 아래 조합별로 확인해주세요.</p>
+<ul class="duplicate-pairs">{% for pair in group.pairs %}<li><a class="mini-btn" href="/admin/places/duplicates/compare/{{ pair.left }}/{{ pair.right }}">#{{ pair.left }} ↔ #{{ pair.right }} 비교하기</a> <span>{{ pair.label }} · {{ pair.reasons|join(' · ') }}</span></li>{% endfor %}</ul>
+</section>{% else %}<div class="admin-empty">이 조건의 중복 의심 장소가 없습니다.</div>{% endfor %}
+{% endif %}
+<p class="form-help">이름·주소·전화번호·지역을 비교하며, 같은 이름의 좌표가 75m 이내이면 우선 확인합니다. 원본 데이터는 변경하지 않습니다.</p>
+{% endblock %}

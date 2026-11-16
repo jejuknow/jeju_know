@@ -1,0 +1,16 @@
+{% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/place-duplicates.css?v=1">{% endblock %}
+{% block admin_content %}
+<p><a href="{{ back_url or '/admin/places/duplicates' }}">← {{ 'CSV 미리보기' if csv_mode else '중복 의심 목록' }}</a></p>
+{% if csv_mode %}<p class="admin-page-description">CSV {{ csv_line }}행의 입력값과 기존 장소입니다. 빈 셀은 업데이트 시 유지되는 값입니다. 실제 반영은 미리보기에서 작업과 대상을 선택해야 합니다.</p>
+{% else %}<p class="admin-page-description">서로 다른 값은 배경색으로 표시됩니다. 같은 상호의 다른 지점·이전 여부를 확인해주세요.</p>
+<p>{% if ignored %}{{ badge('별개 장소로 확인 · 탐지 제외','neutral') }}{% elif match %}{{ badge(match.label,'warning') }} {{ match.reasons|join(' · ') }}{% else %}현재 기준에서 중복 의심 근거가 없습니다.{% endif %}{% if distance is not none %} · 직선거리 {{ '%.1f'|format(distance) }}m{% endif %}</p>{% endif %}
+<section class="admin-panel duplicate-comparison" aria-label="장소 나란히 비교">
+<div class="duplicate-table-wrap" tabindex="0" aria-label="장소 비교 표"><table class="duplicate-table"><thead><tr><th scope="col">비교 항목</th>{% for p in [left,right] %}<th scope="col">{{ 'CSV 입력' if csv_mode and loop.first else '#'~p.id }}<strong>{{ p.name }}</strong>{% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }} 대표사진">{% endif %}{% if p.id %}<a class="mini-btn" href="/admin/places/{{ p.id }}/edit">기존 장소 수정</a>{% endif %}</th>{% endfor %}</tr></thead><tbody>
+{% for row in fields %}<tr {% if row.different %}class="duplicate-different"{% endif %}><th scope="row">{{ row.label }}{% if row.different %}<small>다른 값</small>{% endif %}</th><td>{{ row.left }}</td><td>{{ row.right }}</td></tr>{% endfor %}
+{% for row in relations %}<tr {% if row.different %}class="duplicate-different"{% endif %}><th scope="row">{{ row.label }}</th><td>{{ row.left }}건</td><td>{{ row.right }}건</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% if not csv_mode %}
+<section class="admin-panel duplicate-group"><h2>관리자 판단</h2><p>“유지”는 선택 기록만 남깁니다. 다른 장소의 정보·사진·공개 여부를 변경하거나 삭제·병합하지 않습니다.</p><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><div class="row-actions"><button class="secondary-btn" name="decision" value="keep_left">왼쪽 장소 유지</button><button class="secondary-btn" name="decision" value="keep_right">오른쪽 장소 유지</button>{% if ignored %}<button class="primary-inline" name="decision" value="restore">별개 장소 제외 해제</button>{% else %}<button class="primary-inline" name="decision" value="separate">별개 장소로 확인</button>{% endif %}</div></form><p class="form-help">정리가 필요하면 기존 장소 수정 화면을 이용해주세요. 삭제 권한과 연결 데이터 처리 정책은 그대로 적용됩니다.</p></section>
+{% endif %}
+{% endblock %}

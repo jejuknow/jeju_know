@@ -3,7 +3,6 @@ import json
 import math
 import re
 import unicodedata
-from difflib import SequenceMatcher
 
 LABELS = {"normal": "정상", "review": "확인 필요", "hold": "공개 보류"}
 REASONS = {
@@ -16,21 +15,6 @@ ORDER = "CASE p.auto_check_status WHEN 'hold' THEN 0 WHEN 'review' THEN 1 WHEN '
 BURST_LIMIT, BURST_SECONDS = 10, 600
 
 
-def normalized(value):
-    return re.sub(r"\s+", "", unicodedata.normalize("NFKC", value or "").casefold())
-
-
-def name_key(value):
-    return re.sub(r"[^\w]", "", normalized(value)).replace("_", "")
-
-
-def address_key(value):
-    value = unicodedata.normalize("NFKC", value or "").strip()
-    # Common province aliases are equivalent, but do not erase building/unit numbers.
-    value = re.sub(r"^(?:제주특별자치도|제주도|제주)\s+(?=제주시\b|서귀포시\b)", "", value)
-    return normalized(value)
-
-
 def validate_address(data):
     address = unicodedata.normalize("NFKC", data["address"]).strip()
     if not re.match(r"^(?:(?:제주특별자치도|제주도|제주)\s+)?(?:제주시|서귀포시)\s+\S", address):
@@ -38,24 +22,9 @@ def validate_address(data):
 
 
 def duplicate_matches(conn, data, exclude_id=None):
-    exact, similar = [], []
-    name, address = name_key(data["name"]), address_key(data["address"])
-    for row in conn.execute("""SELECT id,slug,name,address,latitude,longitude,published FROM places
-                              WHERE deleted_at IS NULL AND merged_into_id IS NULL"""):
-        if row["id"] == exclude_id:
-            continue
-        same_address = address == address_key(row["address"])
-        if name == name_key(row["name"]) and same_address:
-            exact.append(dict(row))
-            continue
-        near = False
-        if all(v is not None for v in (data.get("latitude"), data.get("longitude"), row["latitude"], row["longitude"])):
-            dy = (data["latitude"] - row["latitude"]) * 111320
-            dx = (data["longitude"] - row["longitude"]) * 111320 * math.cos(math.radians(row["latitude"]))
-            near = math.hypot(dx, dy) < 100
-        if (same_address or near) and SequenceMatcher(None, name, name_key(row["name"])).ratio() >= .8:
-            similar.append(dict(row))
-    return exact, similar
+    from place_duplicates import find_duplicate_candidates
+    matches = find_duplicate_candidates(conn, data, exclude_id, include_private=True)
+    return [p for p in matches if p["exact"]], [p for p in matches if not p["exact"]]
 
 
 def inspect(data, *, similar=False, has_photo=False, enabled=False):

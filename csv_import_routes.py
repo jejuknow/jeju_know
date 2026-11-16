@@ -167,7 +167,7 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
         with closing(connect_db()) as conn:
             receipt = conn.execute('SELECT result FROM csv_import_runs WHERE token=? AND actor=?', (token, actor(request))).fetchone()
         return render(request, kind, stage=stage, result=json.loads(receipt[0]) if receipt else None,
-                      counts={s: sum(row['status'] == s for row in stage['rows']) for s in ('정상', '경고', '오류', '중복 가능')})
+                      counts={s: sum(row['status'] == s for row in stage['rows']) for s in ('정상', '경고', '오류', '중복 의심')})
 
     @app.get('/admin/imports/{kind}/preview/{token}/errors.csv')
     def errors(request: Request, kind: str, token: str):
@@ -181,6 +181,37 @@ def register_csv_routes(app, templates, connect_db, guard, csrf, flash):
         rows = [{**row['raw'], '오류사유': '; '.join(row['errors'])} for row in stage['rows'] if row['errors']]
         optional = ['영업시간_원문'] if any('영업시간_원문' in r['raw'] for r in stage['rows']) else []
         return file_response(export_csv(HEADERS[kind] + optional + ['오류사유'], rows), kind + '-errors.csv')
+
+    @app.get('/admin/imports/{kind}/preview/{token}/compare/{line}/{place_id}')
+    def compare_csv(request: Request, kind: str, token: str, line: int, place_id: int):
+        if response := guard(request): return response
+        kind_check(kind)
+        try:
+            stage = store.read(token, owner(request), kind)
+            row = next((r for r in stage['rows'] if r['line']==line), None)
+            if not row or not any(p['id']==place_id for p in row['duplicates']):
+                raise ValueError('미리보기의 비교 대상을 확인해주세요.')
+            with closing(connect_db()) as conn:
+                if state_hash(conn) != stage['state_hash']:
+                    raise ValueError('미리보기 이후 정보가 변경되었습니다. CSV를 다시 업로드해주세요.')
+                existing = conn.execute('SELECT * FROM places WHERE id=? AND deleted_at IS NULL AND merged_into_id IS NULL',(place_id,)).fetchone()
+                if not existing: raise ValueError('현재 장소를 찾을 수 없습니다.')
+                # Use the export mapping so every supported CSV column can be compared.
+                from csv_place_export import place_rows
+                category = conn.execute("SELECT slug FROM categories WHERE id=?",(existing['category_id'],)).fetchone()
+                actual = next((key for key,value in KINDS.items() if category and category[0]==value[1]), None)
+                right_values = next(place_rows(conn, actual, place_id=place_id), {}) if actual else {'장소명':existing['name'],'주소':existing['address'],'지역':existing['region'],'전화번호':existing['phone']}
+                fields = [{'label':'카테고리','left':KINDS[kind][0],'right':existing['category'],'different':kind!=actual}]
+
+                fields += [{'label':key,'left':value or '— (신규 기본값 / 수정 시 유지)',
+                    'right':right_values.get(key) or '—','different':str(value or '')!=str(right_values.get(key) or '')}
+                    for key,value in row['raw'].items() if key!='place_id']
+            return templates.TemplateResponse(request=request,name='admin/duplicate_compare.html',context={
+                'csv_mode':True,'csv_line':line,'left':{'name':row['raw']['장소명'] or '기존 이름 유지'},
+                'right':dict(existing),'fields':fields,'relations':[],
+                'back_url':f'/admin/imports/{kind}/preview/{token}'})
+        except ValueError as exc:
+            return HTMLResponse(str(exc),400)
 
     @app.post('/admin/imports/{kind}/preview/{token}/coordinates')
     async def geocoded(request: Request, kind: str, token: str):

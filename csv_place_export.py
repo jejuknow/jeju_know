@@ -9,7 +9,7 @@ from restaurant_taxonomy import official_terms
 from submission_fields import controls
 
 
-def place_rows(conn, kind, *, on_date=None):
+def place_rows(conn, kind, *, on_date=None, place_id=None):
     """Yield import-compatible rows in stable place order, without user/account data."""
     on_date = on_date or today()
     category = conn.execute("SELECT id FROM categories WHERE type='place' AND slug=?", (KINDS[kind][1],)).fetchone()
@@ -17,7 +17,7 @@ def place_rows(conn, kind, *, on_date=None):
         return
     category_id = category['id']
     places = conn.execute('''SELECT * FROM places WHERE category_id=? AND deleted_at IS NULL
-                             AND merged_into_id IS NULL ORDER BY id''', (category_id,)).fetchall()
+                             AND merged_into_id IS NULL AND (? IS NULL OR id=?) ORDER BY id''', (category_id,place_id,place_id)).fetchall()
     terms = official_terms(conn, category_id)
     active = {t['id'] for t in terms}
     linked = defaultdict(set)

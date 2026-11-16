@@ -64,7 +64,7 @@ class CsvImportTest(unittest.TestCase):
     def test_four_cafe_rows_preview_and_save(self):
         first = self.row(잘맞는동행='연인|친구', 영업_시작='10:15', 영업_종료='18:45', 휴무일='월|화', 전화번호='0641234567', 대표메뉴_가격='5500', 꿀팁='뒤편 주차')
         path, page = self.preview([first, self.row(장소명='두 번째 카페', 주소='다른 주소'), first, self.row(카페_특징='존재하지 않는 카페 특징')])
-        self.assertIn('중복 가능', page.text)
+        self.assertIn('중복 의심', page.text)
         self.assertIn('활성 분류에 없습니다', page.text)
         self.assertEqual(len(self.rows('SELECT * FROM places')), 0)
         result = self.commit(path, action_2='create', action_3='create')
@@ -125,7 +125,7 @@ class CsvImportTest(unittest.TestCase):
         self.execute('UPDATE places SET '+','.join(k+'=?' for k in excluded)+' WHERE id=?', (*excluded.values(),p['id']))
         raw = dict.fromkeys(HEADERS['cafe'],''); raw.update(place_id=str(p['id']), 전화번호='0649998888')
         path, page = self.preview([raw])
-        self.assertIn('중복 가능',page.text)
+        self.assertIn('중복 의심',page.text)
         self.commit(path, action_2='update', target_2=str(p['id']))
         new = self.rows('SELECT * FROM places')[0]
         for field in (*excluded, 'name','address','region','published','note','latitude'):

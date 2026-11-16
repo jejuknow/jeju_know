@@ -1,8 +1,5 @@
 """Shared place facts, editorial attributes, duplicate detection and safe merging."""
 import math
-import re
-import unicodedata
-from difflib import SequenceMatcher
 
 from auth_security import safe_external_url
 from community_migrations import today
@@ -22,10 +19,6 @@ SUGGESTION_FIELDS = {"name": "장소명", "address": "주소", "coordinates": "�
                      "map_url": "지도 링크", "website_url": "홈페이지·Instagram", "other": "기타"}
 # Keep old queued reservation suggestions readable/reviewable by administrators.
 MEMBER_SUGGESTION_FIELDS = {k: v for k, v in SUGGESTION_FIELDS.items() if k != "reservation_status"}
-
-
-def normalize(value):
-    return re.sub(r"[^\w가-힣]", "", unicodedata.normalize("NFKC", value or "").casefold()).replace("_", "")
 
 
 def opening(year, month):
@@ -87,25 +80,8 @@ def facts(form, conn, regions, *, new_only=False, existing=None):
 
 
 def duplicates(conn, data, exclude_id=None, include_private=False):
-    name, address = normalize(data.get("name")), normalize(data.get("address"))
-    if not name:
-        return []
-    rows = conn.execute("SELECT id,slug,name,address,region,latitude,longitude,published FROM places WHERE deleted_at IS NULL AND merged_into_id IS NULL" + ("" if include_private else " AND published=1")).fetchall()
-    found = []
-    for row in rows:
-        if row["id"] == exclude_id:
-            continue
-        same_name = name == normalize(row["name"])
-        similar = SequenceMatcher(None, name, normalize(row["name"])).ratio() >= .55
-        same_address = bool(address and address == normalize(row["address"]))
-        near = False
-        if all(v is not None for v in (data.get("latitude"), data.get("longitude"), row["latitude"], row["longitude"])):
-            dy = (float(data["latitude"]) - row["latitude"]) * 111320
-            dx = (float(data["longitude"]) - row["longitude"]) * 111320 * math.cos(math.radians(row["latitude"]))
-            near = math.hypot(dx, dy) < 75
-        if same_name or (similar and (same_address or near)):
-            found.append(dict(row))
-    return found
+    from place_duplicates import find_duplicate_candidates
+    return find_duplicate_candidates(conn, data, exclude_id, include_private=include_private)
 
 
 def editable(place, user_id):

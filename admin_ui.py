@@ -22,6 +22,7 @@ from correction_review import STATUS_LABELS as CORRECTION_LABELS, PENDING as COR
 SUGGESTION_LABELS = {**SUGGESTION_FIELDS, DETAIL_FIELD: DETAIL_LABEL}
 from taxonomy_migrations import TYPES
 from place_auto_checks import counts as auto_counts, ORDER as AUTO_ORDER, decorate as decorate_check
+from place_duplicates import groups as duplicate_groups, membership as duplicate_membership
 
 ACTIVE = "p.deleted_at IS NULL AND p.merged_into_id IS NULL"
 KINDS = {"region": "지역", "place": "장소 카테고리", "restaurant_subcategory": "맛집 유형",
@@ -72,7 +73,7 @@ def counters(conn):
     now = today()
     new_sql, new_args = new_clause(now)
     scalar = lambda sql, args=(): conn.execute(sql, args).fetchone()[0]
-    return dict(auto=auto_counts(conn), total=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE),
+    return dict(duplicates=len(duplicate_groups(conn)), auto=auto_counts(conn), total=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE),
                 unverified=scalar("SELECT count(*) FROM places p WHERE " + ACTIVE + " AND source_type='user' AND verification_status='unverified'"),
                 issue_pending=scalar("SELECT count(*) FROM news_posts WHERE author_type='user' AND approval_status='pending' AND deleted_at IS NULL"),
                 unread_inquiries=scalar("SELECT count(*) FROM contact_inquiries WHERE status='unread'"),
@@ -88,7 +89,9 @@ def admin_context(request, conn):
     account = {"username":actor["username"], "name":actor["display_name"] or actor["username"],
                "role":ROLE_LABELS[actor["role"]], "dedicated":bool(actor.get("id"))}
     path = request.url.path
-    if path.startswith('/admin/imports'):
+    if path.startswith('/admin/places/duplicates'):
+        section, title, active = '장소 관리', '중복 의심', 'duplicates'
+    elif path.startswith('/admin/imports'):
         section, title, active = '장소 관리', 'CSV 관리', 'imports'
     elif path.startswith("/admin/categories") or path.startswith("/admin/classifications/"):
         section = "분류 관리"
@@ -124,6 +127,8 @@ def admin_context(request, conn):
         title, active = {"/admin/community": ("사용자 등록", "community"), "/admin/suggestions": ("정보 바로잡기", "suggestions"),
                          "/admin/places/stale": ("오래된 정보", "stale"), "/admin/new": ("신상 장소", "new"), "/admin/picks": ("JEJU_KNOW PICK", "picks")}.get(path, ("전체 장소", "places"))
     detail = "장소 등록" if path == "/admin/places/new" else "장소 수정" if re.fullmatch(r"/admin/places/\d+/edit", path) else "중복 확인" if path.endswith("/merge") else ""
+    if path.startswith("/admin/places/duplicates/compare/"):
+        detail = "중복 비교"
     if path.startswith("/admin/news/"):
         detail = "ISSUE 등록" if path.endswith("/new") else "ISSUE 수정"
     if path.startswith("/admin/ads/"):
@@ -223,6 +228,13 @@ class AdminUI:
                 where.append("p.opened_year=?")
                 args.append(year)
         with closing(self.db()) as conn:
+            duplicate_map = duplicate_membership(conn)
+            if f.get("duplicate") in ("suspected", "clear"):
+                if duplicate_map:
+                    where.append("p.id " + ("IN" if f["duplicate"] == "suspected" else "NOT IN") + " (" + ",".join("?" for _ in duplicate_map) + ")")
+                    args.extend(duplicate_map)
+                elif f["duplicate"] == "suspected":
+                    where.append("0=1")
             if f.get("category"):
                 from place_category_policy import usage_filter
                 category = conn.execute("SELECT id FROM categories WHERE type='place' AND slug=?", (f['category'][:80],)).fetchone()
@@ -246,6 +258,11 @@ class AdminUI:
                 for row in conn.execute("SELECT id,place_id,new_value FROM place_correction_suggestions WHERE status='pending' AND field=? AND place_id IN (" + ",".join("?" for _ in ids) + ") ORDER BY id", (DETAIL_FIELD, *ids)):
                     pending.setdefault(row["place_id"], []).append({"id": row["id"], "summary": display_proposal(conn, row["new_value"])})
         items = [{**self.place(row), "nickname": row["nickname"], "pending_count": row["pending_count"], "detail_proposals": pending.get(row["id"], [])} for row in rows]
+        for item in items:
+            group = duplicate_map.get(item["id"])
+            item["duplicate_count"] = len(group["places"]) if group else 0
+            edge = next((e for e in group["pairs"] if item["id"] in (e["left"], e["right"])), None) if group else None
+            item["duplicate_url"] = f'/admin/places/duplicates/compare/{edge["left"]}/{edge["right"]}' if edge else ""
         private_count = rows[0]["private_count"] if mode == "all" and rows else 0
         return self.render(request, "places.html", places=items, pagination=page, mode=mode, categories=categories, regions=regions, years=years, selected_year=year, private_count=private_count)
 

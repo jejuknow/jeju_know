@@ -24,7 +24,9 @@ class PlaceChecksModerationTest(unittest.TestCase):
     post = test_community.CommunityTest.post
     form = test_community.CommunityTest.form
     create = test_community.CommunityTest.create
-    place = test_community.CommunityTest.place
+    def place(self, **data):
+        # These fixtures intentionally share an address; unrelated checks explicitly override the warning.
+        return test_community.CommunityTest.place(self, duplicate_ack='1', **data)
     api = test_community.CommunityTest.api
     pick = test_community.CommunityTest.pick
 
@@ -72,7 +74,7 @@ class PlaceChecksModerationTest(unittest.TestCase):
     def test_exact_alias_and_private_duplicate(self):
         p=self.place(name='Cafe 바람')
         self.post(self.admin,f"/admin/places/{p['id']}/toggle-published")
-        r=self.create(name='  CAFE  바람 ',address='제주 제주시 테스트로 123',duplicate_ack='1')
+        r=self.create(name='  CAFE  바람 ',address='제주 제주시 테스트로 123')
         self.assertEqual(r.status_code,409)
         self.assertIn('/place/'+p['slug'],r.text)
         self.execute('UPDATE places SET published=0')
@@ -99,7 +101,7 @@ class PlaceChecksModerationTest(unittest.TestCase):
         self.assertEqual(held['published'],0)
         self.execute("UPDATE site_settings SET value='true' WHERE key='user_place_auto_publish'")
         self.assertEqual(self.rows('SELECT published FROM places WHERE id=?',(held['id'],))[0]['published'],0)
-        self.assertEqual(self.post(self.member,f"/places/{held['id']}/edit",**self.form(name=held['name'])).status_code,303)
+        self.assertEqual(self.post(self.member,f"/places/{held['id']}/edit",**self.form(name=held['name'],duplicate_ack='1')).status_code,303)
         self.assertEqual(self.rows('SELECT published FROM places WHERE id=?',(held['id'],))[0]['published'],0)
         self.assertEqual(self.api(),[])
 
@@ -147,7 +149,7 @@ class PlaceChecksModerationTest(unittest.TestCase):
 
     def test_burst_limit(self):
         for n in range(10):
-            self.assertEqual(self.create(name=f'속도 점검 {n}').status_code,303)
+            self.assertEqual(self.create(name=f'속도 점검 {n}',duplicate_ack='1').status_code,303)
         self.assertEqual(self.create(name='열한번째').status_code,429)
         self.assertEqual(len(self.rows('SELECT * FROM places')),10)
 

@@ -275,7 +275,7 @@ def normalize_common_fields(conn, raw, kind, previous, root):
 def state_hash(conn):
     """Conservative optimistic lock: no overwrite after the preview becomes stale."""
     digest = hashlib.sha256()
-    for table in ('places', 'categories', 'place_category_links', 'images', 'place_image_references', 'place_pick_periods', 'site_settings'):
+    for table in ('places', 'categories', 'place_category_links', 'images', 'place_image_references', 'place_pick_periods', 'site_settings', 'place_duplicate_ignores'):
         for row in conn.execute(f'SELECT * FROM {table} ORDER BY rowid'):
             digest.update(json.dumps(list(row), ensure_ascii=False).encode())
     return digest.hexdigest()
@@ -303,12 +303,18 @@ def prepare_row(conn, raw, kind, root, target=None, *, match_existing=False):
     elif match_existing and raw['장소명']:
         # Preview only: a unique, exact name/address match supplies existing values
         # for validation. Saving still requires the administrator's explicit target.
-        matches = conn.execute('''SELECT p.* FROM places p JOIN categories c ON c.id=p.category_id
-            WHERE p.name=? AND p.address=? AND c.slug=? AND c.type='place'
-            AND p.deleted_at IS NULL AND p.merged_into_id IS NULL LIMIT 2''',
-            (raw['장소명'], raw['주소'], KINDS[kind][1])).fetchall()
+        from place_duplicates import find_duplicate_candidates
+        category = conn.execute("SELECT id FROM categories WHERE type='place' AND slug=?",(KINDS[kind][1],)).fetchone()
+        matches = [r for r in find_duplicate_candidates(conn, {'name':raw['장소명'],'address':raw['주소']}, include_private=True)
+                   if r['exact'] and category and r['category_id']==category[0]]
         if len(matches) == 1:
-            previous = dict(matches[0])
+            previous = dict(conn.execute('SELECT * FROM places WHERE id=?',(matches[0]['id'],)).fetchone())
+        elif not matches and not raw['주소']:
+            # Legacy CSV round-trip identity, not a duplicate verdict: a single
+            # exact raw name/empty-address row may supply unchanged values only.
+            # The preview still requires an explicit target and update decision.
+            legacy = conn.execute("SELECT * FROM places WHERE name=? AND address='' AND category_id=? AND deleted_at IS NULL AND merged_into_id IS NULL LIMIT 2",(raw['장소명'],category[0] if category else None)).fetchall()
+            if len(legacy)==1: previous=dict(legacy[0])
     data, patch, warnings, pick, photos = normalize_common_fields(conn, raw, kind, previous, root)
     terms = (validate_cafe_row if kind == 'cafe' else validate_restaurant_row)(conn, raw, data['category_id'], previous)
     return dict(data=data, patch=patch, warnings=warnings, pick=pick, photos=photos, terms=terms, previous=previous)
@@ -334,21 +340,19 @@ def preview_rows(conn, rows, kind, root):
                 item['subtypes_display'] = ' · '.join(r['name'] for r in terms if r['id'] in ids and r['parent_id'] != prepared['data']['category_id'])
             data = prepared['data']
             candidates = {r['id']: r for r in duplicates(conn, data, include_private=True)}
-            # Same-address candidates count even when the shop names differ.
-            for r in conn.execute('SELECT id,name,address,category_id FROM places WHERE address=? AND deleted_at IS NULL AND merged_into_id IS NULL', (data['address'],)):
-                candidates[r['id']] = dict(r)
             if prepared['previous']:
-                candidates[data['id']] = dict(prepared['previous'])
-            item['duplicates'] = [{'id': r['id'], 'name': r['name'], 'address': r['address'],
+                candidates.setdefault(data['id'], {**dict(prepared['previous']), 'label':'수정 대상', 'reasons':['지정된 기존 장소']})
+            item['duplicates'] = [{'id': r['id'], 'name': r['name'], 'address': r['address'], 'label':r['label'], 'reasons':r['reasons'],
                 'can_update': conn.execute('SELECT category_id FROM places WHERE id=?', (r['id'],)).fetchone()[0] == data['category_id']} for r in candidates.values()]
-            key = (data['name'], data['address'])
+            from place_duplicates import normalize_place_name, normalize_address
+            key = (normalize_place_name(data['name']), normalize_address(data['address']))
             item['same_file'] = seen.get(key)
             seen.setdefault(key, source['line'])
             item['warnings'] = prepared['warnings']
             item['address'] = data['address']
             item['needs_coordinates'] = data.get('latitude') is None or data.get('longitude') is None
             if item['duplicates'] or item['same_file']:
-                item['status'], item['default_action'] = '중복 가능', 'skip'
+                item['status'], item['default_action'] = '중복 의심', 'skip'
             elif item['warnings']:
                 item['status'], item['default_action'] = '경고', 'skip'
         except ValueError as error:

@@ -1,0 +1,7 @@
+<section class="form-card duplicate-warning" data-duplicate-warning {% if not duplicate_candidates and not p.get('duplicate_warning') %}hidden{% endif %} aria-labelledby="duplicateHeading">
+  <h2 id="duplicateHeading">{{ '비슷한 장소가 이미 등록되어 있습니다.' if duplicate_admin else '혹시 이 장소인가요?' }}</h2>
+  <p>기존 장소가 맞다면 상세 내용을 확인해주세요. 다른 지점이라면 아래 확인 항목을 선택하고 계속 등록할 수 있습니다.</p>
+  <div data-duplicate-candidates>{% for item in duplicate_candidates %}<article class="duplicate-candidate">{% if not duplicate_admin and item.image_url %}<img src="{{ item.image_url }}" alt="" loading="lazy">{% endif %}<div><strong>{{ item.name }}</strong><p>{{ item.address if duplicate_admin else item.region }} · {{ item.category }}</p>{% if duplicate_admin %}<p>{{ item.label }} · {{ item.reasons|join(' · ') }}</p>{% endif %}<a href="{{ '/admin/places/'~item.id~'/edit' if duplicate_admin else '/place/'~item.slug }}" target="_blank" rel="noopener">기존 장소 보기 →</a></div></article>{% endfor %}</div>
+  <label class="member-check"><input type="checkbox" name="duplicate_ack" value="1">{{ '후보를 확인했으며 그래도 신규등록합니다.' if duplicate_admin else '다른 장소예요. 기존 후보를 확인했으며 계속 등록할게요.' }}</label>
+</section>
+<p class="form-help" data-duplicate-status role="status" aria-live="polite"></p>

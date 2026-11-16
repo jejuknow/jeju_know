@@ -25,7 +25,11 @@ class CorrectionResolutionTest(unittest.TestCase):
     post = fixtures.CommunityTest.post
     form = fixtures.CommunityTest.form
     create = fixtures.CommunityTest.create
-    place = fixtures.CommunityTest.place
+    def place(self, **data):
+        place = fixtures.CommunityTest.place(self, **data)
+        # Correction UI targets public places; member submissions now wait for approval.
+        self.assertEqual(self.post(self.admin,f"/admin/places/{place['id']}/toggle-published").status_code,303)
+        return self.rows('SELECT * FROM places WHERE id=?',(place['id'],))[0]
 
     def suggestion(self, p, field='parking_status', value='불가'):
         self.assertEqual(self.post(self.member,f'/places/{p["id"]}/suggest',field=field,new_value=value,reason='현장 안내를 확인했습니다.').status_code,303)

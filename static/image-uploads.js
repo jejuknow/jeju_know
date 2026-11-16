@@ -134,7 +134,7 @@
       form.parentNode.querySelector('.duplicate-warning')?.remove();
       if(!warning)return;
       // This is our escaped, same-origin server form, never an external response.
-      form.before(warning);
+      if(form.hasAttribute('data-duplicate-check')){form.prepend(warning);form.dispatchEvent(new Event('place-duplicate-warning'));}else form.before(warning);
       if(form.hasAttribute('data-member-issue-form')&&!form.querySelector('[name=duplicate_ack]')){
         const label=document.createElement('label');label.className='member-check';
         const check=document.createElement('input');check.type='checkbox';check.name='duplicate_ack';check.value='1';check.required=true;

@@ -227,11 +227,12 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 values.update(form_values(form))
                 values.update(cafe_feature_ids=form.getlist("cafe_feature_ids"), cafe_value_suggestion=form.get("cafe_value_suggestion", ""))
                 return place_form(request, values, status=400, error=str(exc), new_only=new_only)
-            exact, _ = duplicate_matches(conn, data, place_id)
+            exact, similar = duplicate_matches(conn, data, place_id)
         data.update(id=place_id, images=image_store.list("places", place_id) if place_id else [])
-        if exact:
-            return place_form(request, data, status=409, error="이미 등록되었거나 확인 중인 장소입니다. 새로 등록하지 않고 기존 장소의 정보 바로잡기를 이용해주세요.",
-                              similar=[p for p in exact if p["published"]], new_only=new_only)
+        if (exact or similar) and form.get("duplicate_ack") != "1":
+            data["duplicate_warning"] = True
+            return place_form(request, data, status=409, error="이미 등록되었거나 확인 중인 장소와 겹칠 수 있습니다. 다른 장소라면 확인 후 계속 등록할 수 있어요.",
+                              similar=[p for p in exact + similar if p["published"] and not p["is_example"]], new_only=new_only)
         try:
             plan = await image_store.prepare(form, "places", slots=MEMBER_PLACE_SLOTS)
         except ImageError as exc:
@@ -244,10 +245,11 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
                 return HTMLResponse("정보 확인 상태가 변경되었습니다. 수정 제안을 이용해주세요.", status_code=403)
             # Serialize duplicate detection and insertion, including other members/private rows.
             exact, similar = duplicate_matches(conn, data, place_id)
-            if exact:
+            if (exact or similar) and form.get("duplicate_ack") != "1":
                 plan.discard()
-                return place_form(request, data, status=409, error="이미 등록되었거나 확인 중인 장소입니다.",
-                                  similar=[p for p in exact if p["published"]], new_only=new_only)
+                data["duplicate_warning"] = True
+                return place_form(request, data, status=409, error="이미 등록되었거나 확인 중인 장소와 겹칠 수 있습니다. 다른 장소라면 확인 후 계속 등록할 수 있어요.",
+                                  similar=[p for p in exact + similar if p["published"] and not p["is_example"]], new_only=new_only)
             try:
                 facts(normalized, conn, allowed_regions, new_only=new_only, existing=fresh)
                 restaurant_ids = parse_selection(conn, form, data['category_id'], fresh, required=True, member=True)
@@ -272,7 +274,7 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
             plan.apply(conn, place_id)
             # Automated checks only prioritize review. A member never grants publication.
             has_photo = bool(conn.execute("SELECT 1 FROM images WHERE place_id=? LIMIT 1", (place_id,)).fetchone())
-            state, reasons = inspect_place(data, similar=bool(similar), has_photo=has_photo, enabled=True)
+            state, reasons = inspect_place(data, similar=bool(exact or similar), has_photo=has_photo, enabled=True)
             published = False
             conn.execute("UPDATE places SET published=0 WHERE id=?", (place_id,))
             record_check(conn, place_id, state, reasons, False)

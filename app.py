@@ -365,6 +365,8 @@ def create_app(test_config=None):
         standardize(app.state.database)
         from restaurant_ranking_migration import migrate as migrate_restaurant_rankings
         migrate_restaurant_rankings(app.state.database)
+        from place_duplicates import migrate as migrate_duplicates
+        migrate_duplicates(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -1281,6 +1283,12 @@ def create_app(test_config=None):
             if error := selection_error(conn, data['category_id']):
                 plan.discard()
                 return HTMLResponse(error, status_code=400)
+            from place_duplicates import find_duplicate_candidates
+            matches = find_duplicate_candidates(conn, data, include_private=True)
+            if matches and form.get("duplicate_ack") != "1":
+                plan.discard()
+                return templates.TemplateResponse(request=request, name="admin_place_form.html",
+                    context={"place":data,"mode":"new","duplicate_candidates":matches, **form_options()}, status_code=409)
             cursor = conn.execute(
                 """
                 INSERT INTO places (
@@ -1453,6 +1461,8 @@ def create_app(test_config=None):
     register_csv_routes(app, templates, connect_db, admin_guard, require_csrf, flash)
     from taxonomy_order import register_routes as register_taxonomy_order_routes
     register_taxonomy_order_routes(app, connect_db, admin_guard, require_csrf)
+    from place_duplicate_routes import register as register_duplicates
+    register_duplicates(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place, secret_key)
     app.state.admin_ui.register()
     return app
 

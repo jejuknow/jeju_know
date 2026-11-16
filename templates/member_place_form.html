@@ -1,13 +1,15 @@
 {% extends "base.html" %}{% from "_image_uploads.html" import image_uploads %}
 {% block title %}{{ '장소 수정' if place and place.id else '신상 장소 알려주기' if new_only else '장소 알려주기' }} | JEJU_KNOW{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/place-duplicates.css?v=1">{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% set p=place or {} %}
 {% block body %}<main class="admin-wide admin-main narrow">
 <p><a class="text-btn" href="/map">← MAP으로 돌아가기</a></p><p class="kicker">MAP · {{ 'NEW' if new_only else 'COMMUNITY' }}</p><h1>{{ '내 장소 수정' if p.get('id') else '신상 장소 알려주기' if new_only else '장소 알려주기' }}</h1>
 <p class="section-copy">등록한 내용은 관리자 확인 후 공개됩니다. 내 활동에서 검토 상태를 확인할 수 있습니다.</p>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
-{% if similar %}<section class="form-card duplicate-warning"><h2>이미 등록된 장소입니다.</h2>{% for item in similar %}<p><a href="/place/{{ item.slug }}" target="_blank" rel="noopener">{{ item.name }} →</a> {{ item.address or item.region }} <a href="/places/{{ item.id }}/suggest">정보 바로잡기 →</a></p>{% endfor %}<p>기존 장소가 맞다면 상세페이지에서 수정 제안을 이용해주세요.</p></section>{% endif %}
-<form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form member-place-form" data-member-place-form data-photo-prepare="/api/place-photos/prepare">
+
+<form method="post" action="{{ '/places/' ~ p.id ~ '/edit' if p.get('id') else '/map/register' }}" enctype="multipart/form-data" class="admin-form member-place-form" data-member-place-form data-duplicate-check="/places/duplicate-check" data-duplicate-audience="member" data-duplicate-exclude="{{ p.id or '' }}" data-photo-prepare="/api/place-photos/prepare">
+{% set duplicate_admin=false %}{% set duplicate_candidates=similar %}{% include "_place_duplicate_warning.html" %}
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="from_new" value="{{ '1' if new_only else '0' }}">
 <section class="form-card"><h2>장소 기본 정보</h2><div class="form-grid two">
 <label>장소명 *<input name="name" required maxlength="120" value="{{ p.get('name','') }}"></label>
@@ -30,4 +32,4 @@
 <p class="form-help" data-submit-status role="status" aria-live="polite"></p><div class="form-actions"><a class="secondary-btn" href="/account/places">내 장소</a><button class="primary-inline" type="submit">{{ '수정사항 저장' if p.get('id') else '장소 등록하기' }}</button></div>
 </form></main>{% endblock %}
 
-{% block scripts %}<script src="/static/cafe-features.js?v=20261105-simple-form"></script><script src="/static/restaurant-fields.js?v=20261106-multi"></script><script src="/static/kakao-loader.js?v=20261026-csv"></script><script src="/static/admin-location.js?v=20261026-csv"></script><script src="/static/member-place.js?v=20261105-simple-form"></script>{% endblock %}
+{% block scripts %}<script src="/static/place-duplicates.js?v=1"></script><script src="/static/cafe-features.js?v=20261105-simple-form"></script><script src="/static/restaurant-fields.js?v=20261106-multi"></script><script src="/static/kakao-loader.js?v=20261026-csv"></script><script src="/static/admin-location.js?v=20261026-csv"></script><script src="/static/member-place.js?v=20261105-simple-form"></script>{% endblock %}
