@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% from '_place_card_status.html' import card_status %}
+{% block head %}<link rel="stylesheet" href="/static/rankings.css?v=20261116">{% endblock %}
+{% block body %}
+<main class="section wrap ranking-detail">
+  <a class="text-btn" href="/best">← BEST 전체 보기</a>
+  <header class="ranking-heading">
+    <p class="kicker">JEJU_KNOW RANKING · {{ ranking.subtype_name }}</p>
+    <h1>{{ ranking.title }}</h1>
+    {% if ranking.intro %}<p class="section-copy ranking-prose">{{ ranking.intro }}</p>{% endif %}
+    <p class="ranking-notice">{{ ranking_notice }}</p>
+    {% if ranking.reference_date %}<p class="ranking-date">평가 기준일 {{ ranking.reference_date }}</p>{% endif %}
+    {% include '_share_actions.html' %}
+  </header>
+  {% if ranking.criteria_note %}<section class="ranking-criteria"><h2>이렇게 비교했어요</h2><p class="ranking-prose">{{ ranking.criteria_note }}</p></section>{% endif %}
+  <ol class="ranking-places" aria-label="{{ ranking.subtype_name }} 맛집 순위">
+    {% for p in places %}
+    <li class="ranking-place">
+      <div class="ranking-place-heading"><span class="ranking-number" aria-label="{{ loop.index }}위">{{ loop.index }}</span><div><h2><a href="/place/{{ p.slug }}">{{ p.name }}</a></h2><p class="ranking-date">{{ p.region }} · {{ ranking.subtype_name }}</p></div></div>
+      {% if p.image_url %}<a class="ranking-photo" href="/place/{{ p.slug }}" tabindex="-1" aria-hidden="true"><img src="{{ p.image_url }}" alt="" loading="lazy" width="640" height="400"></a>{% endif %}
+      <div class="ranking-place-body">{{ card_status(p) }}{% if p.ranking_reason %}<h3>이 순위에 선정한 이유</h3><p class="ranking-prose">{{ p.ranking_reason }}</p>{% endif %}<a class="secondary-btn" href="/place/{{ p.slug }}">장소 상세 보기 →</a></div>
+    </li>
+    {% endfor %}
+  </ol>
+</main>
+{% endblock %}
+{% block scripts %}<script src="/static/share.js?v=20261028" defer></script>{% endblock %}

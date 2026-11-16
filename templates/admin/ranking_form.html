@@ -1,0 +1,42 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_ranking_controls.html' import tokens,action %}
+{% from 'admin/_ui.html' import public_badge %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin-restaurant.css?v=20261116"><link rel="stylesheet" href="/static/admin-ranking.css?v=20261116">{% endblock %}
+{% block admin_content %}
+<div class="ranking-admin taxonomy-admin" data-taxonomy-admin data-reorder-url="/admin/best/rankings/{{ ranking.id if ranking else 0 }}/reorder">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<script type="application/json" id="taxonomyOrderStates">{{ order_states|tojson }}</script>
+<p class="taxonomy-live-status" data-taxonomy-status hidden role="status" aria-live="polite"></p>
+<div class="row-actions"><a class="secondary-btn" href="/admin/best/rankings">← 맛집 랭킹 목록</a>{% if ranking %}{{ public_badge(ranking.is_public) }}{% if ranking.is_public and not ranking.deleted_at %}<a class="secondary-btn" href="/best/ranking/{{ ranking.slug }}" target="_blank" rel="noopener">공개 화면 ↗</a>{% endif %}{% endif %}</div>
+{% if error %}<p class="ranking-admin-warning" role="alert">{{ error }}</p>{% endif %}
+{% for message in warnings %}<p class="ranking-admin-warning">{{ message }}</p>{% endfor %}
+{% if ranking and ranking.deleted_at %}{{ action(ranking,state,csrf_token,'restore','랭킹 복원') }}{% else %}
+<form class="admin-panel ranking-admin-form" method="post" action="/admin/best/rankings/{{ ranking.id~'/edit' if ranking else 'new' }}">
+  <h2>랭킹 기본 정보</h2>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% if ranking %}<input type="hidden" name="version" value="{{ state.version }}" data-order-version="{{ ranking.id }}"><input type="hidden" name="subtype_taxonomy_id" value="{{ ranking.subtype_taxonomy_id }}"><p>기준 세부유형 <strong>{{ ranking.subtype_name }}</strong></p><p class="admin-help">기준 세부유형과 주소는 생성 후 유지됩니다. /best/ranking/{{ ranking.slug }}</p>
+  {% else %}<label>맛집 세부유형 <select name="subtype_taxonomy_id" required data-ranking-subtype><option value="">세부유형 선택</option>{% for term in subtypes %}<option value="{{ term.id }}" data-name="{{ term.name }}" {% if values.get('subtype_taxonomy_id')|string == term.id|string %}selected{% endif %}>{{ term.parent_name }} · {{ term.name }}</option>{% endfor %}</select></label><p class="admin-help">활성 세부유형당 대표 랭킹 1개를 운영합니다. 기본 정보를 비공개로 저장한 다음 장소를 추가해주세요.</p>{% endif %}
+  <label>랭킹 제목 <input name="title" value="{{ values.get('title','') }}" maxlength="120" required data-ranking-title></label>
+  <label>소개 <textarea name="intro" maxlength="2000" rows="3">{{ values.get('intro','') }}</textarea></label>
+  <label>평가 기준 안내 <textarea name="criteria_note" maxlength="2000" rows="4" placeholder="직접 비교한 기준이 있을 때만 입력해주세요.">{{ values.get('criteria_note','') }}</textarea></label>
+  <label>평가 기준일 (선택) <input type="date" name="reference_date" value="{{ values.get('reference_date') or '' }}"></label>
+  {% if ranking %}<label class="ranking-check"><input type="checkbox" name="is_public" value="1" {% if values.get('is_public') in (1,'1',true) %}checked{% endif %}> 공개</label>{% endif %}
+  <div class="row-actions"><button class="primary-inline" type="submit">{{ '기본 정보 저장' if ranking else '비공개 랭킹 만들기' }}</button></div>
+</form>
+{% if ranking %}
+<section class="admin-panel ranking-admin-items"><h2>순위 · {{ selected_items|length }}곳</h2><p class="admin-help">손잡이를 드래그하거나 ↑↓ 버튼으로 옮기면 바로 저장됩니다. 순위는 직접 결정하며, 장소 추가·제거 후 1위부터 이어집니다.</p>
+<div data-order-group="{{ ranking.id }}">
+{% for item in selected_items %}<article class="ranking-editor-item" data-order-item="{{ item.id }}">
+  <div class="ranking-editor-heading"><div class="row-actions"><button class="taxonomy-drag-handle" type="button" data-order-drag aria-label="{{ item.place.name }} 순위 드래그">⠿</button><strong><span data-order-number>{{ item.sort_order }}</span>위</strong><button class="mini-btn" type="button" data-order-step="-1" aria-label="{{ item.place.name }} 위로 이동">↑</button><button class="mini-btn" type="button" data-order-step="1" aria-label="{{ item.place.name }} 아래로 이동">↓</button></div><h3>{{ item.place.name if item.place else '확인할 수 없는 장소' }}</h3><span>{{ '공개 제외 · 분류/장소 확인 필요' if not item.valid else '공개' if item.place.published else '비공개 장소 · 공개 제외' }}</span></div>
+  <form method="post" action="/admin/best/rankings/{{ ranking.id }}/reason">{{ tokens(csrf_token,ranking.id,state) }}<input type="hidden" name="item_id" value="{{ item.id }}"><label>순위 이유 (선택)<textarea name="reason" rows="3" maxlength="2000">{{ item.reason }}</textarea></label><button class="mini-btn" type="submit">이유 저장</button></form>
+  <div class="row-actions"><a class="mini-btn" href="/admin/places/{{ item.place_id }}/edit">장소 확인</a><form method="post" action="/admin/best/rankings/{{ ranking.id }}/remove" data-confirm="이 장소를 랭킹에서만 제거할까요? 장소 원본은 유지됩니다.">{{ tokens(csrf_token,ranking.id,state) }}<input type="hidden" name="item_id" value="{{ item.id }}"><button class="mini-btn danger">랭킹에서 제거</button></form></div>
+</article>{% else %}<p class="admin-empty">아래 후보에서 직접 비교한 장소를 추가해주세요.</p>{% endfor %}
+</div></section>
+<section class="admin-panel ranking-admin-candidates"><h2>{{ ranking.subtype_name }} 장소 후보</h2><p class="admin-help">해당 세부유형이 실제로 연결된 맛집만 표시합니다. 공개 장소가 먼저 표시되며 최대 100곳입니다. 이름 검색으로 범위를 좁혀주세요. 비공개 장소는 랭킹에 추가해도 방문자에게 표시되지 않습니다.</p>
+<form method="get" class="admin-search-row"><label class="admin-search-input">장소명 검색<input type="search" name="q" value="{{ q }}" maxlength="100"></label><button class="primary-inline">후보 검색</button><a class="secondary-btn" href="/admin/best/rankings/{{ ranking.id }}/edit">초기화</a></form>
+<ul class="ranking-candidate-list">{% for place in candidates %}<li><div><strong>{{ place.name }}</strong><small>{{ place.region }} · {{ '공개' if place.published else '비공개' }}</small></div>{% if place.added %}<span>추가됨</span>{% else %}<form method="post" action="/admin/best/rankings/{{ ranking.id }}/add">{{ tokens(csrf_token,ranking.id,state) }}<input type="hidden" name="place_id" value="{{ place.id }}"><button class="mini-btn" aria-label="{{ place.name }} 추가">+ 추가</button></form>{% endif %}</li>{% else %}<li>조건에 맞는 장소가 없습니다.</li>{% endfor %}</ul></section>
+<section class="admin-panel"><h2>공개 관리</h2><p class="admin-help">공개 가능한 장소가 있어야 공개할 수 있습니다. 공개 중단은 비공개를 사용하세요. 삭제 보관 후에도 같은 주소로 복원할 수 있습니다.</p><div class="row-actions">{{ action(ranking,state,csrf_token,'toggle','비공개로 전환' if ranking.is_public else '랭킹 공개') }}{{ action(ranking,state,csrf_token,'delete','삭제 보관','랭킹을 삭제 상태로 보관할까요? 장소는 삭제되지 않습니다. 공개 중단만 필요하면 비공개를 사용해주세요.') }}</div></section>
+{% endif %}{% endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/admin-taxonomy-order.js?v=20261116-ranking" defer></script><script src="/static/admin-ranking.js?v=20261116" defer></script>{% endblock %}

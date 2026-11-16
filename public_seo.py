@@ -215,4 +215,7 @@ def sitemap(conn):
         where, params = public_where(today()) if table == 'news_posts' else ('published=1 AND deleted_at IS NULL'+extra, [])
         for row in conn.execute(f'SELECT slug,updated_at FROM {table} WHERE {where} ORDER BY id', params):
             add(content_url(prefix,row['slug']),row['updated_at'])
+    from restaurant_rankings import public_rankings
+    for ranking in public_rankings(conn):
+        add(content_url('/best/ranking/',ranking['slug']),ranking['updated_at'])
     return ET.tostring(root, encoding='utf-8', xml_declaration=True)

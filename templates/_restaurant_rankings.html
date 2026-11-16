@@ -1,0 +1,21 @@
+{% if rankings %}
+<section class="best-rankings" aria-labelledby="rankingsTitle">
+  <p class="kicker">JEJU_KNOW RANKING</p>
+  <h2 id="rankingsTitle">같은 메뉴라면, 제주노는 어디를 더 추천할까?</h2>
+  <p class="section-copy">JEJU_KNOW가 직접 비교한 장소만 같은 음식끼리 순위를 정리했습니다.</p>
+  <p class="ranking-notice">{{ ranking_notice }}</p>
+  <div class="ranking-grid">
+    {% for ranking in rankings %}
+    <article class="ranking-preview">
+      <span class="ranking-type">{{ ranking.subtype_name }}</span>
+      <h3><a href="/best/ranking/{{ ranking.slug }}">{{ ranking.title }}</a></h3>
+      {% if ranking.intro %}<p class="ranking-preview-intro">{{ ranking.intro }}</p>{% endif %}
+      <ol class="ranking-top-three">
+        {% for place in ranking.top_places %}<li><span class="ranking-number">{{ loop.index }}</span><a href="/place/{{ place.slug }}">{{ place.name }}</a></li>{% endfor %}
+      </ol>
+      <div class="ranking-preview-footer"><span>총 {{ ranking.place_count }}곳</span><a class="text-btn" href="/best/ranking/{{ ranking.slug }}">랭킹 전체 보기 →</a></div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

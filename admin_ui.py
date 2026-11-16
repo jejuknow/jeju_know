@@ -100,6 +100,8 @@ def admin_context(request, conn):
         section, title, active = "콘텐츠 관리", "광고 관리", "ads"
     elif path.startswith("/admin/inquiries"):
         section, title, active = "콘텐츠 관리", "문의 관리", "inquiries"
+    elif path.startswith("/admin/best/rankings"):
+        section, title, active = "콘텐츠 관리", "BEST · 맛집 랭킹", "rankings"
     elif path.startswith("/admin/best"):
         section, title, active = "콘텐츠 관리", "BEST", "best"
     elif path.startswith("/admin/users"):

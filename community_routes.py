@@ -88,9 +88,14 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
 
     @app.get("/best")
     async def best_page(request: Request):
+        from restaurant_rankings import public_rankings, NOTICE
         with closing(connect_db()) as conn:
             collections = collection_list(conn)
-        return render(request, "best.html", collections=collections, collection=None)
+            rankings = public_rankings(conn)
+        for ranking in rankings:
+            ranking['top_places'] = [row_to_place(p, public=True) for p in ranking.pop('visible_items')[:3]]
+        return render(request, "best.html", collections=collections, collection=None,
+                      rankings=rankings, ranking_notice=NOTICE)
 
     @app.get("/best/{slug}")
     async def best_detail(request: Request, slug: str):

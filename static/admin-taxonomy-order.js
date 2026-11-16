@@ -46,6 +46,9 @@
   }
   function renderState(group) {
     const current = states[group.dataset.orderGroup];
+    root.querySelectorAll('[data-order-version]').forEach(input => {
+      if (input.dataset.orderVersion === group.dataset.orderGroup) input.value = current.version;
+    });
     if (group === groups[0]) {
       const nav = root.querySelector('.taxonomy-jumps');
       current.items.forEach(record => {

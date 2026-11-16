@@ -354,6 +354,8 @@ def create_app(test_config=None):
         migrate_taxonomy_order(app.state.database)
         from taxonomy_order import standardize
         standardize(app.state.database)
+        from restaurant_ranking_migration import migrate as migrate_restaurant_rankings
+        migrate_restaurant_rankings(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
@@ -1199,6 +1201,8 @@ def create_app(test_config=None):
                     flash(request, f"현재 {count}개 장소에서 사용 중인 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
                 elif children:
                     flash(request, "하위 분류가 있는 카테고리입니다. 삭제 대신 비활성화할 수 있습니다.", "error")
+                elif conn.execute('SELECT 1 FROM restaurant_rankings WHERE subtype_taxonomy_id=?', (category_id,)).fetchone():
+                    flash(request, "맛집 랭킹의 기준 세부유형입니다. 기록 보존을 위해 삭제 대신 비활성화해주세요.", "error")
                 else:
                     conn.execute("DELETE FROM categories WHERE id=?", (category_id,))
                     if original:
@@ -1396,6 +1400,7 @@ def create_app(test_config=None):
         plan = ImagePlan(image_store, "places")
         with plan.transaction() as conn:
             related = conn.execute("SELECT (SELECT count(*) FROM place_pick_periods WHERE place_id=?) + (SELECT count(*) FROM place_correction_suggestions WHERE place_id=?) + (SELECT count(*) FROM best_collection_places WHERE place_id=?) + (SELECT count(*) FROM place_merge_log WHERE source_id=? OR target_id=?)", (place_id,place_id,place_id,place_id,place_id)).fetchone()[0]
+            related += conn.execute('SELECT count(*) FROM restaurant_ranking_items WHERE place_id=?', (place_id,)).fetchone()[0]
             if related:
                 for owner in conn.execute("SELECT id FROM places WHERE id=? OR merged_into_id=?", (place_id,place_id)).fetchall():
                     plan.delete_owner(conn, owner[0])
@@ -1412,6 +1417,8 @@ def create_app(test_config=None):
     register_contact_routes(app, templates, connect_db, admin_guard, require_csrf, flash, secret_key)
     register_member_routes(app, templates, connect_db, require_csrf, flash,
                            parse_news_form, row_to_news, admin_guard, list(PUBLIC_CATEGORIES.values()), secret_key, image_store)
+    from restaurant_ranking_routes import register as register_restaurant_rankings
+    register_restaurant_rankings(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place)
     register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
                               row_to_place, form_options, REGIONS, secret_key, image_store)
     app.state.admin_ui = AdminUI(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place, row_to_news, NEWS_CATEGORIES, NEWS_CATEGORY_ALIASES)

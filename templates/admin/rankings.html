@@ -1,0 +1,11 @@
+{% extends 'admin/base.html' %}
+{% from 'admin/_ui.html' import public_badge %}
+{% from 'admin/_ranking_controls.html' import action %}
+{% block admin_content %}
+<p class="admin-page-description">같은 음식의 세부유형 안에서 직접 비교한 맛집과 순위를 관리합니다. 기존 상황별 BEST와 별도로 운영됩니다.</p>
+<form method="get" class="admin-filters"><div class="admin-search-row"><label class="admin-search-input">랭킹 제목·세부유형<input type="search" name="q" value="{{ q }}" maxlength="100"></label><label>보기<select name="archived"><option value="0">운영 중</option><option value="1" {% if archived %}selected{% endif %}>삭제 보관함</option></select></label><button class="primary-inline">검색</button><a class="primary-inline admin-create" href="/admin/best/rankings/new">+ 맛집 랭킹 만들기</a></div></form>
+<section class="admin-panel"><div class="admin-data-wrap"><table class="admin-data-table"><thead><tr><th>랭킹</th><th>기준 세부유형</th><th>포함 장소</th><th>공개 설정</th><th>관리</th></tr></thead><tbody>
+{% for r in rankings %}<tr><td data-label="랭킹" class="admin-cell-title"><a class="admin-title-link" href="/admin/best/rankings/{{ r.id }}/edit">{{ r.title }}</a><small>/best/ranking/{{ r.slug }}</small></td><td data-label="세부유형">{{ r.subtype_name }}</td><td data-label="장소">{{ r.place_count }}곳</td><td data-label="공개 설정">{{ public_badge(r.is_public) }}</td><td data-label="관리"><div class="row-actions"><a class="mini-btn" href="/admin/best/rankings/{{ r.id }}/edit">{{ '상세' if archived else '수정' }}</a>{% if archived %}{{ action(r,r.state,csrf_token,'restore','복원') }}{% else %}{{ action(r,r.state,csrf_token,'toggle','비공개' if r.is_public else '공개') }}{{ action(r,r.state,csrf_token,'delete','삭제 보관','랭킹을 삭제 상태로 보관할까요? 포함된 장소는 삭제되지 않습니다. 공개 중단만 필요하면 비공개를 사용해주세요.') }}{% endif %}</div></td></tr>
+{% else %}<tr><td colspan="5" class="admin-empty">등록된 맛집 랭킹이 없습니다. 실제 비교한 세부유형부터 만들어주세요.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

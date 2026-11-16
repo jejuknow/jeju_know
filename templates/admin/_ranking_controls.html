@@ -1,0 +1,2 @@
+{% macro tokens(csrf, ranking_id, state) %}<input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="version" value="{{ state.version }}" data-order-version="{{ ranking_id }}">{% endmacro %}
+{% macro action(ranking, state, csrf, name, label, confirmation='') %}<form method="post" action="/admin/best/rankings/{{ ranking.id }}/{{ name }}" {% if confirmation %}data-confirm="{{ confirmation }}"{% endif %}>{{ tokens(csrf,ranking.id,state) }}<button class="mini-btn {{ 'danger' if name=='delete' }}" type="submit">{{ label }}</button></form>{% endmacro %}

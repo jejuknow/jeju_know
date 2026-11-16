@@ -1,0 +1,22 @@
+.ranking-admin{display:grid;gap:20px;min-width:0}
+.ranking-admin .admin-panel{padding:24px}
+.ranking-admin h2{font-size:20px;line-height:1.5;margin:0 0 12px}
+.ranking-admin h3{font-size:17px;line-height:1.5;margin:0}
+.ranking-admin-form,.ranking-editor-item{display:grid;gap:16px}
+.ranking-admin label{display:grid;gap:8px;font-weight:600;min-width:0}
+.ranking-admin input,.ranking-admin textarea,.ranking-admin select{max-width:100%;min-width:0;box-sizing:border-box}
+.ranking-admin .ranking-check{display:flex;align-items:center;gap:10px}
+.ranking-check input{width:auto}
+.ranking-admin-warning{margin:0;padding:14px 18px;border:1px solid #f4d9a6;background:#fffbef;border-radius:12px;line-height:1.7}
+.ranking-editor-item{padding:20px 0;border-top:1px solid var(--line,#e5e9f2)}
+.ranking-editor-item>form{display:grid;gap:10px;justify-items:start}
+.ranking-editor-item>form>label{width:100%}
+.ranking-editor-heading{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.ranking-editor-heading>span{font-size:12px;color:#667085}
+.ranking-admin [data-order-drag]{touch-action:none;cursor:grab;min-width:40px;min-height:40px;border:1px solid #dce2ee;border-radius:8px;background:#fff;font-size:22px}
+.ranking-candidate-list{list-style:none;padding:0;margin:20px 0 0}
+.ranking-candidate-list li{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid #e5e9f2}
+.ranking-candidate-list li>div{min-width:0}
+.ranking-candidate-list small{display:block;color:#667085;margin-top:5px}
+.ranking-candidate-list form{flex-shrink:0}
+@media(max-width:600px){.ranking-editor-heading{align-items:flex-start}.ranking-editor-heading h3{flex-basis:100%}.ranking-admin .admin-panel{padding:18px}.ranking-admin .mini-btn{white-space:nowrap}.ranking-admin .admin-search-row{flex-wrap:wrap}.ranking-admin .admin-search-input{flex-basis:100%}}
