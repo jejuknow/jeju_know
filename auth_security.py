@@ -24,6 +24,8 @@ from image_limits import MAX_FILE_BYTES, FORM_BYTES, BODY_LIMIT_MESSAGE, MEMBER_
 PASSWORD_HASHER = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1, type=Type.ID)
 DUMMY_HASH = PASSWORD_HASHER.hash(secrets.token_urlsafe(32))
 COOKIE_NAME = "jejuno_session"
+MEMBER_SESSION_SECONDS = 7 * 86400
+ADMIN_SESSION_SECONDS = 8 * 3600
 HASH_SLOTS = threading.BoundedSemaphore(2)
 
 
@@ -106,6 +108,13 @@ class ServerSessionMiddleware:
                 # Compatibility for pre-existing operator members, never a dedicated super administrator.
                 admin = dict(member_id=member["id"], username=member["username"],
                              display_name=member["nickname"], role="sub_admin")
+            if admin:
+                # Existing sessions were issued for seven days. Derive their original
+                # issue time once; never extend them when applying the shorter limit.
+                issued = data.get("auth_issued_at", row["expires_at"] - MEMBER_SESSION_SECONDS)
+                if now >= issued + ADMIN_SESSION_SECONDS:
+                    conn.execute("DELETE FROM auth_sessions WHERE token_hash=?", (token_hash,))
+                    return {}, None, None, None
             return data, dict(member) if member else None, row["expires_at"], admin
 
     def save(self, old_hash, data, expiry, rotate):
@@ -117,7 +126,8 @@ class ServerSessionMiddleware:
             if not data:
                 return "", 0
             user_id, admin_id = data.get("user_id"), data.get("admin_id")
-            if user_id and not conn.execute("SELECT 1 FROM users WHERE id=? AND status='active'", (user_id,)).fetchone():
+            member = conn.execute("SELECT role FROM users WHERE id=? AND status='active'", (user_id,)).fetchone() if user_id else None
+            if user_id and not member:
                 return "", 0
             if admin_id and not conn.execute(
                 "SELECT 1 FROM admins WHERE id=? AND is_active=1 AND auth_version=?",
@@ -126,7 +136,10 @@ class ServerSessionMiddleware:
                 return "", 0
             if rotate or not expiry:
                 token = secrets.token_urlsafe(32)
-                age = 7 * 86400 if user_id or admin_id else 3600
+                is_admin = admin_id or (member and member["role"] == "admin")
+                age = ADMIN_SESSION_SECONDS if is_admin else MEMBER_SESSION_SECONDS if user_id else 3600
+                if is_admin:
+                    data["auth_issued_at"] = now
                 conn.execute("INSERT INTO auth_sessions VALUES (?,?,?,?,?)", (hashlib.sha256(token.encode()).hexdigest(), json.dumps(data), user_id, admin_id, now + age))
                 return token, age
             conn.execute("UPDATE auth_sessions SET data=?,user_id=?,admin_id=? WHERE token_hash=? AND expires_at>?", (json.dumps(data), user_id, admin_id, old_hash, now))

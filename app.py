@@ -1,6 +1,7 @@
 import asyncio
 import hmac
 import json
+import logging
 import math
 import mimetypes
 import os
@@ -8,6 +9,7 @@ import re
 import secrets
 import sqlite3
 import uuid
+import traceback
 from contextlib import closing, asynccontextmanager, suppress
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -150,6 +152,9 @@ def create_app(test_config=None):
     database_path = Path(test_config.get("DATABASE") or os.environ.get("JEJUNO_DATABASE", data_dir / "jejuno.db"))
     secret_path = data_dir / "secret_key.txt"
 
+    if os.environ.get("RAILWAY_ENVIRONMENT_ID") and not test_config.get("TESTING") and not os.environ.get("SECRET_KEY", "").strip():
+        raise RuntimeError("Railway SECRET_KEY environment variable is required")
+
     if test_config.get("SECRET_KEY"):
         secret_key = test_config["SECRET_KEY"]
     elif os.environ.get("SECRET_KEY"):
@@ -159,6 +164,7 @@ def create_app(test_config=None):
     else:
         secret_key = secrets.token_urlsafe(48)
         secret_path.write_text(secret_key, encoding="utf-8")
+        secret_path.chmod(0o600)
 
     # Fail closed unless this is explicitly a development environment.
     docs_enabled = os.environ.get("JEJUNO_ENV", "production").strip().lower() == "development"
@@ -194,6 +200,14 @@ def create_app(test_config=None):
     mimetypes.add_type("font/woff2", ".woff2")
     mimetypes.add_type("image/webp", ".webp")
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+    @app.exception_handler(Exception)
+    async def safe_server_error(request, exc):
+        # Stack locations only: exception messages/locals can contain submitted secrets.
+        frames = [(Path(f.filename).name, f.lineno, f.name) for f in traceback.extract_tb(exc.__traceback__)]
+        logging.getLogger(__name__).error("Unhandled application error: type=%s frames=%s", type(exc).__name__, frames)
+        return HTMLResponse("문제가 발생했습니다. 잠시 후 다시 시도해주세요.", status_code=500,
+                            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex,nofollow"})
 
     @app.middleware('http')
     async def indexing_policy(request, call_next):
@@ -895,6 +909,7 @@ def create_app(test_config=None):
             [("ip", request.client.host if request.client else "unknown"), ("username", username[:200])],
             limit=ADMIN_LOGIN_LIMIT, window=ADMIN_LOGIN_WINDOW_SECONDS,
         ):
+            logging.getLogger(__name__).warning("Administrator login rate limit reached")
             return HTMLResponse("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", status_code=429,
                                 headers={"Retry-After": str(ADMIN_LOGIN_WINDOW_SECONDS)})
         conn = connect_db()
@@ -933,6 +948,9 @@ def create_app(test_config=None):
         form = await request.form()
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
+        with closing(connect_db()) as conn, conn:
+            actor = request.scope["admin_identity"]
+            audit(conn, request, "관리자 로그아웃", "관리자", actor.get("id"))
         request.session.clear()
         return RedirectResponse(url="/", status_code=303)
 
