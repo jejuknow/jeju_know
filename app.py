@@ -397,6 +397,8 @@ def create_app(test_config=None):
         migrate_restaurant_rankings(app.state.database)
         from place_duplicates import migrate as migrate_duplicates
         migrate_duplicates(app.state.database)
+        from operational_health import migrate as migrate_operational_health
+        migrate_operational_health(app.state.database)
 
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)

@@ -2,6 +2,9 @@
 import math
 import re
 import unicodedata
+from pathlib import Path
+from threading import RLock
+from collections import OrderedDict
 from collections import defaultdict
 from functools import lru_cache
 from itertools import combinations
@@ -14,6 +17,8 @@ PRIORITY = {"high": 0, "medium": 1, "low": 2}
 FIELDS = ("id", "name", "address", "phone", "category_id", "category", "region", "latitude", "longitude",
           "slug", "published", "is_example", "image_url")
 ACTIVE = "deleted_at IS NULL AND merged_into_id IS NULL"
+_snapshots = OrderedDict()
+_snapshot_lock = RLock()
 
 
 def migrate(database):
@@ -154,8 +159,28 @@ def _grouped(values, ignored):
 
 
 def groups(conn):
-    # O(n) content signature; compare indexed candidates only when data/decisions change.
-    return _grouped(tuple(tuple(p[k] for k in FIELDS) for p in rows(conn)),tuple(sorted(ignores(conn))))
+    database = conn.execute("PRAGMA database_list").fetchone()[2]
+    tracked = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='place_duplicate_revision'").fetchone()
+    if not database or not tracked or conn.in_transaction:
+        return _grouped(tuple(tuple(p[k] for k in FIELDS) for p in rows(conn)), tuple(sorted(ignores(conn))))
+    stat = Path(database).stat()
+    key = (database, stat.st_ino, stat.st_dev)
+    # Capture revision and rows in one read snapshot so a concurrent edit cannot
+    # label old results with a new revision. No place rows are fetched on cache hits.
+    with _snapshot_lock:
+        conn.execute("BEGIN")
+        try:
+            revision = conn.execute("SELECT revision FROM place_duplicate_revision WHERE id=1").fetchone()[0]
+            cached = _snapshots.get(key)
+            if cached is None or cached[0] != revision:
+                result = _grouped(tuple(tuple(p[k] for k in FIELDS) for p in rows(conn)), tuple(sorted(ignores(conn))))
+                _snapshots[key] = (revision, result)
+            _snapshots.move_to_end(key)
+            while len(_snapshots) > 8:
+                _snapshots.popitem(last=False)
+            return _snapshots[key][1]
+        finally:
+            conn.rollback()
 
 
 def membership(conn):

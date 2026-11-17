@@ -23,6 +23,7 @@ SUGGESTION_LABELS = {**SUGGESTION_FIELDS, DETAIL_FIELD: DETAIL_LABEL}
 from taxonomy_migrations import TYPES
 from place_auto_checks import counts as auto_counts, ORDER as AUTO_ORDER, decorate as decorate_check
 from place_duplicates import groups as duplicate_groups, membership as duplicate_membership
+from operational_health import counts as health_counts, MISSING_COORDINATES, MISSING_IMAGE
 
 ACTIVE = "p.deleted_at IS NULL AND p.merged_into_id IS NULL"
 KINDS = {"region": "지역", "place": "장소 카테고리", "restaurant_subcategory": "맛집 유형",
@@ -166,10 +167,12 @@ class AdminUI:
         with closing(self.db()) as conn:
             from analytics import report
             stats = report(conn, {'period':'30d'})
-            freshness = freshness_counts(conn, ACTIVE, six_month_cutoff(today()).isoformat())
+            health = health_counts(conn, six_month_cutoff(today()).isoformat())
+            freshness = {key: health[key] for key in ("stale", "never")}
             places = [decorate_check(dict(r)) for r in conn.execute("SELECT p.*,u.nickname FROM places p LEFT JOIN users u ON u.id=p.submitted_by_user_id WHERE " + ACTIVE + " AND p.source_type='user' AND p.verification_status='unverified' ORDER BY " + AUTO_ORDER + ",p.id DESC LIMIT 5")]
             suggestions = conn.execute("SELECT s.*,p.name FROM place_correction_suggestions s LEFT JOIN places p ON p.id=s.place_id WHERE " + CORRECTION_PENDING + " ORDER BY s.id DESC LIMIT 5").fetchall()
-        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS, analytics=stats, freshness=freshness)
+        return self.render(request, "dashboard.html", places=places, suggestions=suggestions, suggestion_fields=SUGGESTION_LABELS,
+                           analytics=stats, freshness=freshness, health=health, backup=self.app.state.backups.status())
 
     def stale_places(self, request):
         if response := self.guard(request):
@@ -201,6 +204,8 @@ class AdminUI:
             return response
         f = request.query_params
         where, args = [ACTIVE], []
+        if f.get("missing") in ("coordinates", "image"):
+            where.append(MISSING_COORDINATES if f["missing"] == "coordinates" else MISSING_IMAGE)
         field = f.get("search_by", "all")
         q = f.get("q", "").strip()[:200]
         if q:
