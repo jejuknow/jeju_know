@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/place-duplicates.css?v=1">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/place-duplicates.css?v=2">{% endblock %}
 {% block admin_content %}
 <p><a href="{{ back_url or '/admin/places/duplicates' }}">← {{ 'CSV 미리보기' if csv_mode else '중복 의심 목록' }}</a></p>
 {% if csv_mode %}<p class="admin-page-description">CSV {{ csv_line }}행의 입력값과 기존 장소입니다. 빈 셀은 업데이트 시 유지되는 값입니다. 실제 반영은 미리보기에서 작업과 대상을 선택해야 합니다.</p>

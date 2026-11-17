@@ -1,5 +1,5 @@
 {% extends 'admin/base.html' %}{% from 'admin/_ui.html' import badge %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/place-duplicates.css?v=1">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/place-duplicates.css?v=2">{% endblock %}
 {% block admin_content %}
 <p class="admin-page-description">자동으로 중복 가능성이 있는 장소를 찾았습니다. 삭제 또는 병합은 자동으로 처리하지 않습니다.</p>
 <nav class="admin-tabs" aria-label="중복 의심 등급"><a href="/admin/places/duplicates" {% if selected=='all' %}aria-current="page"{% endif %}>전체 {{ group_count }}그룹</a>{% for value,label in levels.items() %}<a href="?level={{ value }}" {% if selected==value %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}<a href="?level=ignored" {% if selected=='ignored' %}aria-current="page"{% endif %}>별개 장소 제외 {{ ignored|length }}쌍</a></nav>
