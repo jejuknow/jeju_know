@@ -2,7 +2,7 @@
 {% from 'admin/_ui.html' import icon %}
 {% block title %}{{ admin_title }} | JEJU_KNOW ADMIN{% endblock %}
 {% block body_class %}admin-body admin-shell{% endblock %}
-{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin.css?v=20261105-correction-resolved"><link rel="stylesheet" href="/static/analytics.css?v=20261029">{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/admin.css?v=20261117-operational-health"><link rel="stylesheet" href="/static/analytics.css?v=20261029">{% endblock %}
 {% block body %}
 <a class="admin-skip" href="#adminContent">본문으로 건너뛰기</a>
 <div class="admin-drawer-shade" id="adminDrawerShade" hidden></div>
@@ -19,7 +19,7 @@
       ('회원 관리','user',[('users','회원 목록','/admin/users')]),
       ('관리자 관리','user',[('operators','관리자 목록','/admin/admins'),('admin-logs','관리자 활동 기록','/admin/admin-logs')]),
       ('통계','dashboard',[('analytics','방문·FIND 통계','/admin/analytics')]),
-      ('운영 설정','settings',[('home','홈 화면','/admin/settings/home'),('general','기본 설정','/admin/settings/general')])
+      ('운영 설정','settings',[('home','홈 화면','/admin/settings/home'),('general','기본 설정','/admin/settings/general'),('backups','백업 관리','/admin/backups')])
     ] if is_super or group not in ("분류 관리","운영 설정","관리자 관리") %}
     <details class="admin-nav-group" {% if admin_section==group %}open{% endif %}><summary>{{ icon(symbol) }}{{ group }}<span class="admin-chevron" aria-hidden="true">⌄</span></summary>
       {% if group=='분류 관리' %}{% for key,label in classification_kinds.items() %}<a href="/admin/classifications/{{ key }}" {% if admin_active=='class-'~key %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}

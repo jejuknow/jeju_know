@@ -26,10 +26,10 @@
 7. `http://서버IP:8000` 확인
 8. 도메인 연결 후 Caddy/Nginx와 HTTPS 설정
 9. `SESSION_COOKIE_SECURE=1`로 변경 후 재시작
-10. `deploy/backup.sh`를 하루 1회 실행하도록 cron 등록
+10. 앱이 한국시간 03:00에 SQLite 자동 백업을 실행합니다. 별도 cron은 필요하지 않습니다. 수동 실행은 `deploy/backup.sh manual`, 복구 검증은 `deploy/backup.sh verify`를 사용합니다. [복구 절차](docs/backup-recovery.md)를 확인하세요.
 
 ## SQLite 보존
 `docker-compose.yml`의 `./data:/data` 바인드 마운트 때문에 컨테이너를 다시 만들어도 DB는 서버의 `data/jejuno.db`에 남습니다.
 
 ## 주의
-현재 포함된 `data/jejuno.db`는 이 대화에서 생성된 프로토타입 DB입니다. 사용자의 PC에서 이미 관리자 CRUD로 데이터를 추가했다면, 서버 배포 전에 PC의 최신 `jejuno.db`로 이 파일을 교체해야 합니다.
+운영 Volume의 기존 DB를 로컬 DB나 seed 파일로 교체하지 마세요. 재배포는 기존 `/data/jejuno.db`를 유지합니다. 장애 복구가 필요한 경우 쓰기 중단·현재 DB 보존·백업 검증·운영자 승인 절차를 먼저 따릅니다.

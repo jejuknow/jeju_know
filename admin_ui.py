@@ -117,6 +117,8 @@ def admin_context(request, conn):
         section, title, active = "관리자 관리", "관리자 활동 기록", "admin-logs"
     elif path.startswith("/admin/account"):
         section, title, active = "내 계정", "내 관리자 계정", "operator-self"
+    elif path.startswith("/admin/backups"):
+        section, title, active = "운영 설정", "백업 관리", "backups"
     elif path.startswith("/admin/settings"):
         section, active = "운영 설정", path.rsplit("/", 1)[-1]
         title = "홈 화면" if active == "home" else "기본 설정"

@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import json
 import math
@@ -7,7 +8,7 @@ import re
 import secrets
 import sqlite3
 import uuid
-from contextlib import closing
+from contextlib import closing, asynccontextmanager, suppress
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -58,6 +59,8 @@ from contact_inquiries import migrate as migrate_contact, migrate_member_inquiri
 from issue_calendar_migration import migrate as migrate_issue_calendar
 from fastapi import HTTPException
 from issue_review import migrate as migrate_issue_review, candidates, submission_error, review_label, has_poster
+from sqlite_backups import BackupManager
+from backup_routes import register_backups
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_DIR = BASE_DIR / "data"
@@ -159,14 +162,27 @@ def create_app(test_config=None):
 
     # Fail closed unless this is explicitly a development environment.
     docs_enabled = os.environ.get("JEJUNO_ENV", "production").strip().lower() == "development"
+    @asynccontextmanager
+    async def lifespan(app):
+        task = None if app.state.testing else asyncio.create_task(app.state.backups.schedule())
+        try:
+            yield
+        finally:
+            if task:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+
     app = FastAPI(
         title="JEJU_KNOW",
+        lifespan=lifespan,
         docs_url="/docs" if docs_enabled else None,
         redoc_url="/redoc" if docs_enabled else None,
         openapi_url="/openapi.json" if docs_enabled else None,
     )
     app.router.route_class = ClosedFormRoute
     app.state.database = str(database_path)
+    app.state.backups = BackupManager(database_path)
     app.state.testing = bool(test_config.get("TESTING"))
     app.state.kakao_map_key = os.environ.get("KAKAO_MAP_JS_KEY", "").strip()
     app.add_middleware(
@@ -1446,6 +1462,7 @@ def create_app(test_config=None):
         flash(request, f"‘{row['name']}’을(를) 즉시 삭제했습니다.", "success")
         return RedirectResponse(url=admin_return(form), status_code=303)
 
+    register_backups(app, templates, connect_db, require_csrf, flash, secret_key)
     register_admin_accounts(app, templates, connect_db, require_csrf, flash, secret_key)
     register_ad_routes(app, templates, connect_db, admin_guard, require_csrf, flash, image_store)
     register_contact_routes(app, templates, connect_db, admin_guard, require_csrf, flash, secret_key)

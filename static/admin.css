@@ -62,3 +62,7 @@
 .correction-history{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 16px}
 .correction-stale-label{color:#8c6518}
 @media(max-width:900px){.correction-values{grid-template-columns:1fr}.correction-actions{align-items:stretch}.correction-actions button{flex:1 1 auto;max-width:100%}}
+
+/* Backup controls must reserve their full touch height at every viewport. */
+.admin-backup-panel{padding:20px}.admin-backup-panel p{margin:12px 0;line-height:1.65}.admin-backup-panel .backup-actions{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin:18px 0}.backup-actions form{display:flex;margin:0}.backup-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px}.admin-backup-panel code{overflow-wrap:anywhere}.admin-backup-panel ol{padding-left:22px;line-height:1.8}.admin-backup-status.admin-summary-card:last-child{display:flex;grid-column:1/-1}.admin-backup-status>strong{font-size:22px}.admin-backup-panel td[data-label="파일"]{overflow-wrap:anywhere}
+@media(max-width:640px){.admin-backup-panel{padding:16px}.backup-actions form{flex:1 1 100%}.backup-actions button{width:100%}.admin-backup-panel td[data-label="파일"]{grid-column:1/-1}}
