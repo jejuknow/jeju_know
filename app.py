@@ -1493,6 +1493,8 @@ def create_app(test_config=None):
     register_community_routes(app, templates, connect_db, require_csrf, flash, admin_guard,
                               row_to_place, form_options, REGIONS, secret_key, image_store)
     app.state.admin_ui = AdminUI(app, templates, connect_db, admin_guard, require_csrf, flash, row_to_place, row_to_news, NEWS_CATEGORIES, NEWS_CATEGORY_ALIASES)
+    from best_places import register_routes as register_best_place_routes
+    register_best_place_routes(app, connect_db, admin_guard, require_csrf, image_store)
     app.state.analytics = Analytics(app, str(database_path), secret_key, admin_guard, templates)
     from csv_import_routes import register_csv_routes
     register_csv_routes(app, templates, connect_db, admin_guard, require_csrf, flash)

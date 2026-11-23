@@ -469,9 +469,10 @@ class AdminUI:
             with closing(self.db()) as conn:
                 c = conn.execute("SELECT * FROM best_collections WHERE id=? AND deleted_at IS NULL", (collection_id,)).fetchone()
                 if not c: return HTMLResponse("모음을 찾을 수 없습니다.", status_code=404)
-                selected = conn.execute("SELECT p.id,p.name,b.sort_order FROM best_collection_places b JOIN places p ON p.id=b.place_id WHERE b.collection_id=? AND " + ACTIVE + " ORDER BY b.sort_order,p.id", (collection_id,)).fetchall()
-                places = conn.execute("SELECT id,name FROM places p WHERE " + ACTIVE + " ORDER BY name").fetchall()
-            return self.render(request, "best_form.html", collection=c, selected_places=selected, places=places)
+                from best_places import editor_state, filters
+                state = editor_state(conn, collection_id, app.state.image_store)
+                options = filters(conn)
+            return self.render(request, "best_form.html", collection=c, best_state=state, best_filters=options)
 
         @app.post("/admin/best/new")
         @app.post("/admin/best/{collection_id}/edit")

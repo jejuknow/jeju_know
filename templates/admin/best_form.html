@@ -1,3 +1,41 @@
 {% extends 'admin/base.html' %}
 {% block admin_content %}<section class="admin-panel admin-editor-body"><h2>{{ 'BEST 수정' if collection else 'BEST 만들기' }}</h2><form class="admin-form" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>모음 제목<input name="title" value="{{ collection.title if collection else '' }}" maxlength="120" required></label><label>소개<textarea name="description" maxlength="2000" rows="3">{{ collection.description if collection else '' }}</textarea></label><label>대표 이미지 URL<input name="image_url" value="{{ collection.image_url if collection else '' }}" maxlength="2000" placeholder="https://... 또는 기존 /uploads/ 이미지 주소"></label><label>노출 순서<input type="number" name="sort_order" value="{{ collection.sort_order if collection else 0 }}" min="0" max="9999" required></label><label class="check"><input type="checkbox" name="published" value="1" {% if collection and collection.published %}checked{% endif %}>공개</label><div class="row-actions"><button class="primary-inline">저장</button><a class="secondary-btn" href="/admin/best">목록으로</a>{% if collection %}<a class="secondary-btn" href="/best/{{ collection.slug }}" target="_blank">방문자 화면 ↗</a>{% endif %}</div></form></section>
-{% if collection %}<section class="admin-panel admin-editor-body"><h2>포함 장소 · 순서 관리</h2>{% for p in selected_places %}<form method="post" action="/admin/best/{{ collection.id }}/places" class="admin-best-item"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="place_id" value="{{ p.id }}"><a href="/admin/places/{{ p.id }}/edit">{{ p.name }}</a><label>순서<input type="number" name="sort_order" min="0" max="9999" value="{{ p.sort_order }}"></label><button class="mini-btn" name="action" value="add">순서 저장</button><button class="mini-btn" name="action" value="remove">모음에서 제외</button></form>{% else %}<p>포함된 장소가 없습니다.</p>{% endfor %}<form method="post" action="/admin/best/{{ collection.id }}/places" class="admin-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="action" value="add"><div class="form-grid two"><label>장소 선택<select name="place_id" required>{% for p in places %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label><label>순서<input type="number" name="sort_order" min="0" max="9999" value="0"></label></div><button class="primary-inline">+ 장소 추가</button></form></section>{% endif %}{% endblock %}
+{% if collection %}
+<link rel="stylesheet" href="/static/admin-best.css?v=20261123">
+<div class="best-editor" data-best-editor data-url="/admin/best/{{ collection.id }}/places">
+  <script type="application/json" id="bestEditorState">{{ best_state|tojson }}</script>
+  <script type="application/json" id="bestEditorFilters">{{ best_filters|tojson }}</script>
+  <noscript><p class="admin-panel">장소 검색과 순서 관리를 위해 JavaScript를 켜주세요.</p></noscript>
+  <div class="best-notice" role="status" aria-live="polite" data-notice></div>
+  <button type="button" class="secondary-btn" data-refresh hidden>최신 목록 다시 불러오기</button>
+  <section class="admin-panel admin-editor-body" aria-labelledby="bestSearchHeading">
+    <h2 id="bestSearchHeading">장소 찾기 · 추가</h2>
+    <p class="best-help">장소를 선택한 순서대로 모음의 맨 뒤에 추가합니다.</p>
+    <div class="best-tabs" role="group" aria-label="검색 카테고리" data-search-categories>
+      <button type="button" class="mini-btn" data-category="" aria-pressed="true">전체</button>
+      {% for c in best_filters.categories %}<button type="button" class="mini-btn" data-category="{{ c.id }}" aria-pressed="false">{{ c.name }}</button>{% endfor %}
+    </div>
+    <form class="admin-form best-search" data-search-form>
+      <div class="best-search-fields">
+        <label>장소명·지역·유형 검색<input type="search" name="q" maxlength="120" placeholder="예: 천일, 구좌 베이커리" autocomplete="off"></label>
+        <label>지역<select name="region"><option value="">전체 지역</option>{% for r in best_filters.regions %}<option value="{{ r.value }}">{{ r.label }}</option>{% endfor %}</select></label>
+        <label data-major-wrap hidden>맛집 대분류<select name="major"><option value="">전체 음식</option></select></label>
+        <label data-term-wrap hidden><span data-term-label>세부 조건</span><select name="term"><option value="">전체</option></select></label>
+      </div>
+      <div class="row-actions"><button type="submit" class="secondary-btn">검색</button><button type="button" class="mini-btn" data-reset>조건 초기화</button></div>
+    </form>
+    <p class="best-help" role="status" data-search-status></p>
+    <div class="best-results" data-results aria-label="장소 검색 결과"></div>
+    <nav class="row-actions best-pagination" aria-label="장소 검색 페이지"><button type="button" class="mini-btn" data-prev>이전</button><span data-page></span><button type="button" class="mini-btn" data-next>다음</button></nav>
+    <div class="best-add-bar"><p class="best-help" data-selection>선택한 장소가 없습니다.</p><div class="row-actions"><button type="button" class="primary-inline" data-add disabled>선택한 0곳 추가</button><button type="button" class="mini-btn" data-clear disabled>선택 해제</button></div></div>
+  </section>
+  <section class="admin-panel admin-editor-body" aria-labelledby="bestIncludedHeading">
+    <h2 id="bestIncludedHeading">포함 장소 · 순서 관리 <span data-included-count></span></h2>
+    <div class="best-tabs" role="group" aria-label="포함 장소 카테고리" data-included-categories></div>
+    <p class="best-help" data-order-help>전체 보기에서 손잡이를 드래그하거나 ↑↓ 버튼으로 순서를 바꿀 수 있습니다. 변경 즉시 저장됩니다.</p>
+    <ol class="best-included" data-included></ol>
+    <p class="best-help" data-empty hidden>포함된 장소가 없습니다. 위에서 장소를 찾아 추가해주세요.</p>
+  </section>
+</div>
+<script src="/static/admin-best.js?v=20261123" defer></script>
+{% endif %}{% endblock %}

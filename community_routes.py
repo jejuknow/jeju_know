@@ -11,6 +11,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData, UploadFile
 
 from admin_roles import audit
+from best_places import change as change_best_places
+from taxonomy_order import Conflict
 from correction_review import original_value, describe as describe_correction
 from auth_security import current_user, rate_limited, safe_external_url
 from community_migrations import today
@@ -539,20 +541,20 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
         if form is None:
             return bad_csrf()
         try:
-            place_id, order = int(form.get("place_id", "")), int(form.get("sort_order", "0"))
-            if not 0 <= order <= 9999 or form.get("action") not in ("add","remove"):
+            place_id = int(form.get("place_id", ""))
+            if form.get("action") not in ("add","remove"):
                 raise ValueError
         except ValueError:
-            return HTMLResponse("장소와 순서를 확인해주세요.", status_code=400)
-        with closing(connect_db()) as conn, conn:
-            place_exists = (get_place(conn, place_id) if form.get("action") == "add" else conn.execute("SELECT id FROM places WHERE id=?", (place_id,)).fetchone())
-            if not conn.execute("SELECT 1 FROM best_collections WHERE id=? AND deleted_at IS NULL", (collection_id,)).fetchone() or not place_exists:
-                return HTMLResponse("장소 또는 모음을 찾을 수 없습니다.", status_code=404)
-            if form.get("action") == "remove":
-                conn.execute("DELETE FROM best_collection_places WHERE collection_id=? AND place_id=?", (collection_id,place_id))
-            else:
-                conn.execute("INSERT INTO best_collection_places VALUES (?,?,?) ON CONFLICT(collection_id,place_id) DO UPDATE SET sort_order=excluded.sort_order", (collection_id,place_id,order))
-            conn.execute("UPDATE best_collections SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (collection_id,))
-            audit(conn,request,"BEST 구성 수정","BEST",collection_id)
+            return HTMLResponse("장소를 확인해주세요.", status_code=400)
+        try:
+            with closing(connect_db()) as conn, conn:
+                conn.execute('BEGIN IMMEDIATE')
+                change_best_places(conn, request, collection_id, form['action'], [place_id])
+        except LookupError:
+            return HTMLResponse("모음을 찾을 수 없습니다.", status_code=404)
+        except Conflict:
+            return HTMLResponse("이미 모음에 포함된 장소입니다.", status_code=409)
+        except ValueError:
+            return HTMLResponse("장소를 확인해주세요.", status_code=400)
         flash(request, "추천 모음 구성을 저장했습니다.")
         return redirect(f"/admin/best/{collection_id}/edit")
