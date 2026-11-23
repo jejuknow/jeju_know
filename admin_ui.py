@@ -7,8 +7,11 @@ import uuid
 from contextlib import closing
 from urllib.parse import urlencode, urlsplit
 
-from fastapi import Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import Request, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
+from image_uploads import ImageError, FORM_BYTES, optimize_upload
 from issue_discovery import VALID_DATES
 from admin_settings import catalog, catalog_usage, read_settings, write_setting, DEFAULTS
 from auth_security import current_user, safe_external_url
@@ -474,26 +477,66 @@ class AdminUI:
                 options = filters(conn)
             return self.render(request, "best_form.html", collection=c, best_state=state, best_filters=options)
 
+        @app.post("/admin/best/image-preview")
+        async def best_image_preview(request: Request):
+            if response := self.guard(request): return response
+            form = await request.form(max_files=1, max_fields=5, max_part_size=FORM_BYTES)
+            if not self.csrf(request, form):
+                return JSONResponse({"detail": "CSRF 검증에 실패했습니다."}, status_code=400)
+            photo = form.get("image_0")
+            if not isinstance(photo, UploadFile) or not photo.filename:
+                return JSONResponse({"detail": "이미지를 선택해주세요."}, status_code=400)
+            try:
+                pixels, _, _ = await run_in_threadpool(optimize_upload, photo.file, photo.filename, photo.content_type or "")
+            except ImageError as error:
+                return JSONResponse({"detail": str(error)}, status_code=400)
+            # Preview bytes are returned to the browser, never stored on disk or in DB.
+            return Response(pixels, media_type="image/webp", headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
         @app.post("/admin/best/new")
         @app.post("/admin/best/{collection_id}/edit")
-        async def best_save(request: Request, collection_id: int = 0):
+        async def best_save(request: Request):
             if response := self.guard(request): return response
-            form = await self.checked(request)
-            if form is None: return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
+            collection_id = request.path_params.get("collection_id", 0)
+            form = await request.form(max_files=1, max_fields=15, max_part_size=FORM_BYTES)
+            if not self.csrf(request, form): return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
             title, description, image = [str(form.get(k, "")).strip() for k in ("title", "description", "image_url")]
             order = integer(form.get("sort_order"), -1, 0, 9999)
-            if not title or len(title)>120 or len(description)>2000 or len(image)>2000 or not (safe_external_url(image) or re.fullmatch(r"/uploads/(places|issues)/[a-f0-9]+\.webp", image)) or order<0:
+            if not title or len(title)>120 or len(description)>2000 or len(image)>2000 or not (safe_external_url(image) or re.fullmatch(r"/uploads/(?:(?:places|issues)/[a-f0-9]+|best/[a-f0-9]{32})\.webp", image)) or order<0:
                 return HTMLResponse("제목·소개·이미지 URL·순서를 확인해주세요.", status_code=400)
-            with closing(self.db()) as conn, conn:
-                values = (title, description, image, order, int(form.get("published")=="1"))
-                creating = not collection_id
-                if collection_id:
-                    if not conn.execute("SELECT 1 FROM best_collections WHERE id=? AND deleted_at IS NULL", (collection_id,)).fetchone(): return HTMLResponse("모음을 찾을 수 없습니다.", status_code=404)
-                    conn.execute("UPDATE best_collections SET title=?,description=?,image_url=?,sort_order=?,published=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (*values, collection_id))
-                else:
-                    collection_id = conn.execute("INSERT INTO best_collections(title,description,image_url,sort_order,published,slug,updated_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)", (*values, "collection-"+uuid.uuid4().hex[:12])).lastrowid
-                audit(conn,request,"BEST 등록" if creating else "BEST 수정","BEST",collection_id,title)
-            self.flash(request, "BEST를 저장했습니다.")
+            plan = None
+            try:
+                plan = await app.state.image_store.prepare(form, "best", slots=1)
+                with closing(self.db()) as conn, conn:
+                    conn.execute("BEGIN IMMEDIATE")
+                    existing = conn.execute("SELECT * FROM best_collections WHERE id=? AND deleted_at IS NULL", (collection_id,)).fetchone() if collection_id else None
+                    if collection_id and not existing: raise HTTPException(404, "모음을 찾을 수 없습니다.")
+                    if existing and "original_image" in form and form["original_image"] != existing["image_url"]:
+                        raise HTTPException(409, "다른 곳에서 대표이미지를 변경했습니다. 새로고침 후 다시 확인해주세요.")
+                    # The ordinary editor does not accept a client-provided storage path.
+                    # Legacy URL forms remain compatible; the new UI uses a read-only field.
+                    if "original_image" in form: image = existing["image_url"] if existing else ""
+                    if 0 in plan.remove: image = ""
+                    elif photo := plan.new.get(0): image = "/uploads/" + photo["file_path"]
+                    if 0 in plan.remove and plan.new:
+                        raise ImageError("이미지 변경과 제거를 동시에 요청할 수 없습니다.")
+                    values = (title, description, image, order, int(form.get("published")=="1"))
+                    creating = not collection_id
+                    if collection_id:
+                        conn.execute("UPDATE best_collections SET title=?,description=?,image_url=?,sort_order=?,published=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", (*values, collection_id))
+                    else:
+                        collection_id = conn.execute("INSERT INTO best_collections(title,description,image_url,sort_order,published,slug,updated_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)", (*values, "collection-"+uuid.uuid4().hex[:12])).lastrowid
+                    audit(conn,request,"BEST 등록" if creating else "BEST 수정","BEST",collection_id,title)
+            except BaseException as error:
+                if plan: plan.discard()
+                if isinstance(error, ImageError): return JSONResponse({"detail": str(error)}, status_code=400)
+                if isinstance(error, sqlite3.Error): return JSONResponse({"detail": "저장하지 못했습니다. 기존 대표이미지는 유지됩니다. 잠시 후 다시 시도해주세요."}, status_code=503)
+                raise
+            # Replaced/removed files may be shared by copied collections or legacy URLs.
+            # Keep them for recovery; only failed, uncommitted uploads are discarded.
+            self.flash(request, "대표 이미지를 제거했습니다. BEST는 유지됩니다." if 0 in plan.remove else "대표 이미지를 변경했습니다." if plan.new else "BEST를 저장했습니다.")
+            if request.headers.get("X-Requested-With") == "fetch":
+                return JSONResponse({"redirect": f"/admin/best/{collection_id}/edit"})
             return RedirectResponse(f"/admin/best/{collection_id}/edit", 303)
 
         @app.post("/admin/best/{collection_id}/{action}")

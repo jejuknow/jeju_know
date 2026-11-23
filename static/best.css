@@ -11,7 +11,7 @@
 .best-toolbar .best-back{margin-left:auto}
 .best-page .collection-grid{align-items:stretch}
 .best-page .best-collection-card{display:flex;flex-direction:column;min-width:0;color:var(--text);cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
-.best-collection-card .collection-emoji{display:flex;align-items:center;justify-content:center;height:160px;flex-shrink:0;background:var(--soft);border-radius:12px;font-size:44px}
+.best-collection-card .collection-emoji{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;flex-shrink:0;background:var(--soft);border-radius:12px;font-size:44px}
 .best-page .best-collection-card h3{margin:18px 0 12px;font-size:21px;line-height:1.45}
 .best-page .best-collection-card p{margin:0;min-height:0;line-height:1.7}
 .best-page .best-collection-card .collection-cta{display:block;margin-top:auto;padding-top:24px;font-size:14px;font-weight:800;color:var(--brand)}
@@ -49,3 +49,4 @@
  .best-page .best-filters{margin-bottom:24px}
 }
 @media(prefers-reduced-motion:reduce){.best-page .best-collection-card{transition:none}.best-page .best-collection-card:hover{transform:none}}
+.best-page .best-detail-cover {display:block;width:100%;max-width:720px;aspect-ratio:16/9;object-fit:cover;border-radius:16px;margin:20px 0}

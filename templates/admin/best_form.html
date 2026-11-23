@@ -1,7 +1,44 @@
 {% extends 'admin/base.html' %}
-{% block admin_content %}<section class="admin-panel admin-editor-body"><h2>{{ 'BEST 수정' if collection else 'BEST 만들기' }}</h2><form class="admin-form" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>모음 제목<input name="title" value="{{ collection.title if collection else '' }}" maxlength="120" required></label><label>소개<textarea name="description" maxlength="2000" rows="3">{{ collection.description if collection else '' }}</textarea></label><label>대표 이미지 URL<input name="image_url" value="{{ collection.image_url if collection else '' }}" maxlength="2000" placeholder="https://... 또는 기존 /uploads/ 이미지 주소"></label><label>노출 순서<input type="number" name="sort_order" value="{{ collection.sort_order if collection else 0 }}" min="0" max="9999" required></label><label class="check"><input type="checkbox" name="published" value="1" {% if collection and collection.published %}checked{% endif %}>공개</label><div class="row-actions"><button class="primary-inline">저장</button><a class="secondary-btn" href="/admin/best">목록으로</a>{% if collection %}<a class="secondary-btn" href="/best/{{ collection.slug }}" target="_blank">방문자 화면 ↗</a>{% endif %}</div></form></section>
+{% block admin_content %}
+<link rel="stylesheet" href="/static/admin-best.css?v=20261123-cover">
+<section class="admin-panel admin-editor-body">
+  <h2>{{ 'BEST 수정' if collection else 'BEST 만들기' }}</h2>
+  <form class="admin-form" method="post" enctype="multipart/form-data" data-best-cover-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="original_image" value="{{ collection.image_url if collection else '' }}">
+    <input type="hidden" name="remove_image_0" value="0">
+    <label>모음 제목<input name="title" value="{{ collection.title if collection else '' }}" maxlength="120" required></label>
+    <label>소개<textarea name="description" maxlength="2000" rows="3">{{ collection.description if collection else '' }}</textarea></label>
+    <section class="best-cover-editor" aria-labelledby="bestCoverHeading">
+      <h3 id="bestCoverHeading">대표 이미지</h3>
+      <p class="best-help" id="bestCoverHelp">BEST 목록과 공유 이미지 등에 사용됩니다. 가로형 이미지를 권장합니다.<br>권장 비율: 16:9 · JPG, PNG, WebP, HEIC·HEIF · 최대 32MB, 5,000만 화소</p>
+      <p class="best-help" data-cover-heading>현재 대표 이미지</p>
+      <div class="best-cover-preview">
+        <img {% if collection and collection.image_url %}src="{{ collection.image_url }}"{% else %}hidden{% endif %} alt="BEST 대표 이미지 미리보기" data-cover-image>
+        <span data-cover-empty {% if collection and collection.image_url %}hidden{% endif %}>현재 등록된 이미지가 없습니다.</span>
+      </div>
+      <div class="row-actions">
+        <label class="secondary-btn best-cover-picker"><span data-cover-pick-label>{{ '이미지 변경' if collection and collection.image_url else '이미지 업로드' }}</span><input type="file" name="image_0" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif" aria-label="대표 이미지 선택" aria-describedby="bestCoverHelp"></label>
+        <button type="button" class="mini-btn" data-cover-remove {% if not collection or not collection.image_url %}hidden{% endif %}>이미지 제거</button>
+        <button type="button" class="mini-btn" data-cover-reset hidden>변경 취소</button>
+      </div>
+      <p class="best-cover-filename" data-cover-filename></p>
+      <p class="best-help" role="status" aria-live="polite" data-cover-status>선택하거나 제거한 이미지는 저장 버튼을 눌러야 반영됩니다.</p>
+      <details class="best-cover-advanced"><summary>고급설정</summary><label>대표 이미지 경로<input name="image_url" value="{{ collection.image_url if collection else '' }}" readonly></label><p class="best-help">현재 저장된 주소입니다. 기존 외부 URL 이미지도 유지됩니다.</p></details>
+      <noscript><p class="best-help">이미지 선택 후 저장할 수 있습니다. 저장 전 미리보기와 제거 기능은 JavaScript를 켜주세요.</p></noscript>
+    </section>
+    <label>노출 순서<input type="number" name="sort_order" value="{{ collection.sort_order if collection else 0 }}" min="0" max="9999" required></label>
+    <label class="check"><input type="checkbox" name="published" value="1" {% if collection and collection.published %}checked{% endif %}>공개</label>
+    <div class="row-actions"><button type="submit" class="primary-inline">저장</button><a class="secondary-btn" href="/admin/best">목록으로</a>{% if collection %}<a class="secondary-btn" href="/best/{{ collection.slug }}" target="_blank" rel="noopener">방문자 화면 ↗</a>{% endif %}</div>
+    <p class="best-help" role="status" aria-live="polite" data-cover-save-status></p>
+  </form>
+  <dialog class="best-cover-dialog" data-cover-dialog aria-labelledby="bestCoverConfirm">
+    <h3 id="bestCoverConfirm">대표 이미지를 제거할까요?</h3><p>BEST 데이터는 유지되며 대표 이미지만 제거됩니다. 저장 버튼을 눌러야 반영됩니다.</p>
+    <div class="row-actions"><button type="button" class="secondary-btn" data-cover-cancel>취소</button><button type="button" class="primary-inline" data-cover-confirm>이미지 제거</button></div>
+  </dialog>
+</section>
+<script src="/static/admin-best-cover.js?v=20261123" defer></script>
 {% if collection %}
-<link rel="stylesheet" href="/static/admin-best.css?v=20261123">
 <div class="best-editor" data-best-editor data-url="/admin/best/{{ collection.id }}/places">
   <script type="application/json" id="bestEditorState">{{ best_state|tojson }}</script>
   <script type="application/json" id="bestEditorFilters">{{ best_filters|tojson }}</script>

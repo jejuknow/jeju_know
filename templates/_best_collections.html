@@ -4,7 +4,7 @@
   <a class="collection-card best-collection-card" href="/best/{{ c.slug|urlencode }}" aria-labelledby="collectionTitle{{ c.id }}">
   {% else %}<article class="collection-card">{% endif %}
     {% if c.image_url %}
-    <img src="{{ c.image_url }}" alt="{{ c.title }}" style="width:100%;height:160px;object-fit:cover;border-radius:12px" loading="lazy">
+    <img src="{{ c.image_url }}" alt="{{ c.title }}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px" loading="lazy">
     {% else %}<span class="collection-emoji" aria-hidden="true">{{ c.emoji }}</span>{% endif %}
     <h3 id="collectionTitle{{ c.id }}">{{ c.title }}</h3>
     {% if c.description %}<p>{{ c.description }}</p>{% endif %}

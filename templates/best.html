@@ -3,7 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="/static/home.css?v=20261027-3d-icons">
 <link rel="stylesheet" href="/static/rankings.css?v=20261116">
-<link rel="stylesheet" href="/static/best.css?v=20261123">
+<link rel="stylesheet" href="/static/best.css?v=20261123-cover">
 {% endblock %}
 {% block body %}
 <main class="section wrap best-page">
@@ -13,6 +13,7 @@
     <h1>{{ collection.title if collection else '상황별 추천 모음' }}</h1>
     {% if not collection or collection.description %}<p class="section-copy">{{ collection.description if collection else 'JEJU_KNOW가 직접 구성한 주제별 장소 모음입니다.' }}</p>{% endif %}
     {% if collection %}
+    {% if collection.image_url %}<img class="best-detail-cover" src="{{ collection.image_url }}" alt="{{ collection.title }} 대표 이미지">{% endif %}
     <div class="best-toolbar">
       {% include "_share_actions.html" %}
       <a class="text-btn best-back" href="/best">← 전체 BEST</a>

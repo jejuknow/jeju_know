@@ -52,3 +52,22 @@
  .best-add-bar .primary-inline{flex:1;min-height:44px}
  .best-place-info>a,.best-place-info>strong{font-size:14px}
 }
+/* Cover management shares the form save; no persistent file is created by preview. */
+.best-cover-editor {min-width:0;border:1px solid var(--line,#e2e7f0);border-radius:16px;padding:20px;display:grid;gap:12px}
+.best-cover-editor h3,.best-cover-editor p {margin:0;word-break:keep-all;overflow-wrap:anywhere;line-height:1.6}
+.best-cover-preview {width:100%;max-width:560px;aspect-ratio:16/9;background:#f5f7fb;border:1px solid #e2e7f0;border-radius:12px;overflow:hidden;display:grid;place-items:center}
+.best-cover-preview img {width:100%;height:100%;min-height:0;object-fit:contain;grid-area:1/1}
+.best-cover-preview span {padding:20px;text-align:center;color:var(--muted,#667085);word-break:keep-all;overflow-wrap:break-word}
+.best-cover-editor [hidden] {display:none!important}
+.best-cover-picker {position:relative;cursor:pointer;overflow:hidden;min-height:44px}
+.best-cover-picker input[type=file] {position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.best-cover-picker:focus-within {outline:3px solid var(--primary,#4064ff);outline-offset:3px}
+.best-cover-editor .row-actions {flex-wrap:wrap}
+.best-cover-editor button {min-height:44px;white-space:nowrap}
+.best-cover-filename {font-size:13px;color:var(--muted,#667085)}
+.best-cover-advanced summary {cursor:pointer;padding:10px 0}
+.best-cover-advanced input {font-size:13px;background:#f5f7fb}
+.best-cover-dialog {width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 40px);box-sizing:border-box;border:1px solid #dfe5ef;border-radius:18px;padding:24px;color:inherit}
+.best-cover-dialog::backdrop {background:rgb(15 23 42 / .4)}
+.best-cover-dialog p {word-break:keep-all;line-height:1.7}
+@media(max-width:600px){.best-cover-editor{padding:14px}.best-cover-editor .best-help{font-size:13px}}

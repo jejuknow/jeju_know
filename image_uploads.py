@@ -27,7 +27,7 @@ INSPECT_FORMATS = [*MIME_TYPES, "GIF"]
 # Keep libheif/Pillow security limits. Ignore depth/auxiliary images and decode serially.
 register_heif_opener(decode_threads=1, depth_images=False, aux_images=False)
 KINDS = {"places": "place_id", "issues": "issue_id"}
-FILE_PATH = re.compile(r"(?:places|issues|ads)/[0-9a-f]{32}\.webp\Z")
+FILE_PATH = re.compile(r"(?:places|issues|ads|best)/[0-9a-f]{32}\.webp\Z")
 PROCESS_SLOTS = threading.BoundedSemaphore(1)
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class ImageStore:
     def __init__(self, root, connect_db):
         self.root = Path(root).resolve()
         self.connect_db = connect_db
-        for kind in (*KINDS, "ads"):
+        for kind in (*KINDS, "ads", "best"):
             folder = self.root / kind
             if folder.is_symlink():
                 raise RuntimeError("Upload directories must not be symlinks")
@@ -226,7 +226,7 @@ class ImageStore:
                     continue
                 # An editor may have reused an uploaded file through the legacy URL field.
                 if any(conn.execute(f"SELECT 1 FROM {table} WHERE instr(image_url,?)>0", ('/uploads/' + relative,)).fetchone()
-                       for table in ("places", "news_posts")):
+                       for table in ("places", "news_posts", "best_collections")):
                     continue
                 try:
                     self.path(relative).unlink(missing_ok=True)
@@ -236,13 +236,15 @@ class ImageStore:
                 conn.execute("DELETE FROM image_file_gc WHERE file_path=?", (relative,))
 
     def response(self, request, kind, filename):
-        if kind not in KINDS:
+        if kind not in {*KINDS, "best"}:
             return Response(status_code=404)
         try:
             path = self.path(f"{kind}/{filename}")
         except ImageError:
             return Response(status_code=404)
         with closing(self.connect_db()) as conn:
+            covers = conn.execute("SELECT published,deleted_at FROM best_collections WHERE image_url=?",
+                                  (f"/uploads/{kind}/{filename}",)).fetchall()
             # Only registered images are served; private/deleted content remains protected.
             rows = conn.execute("""SELECT CASE WHEN COALESCE(c.deleted_at,p.deleted_at) IS NULL THEN COALESCE(c.published,p.published) ELSE 0 END AS place_public,
                 COALESCE(c.submitted_by_user_id,p.submitted_by_user_id) AS place_author,
@@ -252,7 +254,8 @@ class ImageStore:
                 LEFT JOIN news_posts n ON n.id=i.issue_id
                 WHERE i.file_path=?""", (f"{kind}/{filename}",)).fetchall()
         member = request.scope.get("member")
-        allowed = any(request.session.get("admin_id") or (member and member["role"] == "admin") or row["place_public"] or
+        admin = request.session.get("admin_id") or (member and member["role"] == "admin")
+        allowed = any(admin or (row["published"] and row["deleted_at"] is None) for row in covers) or any(admin or row["place_public"] or
                       (member and row["place_deleted"] is None and row["place_author"] == member["id"]) or
                       (row["deleted_at"] is None and (row["issue_public"] or
                        (member and member["id"] == row["author_id"]))) for row in rows)
