@@ -2,6 +2,7 @@
 import json
 import secrets
 import sqlite3
+from collections import Counter
 from contextlib import closing
 from urllib.parse import quote
 
@@ -101,13 +102,24 @@ def register_community_routes(app, templates, connect_db, require_csrf, flash, a
 
     @app.get("/best/{slug}")
     async def best_detail(request: Request, slug: str):
+        from place_taxonomy import taxonomy
         with closing(connect_db()) as conn:
             collection = conn.execute("SELECT * FROM best_collections WHERE slug=? AND published=1 AND deleted_at IS NULL", (slug,)).fetchone()
             if not collection:
                 return HTMLResponse("추천 모음을 찾을 수 없습니다.", status_code=404)
             rows = conn.execute("""SELECT p.* FROM best_collection_places b JOIN places p ON p.id=b.place_id
                 WHERE b.collection_id=? AND p.published=1 AND COALESCE(p.is_example,0)=0 AND p.deleted_at IS NULL AND p.merged_into_id IS NULL ORDER BY b.sort_order,p.id""", (collection["id"],)).fetchall()
-        return render(request, "best.html", collection=dict(collection), places=[row_to_place(r, public=True) for r in rows], seo=collection_metadata(dict(collection)))
+            categories = taxonomy(conn, regions, [])['categories']
+        # Counts and cards share the exact same public rows and editorial order.
+        counts = Counter(r['category_id'] for r in rows)
+        category_names = {c['id']: c['name'] for c in categories}
+        places = [row_to_place(r, public=True) for r in rows]
+        for place in places:
+            place['category'] = category_names.get(place['category_id'], place['category'])
+        best_categories = [dict(id=c['id'], name=c['name'], count=counts[c['id']])
+                           for c in categories if counts[c['id']]]
+        return render(request, "best.html", collection=dict(collection), places=places,
+                      best_categories=best_categories, seo=collection_metadata(dict(collection)))
 
     def place_form(request, data=None, *, status=200, error=None, similar=None, new_only=False):
         return render(request, "member_place_form.html", status, place=data, error=error,
