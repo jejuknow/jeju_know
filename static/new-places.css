@@ -1,0 +1,53 @@
+/* NEW only: shared cards, navigation and desktop grid retain their existing rules. */
+.new-places .new-mobile{display:none}
+.new-places [hidden]{display:none!important}
+.new-places .compact-place-card{position:relative;isolation:isolate}
+.new-places .card-actions a:first-child::after{content:"";position:absolute;inset:0;z-index:1}
+.new-places .card-actions a:last-child{position:relative;z-index:2}
+.new-places .compact-place-card:has(.card-actions a:first-child:focus-visible){outline:3px solid var(--brand);outline-offset:3px}
+.new-places .compact-place-reason:empty{display:none}
+.new-places .new-tabs button{min-height:44px}
+.new-places .new-results-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.new-places #listSummary{margin:0;min-width:0}
+.new-places #listMapLink{flex-shrink:0;display:inline-flex;align-items:center;min-height:44px;white-space:nowrap}
+
+@media(max-width:760px){
+  .new-places.section{padding-top:32px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+  .new-places .new-mobile{display:block}
+  .new-places .new-desktop{display:none}
+  .new-places .new-intro{display:flex;flex-direction:column;align-items:stretch;gap:16px;margin-bottom:24px}
+  .new-places .new-intro>div{flex:initial}
+  .new-places .new-heading-label{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .new-places .page-nav-icon{width:32px;height:32px;border-radius:10px;margin:0}
+  .new-places .new-heading-label .kicker{margin:0}
+  .new-places h1{font-size:28px;line-height:1.35;letter-spacing:-1px;margin:0;word-break:keep-all;overflow-wrap:break-word}
+  .new-places .new-title-tail{display:block}
+  .new-places .new-intro .section-copy{font-size:14px;line-height:1.6;margin:12px 0 0;max-width:30em}
+  .new-places .new-policy{font-size:12px;line-height:1.6;color:var(--muted);margin:8px 0 0}
+  .new-places .new-submit{display:flex;align-items:center;justify-content:center;width:100%;min-height:46px;padding:12px 14px;white-space:nowrap}
+  .new-places .new-tabs{display:flex;flex-wrap:nowrap;gap:8px;margin:0 0 20px}
+  .new-places .new-tabs .chip{flex:1;min-width:0;min-height:44px;padding:9px 8px;display:flex;justify-content:center;align-items:center;gap:6px;white-space:nowrap}
+  .new-places .new-results-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .new-places #listSummary{margin:0;min-width:0;font-size:13px;font-weight:700;line-height:1.6}
+  .new-places #listMapLink{flex-shrink:0;display:flex;align-items:center;min-height:44px;padding:8px 12px;font-size:12px;white-space:nowrap}
+  .new-places #allPlaceGrid{grid-template-columns:minmax(0,1fr);gap:18px;margin-top:16px}
+  .new-places .compact-place-card{flex-direction:column}
+  .new-places .compact-place-visual{width:100%;height:auto;min-height:0;aspect-ratio:16/9}
+  .new-places .compact-place-body{padding:16px}
+  .new-places .place-card-badges{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+  .new-places .place-card-badges .badge-pick{order:0}
+  .new-places .place-card-badges .badge-new{order:1}
+  .new-places .place-card-badges .user-badge:not(.badge-pick):not(.badge-new){order:2}
+  .new-places .place-card-opening{font-size:13px;margin:0 0 6px;line-height:1.6}
+  .new-places .compact-place-meta{font-size:13px;margin:0 0 8px}
+  .new-places .compact-place-body h3{font-size:20px;line-height:1.45;margin:0;word-break:keep-all;overflow-wrap:break-word}
+  .new-places .compact-place-body .tag-row{margin:12px 0 0;gap:6px}
+  .new-places .tag{max-width:100%;white-space:normal;word-break:keep-all;overflow-wrap:break-word}
+  .new-places .compact-place-reason,.new-places .card-menu{font-size:14px;line-height:1.6;margin:12px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:break-word}
+  .new-places .compact-place-card:has(.compact-place-reason:not(:empty)) .card-menu{display:none}
+  .new-places .compact-place-reason:empty{display:none}
+  .new-places .card-actions{padding-top:16px;gap:12px;justify-content:space-between}
+  .new-places .card-actions .detail-link{display:inline-flex;align-items:center;min-height:44px;margin:0;padding:8px 0;font-size:14px;white-space:nowrap}
+  .new-places #allPlaceGrid+button{width:100%;min-height:44px;margin-top:20px}
+  .new-places .empty-state h2{font-size:18px;line-height:1.6}
+}

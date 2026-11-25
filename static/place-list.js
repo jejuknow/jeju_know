@@ -16,7 +16,7 @@
       const html=places.map(p=>window.HomeCards.placeCard(p,p.region_label||search.regionLabel(p.region))).join('');
       if(page===0)grid.innerHTML=html;else grid.insertAdjacentHTML('beforeend',html);
       page++;shown+=places.length;
-      summary.textContent=`${labels.length?labels.join(' · ')+' · ':''}총 ${total}곳`;
+      summary.textContent=summary.dataset.categoryLabel?`${summary.dataset.categoryLabel} · ${total}곳`:`${labels.length?labels.join(' · ')+' · ':''}총 ${total}곳`;
       more.hidden=shown>=total;more.textContent=`더 보기 (${shown}/${total})`;
       document.getElementById('listEmpty').hidden=total>0;
     }catch{summary.textContent='장소를 불러오지 못했습니다. 다시 시도해 주세요.';more.hidden=false;more.textContent='다시 시도';}

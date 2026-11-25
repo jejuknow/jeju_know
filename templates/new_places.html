@@ -1,6 +1,42 @@
-{% extends "base.html" %}{% block title %}NEW · 최근 새로 생긴 제주 카페와 맛집 | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home.css?v=20261027-3d-icons">{% endblock %}
-{% block body %}<main class="section wrap new-places"><div class="section-head"><div>{{ navigation_icon('new') }}<p class="kicker">NEW</p><h1>최근 새로 생긴 제주 카페와 맛집</h1><p class="section-copy">최근 6개월 사이에 문을 연 곳과 새 소식으로 소개하는 장소를 찾아보세요. 사용자 등록 정보는 확인 상태를 함께 표시합니다.</p></div><a class="primary-inline" href="/map/register?source=new{% if selected_category %}&amp;category={{ selected_category }}{% endif %}">+ 신상 장소 알려주기</a></div>
-<nav class="chips new-tabs" aria-label="신상 장소 종류">{% for value,label in [('', '전체'),('cafe','신상 카페'),('food','신상 맛집')] %}<a class="chip {{ 'is-selected' if selected_category==value }}" href="/new{{ '?category=' ~ value if value else '' }}" {% if selected_category==value %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
-<p id="listSummary" class="section-copy" role="status">총 {{ initial_total }}곳</p><a id="listMapLink" class="text-btn" href="/map?new=current">지도로 보기 →</a><div id="allPlaceGrid" data-new="current" class="compact-place-grid">{% for p in initial_places %}{% include '_place_card.html' %}{% else %}<p>선택한 조건에 맞는 장소가 아직 없습니다.</p>{% endfor %}</div><div id="listEmpty" class="empty-state" hidden><h2>아직 이 조건의 신상 장소가 없습니다.</h2><p>알고 있는 새 장소를 함께 알려주세요.</p></div></main>{% endblock %}
-{% block scripts %}<script src="/static/place-search.js?v=20261028-public"></script><script src="/static/home-cards.js?v=20261104-seo"></script><script src="/static/place-list.js?v=20261116-audit"></script>{% endblock %}
+{% extends "base.html" %}
+{% block title %}NEW · 최근 새로 생긴 제주 카페와 맛집 | JEJU_KNOW{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/home.css?v=20261027-3d-icons">
+<link rel="stylesheet" href="/static/new-places.css?v=20261125">
+{% endblock %}
+{% block body %}
+{% set category_label = '카페' if selected_category=='cafe' else '맛집' if selected_category=='food' else '전체' %}
+<main class="section wrap new-places">
+  <header class="section-head new-intro">
+    <div>
+      <div class="new-heading-label">{{ navigation_icon('new') }}<p class="kicker">NEW</p></div>
+      <h1>최근 새로 생긴 제주 <span class="new-title-tail">카페와 맛집</span></h1>
+      <p class="section-copy new-desktop">최근 6개월 사이에 문을 연 곳과 새 소식으로 소개하는 장소를 찾아보세요. 사용자 등록 정보는 확인 상태를 함께 표시합니다.</p>
+      <p class="section-copy new-mobile">최근 6개월 사이 문을 연 제주 카페와 맛집을 모았습니다.</p>
+      <p class="new-policy new-mobile">사용자 등록 정보는 확인 상태를 함께 표시합니다.</p>
+    </div>
+    <a class="primary-inline new-submit" href="/map/register?source=new{% if selected_category %}&amp;category={{ selected_category }}{% endif %}">+ 신상 장소 알려주기</a>
+  </header>
+  <form class="chips new-tabs" action="/new" method="get" aria-label="신상 장소 종류">
+    {% for value,label,icon in [('', '전체',''),('cafe','카페','cafe'),('food','맛집','restaurant')] %}
+    <button type="submit" name="category" value="{{ value }}" class="chip {{ 'is-selected' if selected_category==value }}" aria-pressed="{{ 'true' if selected_category==value else 'false' }}">
+      {% if icon %}<span class="new-mobile">{{ navigation_icon(icon,'icon-image--chip',24) }}</span><span class="new-desktop">신상 </span>{% endif %}{{ label }}
+    </button>
+    {% endfor %}
+  </form>
+  <div class="new-results-head">
+    <p id="listSummary" class="section-copy" role="status" data-category-label="{{ category_label }}">{{ category_label }} · {{ initial_total }}곳</p>
+    <a id="listMapLink" class="text-btn" href="/map?new=current{% if selected_category %}&amp;category={{ selected_category }}{% endif %}"><span class="new-desktop">지도로 보기 →</span><span class="new-mobile">지도 보기 ↗</span></a>
+  </div>
+  <div id="allPlaceGrid" data-new="current" class="compact-place-grid">{% for p in initial_places %}{% include '_place_card.html' %}{% endfor %}</div>
+  <div id="listEmpty" class="empty-state" {% if initial_total %}hidden{% endif %}>
+    <h2>현재 조건에 해당하는 신상 {{ category_label if selected_category else '장소' }}가 없습니다.</h2>
+    <a href="/new" class="text-btn">전체 보기 →</a>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="/static/place-search.js?v=20261028-public"></script>
+<script src="/static/home-cards.js?v=20261125-new"></script>
+<script src="/static/place-list.js?v=20261125-new"></script>
+{% endblock %}

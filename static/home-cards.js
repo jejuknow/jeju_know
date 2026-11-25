@@ -15,7 +15,7 @@
     const tags=(place.detail_features||[]).slice(0,3);
     const highlights=tags.length?`<div class="tag-row">${tags.map(tag=>`<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>`:'';
     const menu=place.signature_menu?`<p class="card-menu">${escapeHtml(place.signature_menu.split('\n')[0])}</p>`:'';
-    return `<article class="compact-place-card">${visual(place,'compact-place-visual')}<div class="compact-place-body">${status.html(place)}<p class="compact-place-meta">${escapeHtml(region)} · ${escapeHtml(place.category)}</p><h3>${escapeHtml(place.name)}</h3>${highlights}${menu}<p class="compact-place-reason">${escapeHtml(place.one_line||'')}</p><div class="card-actions"><a class="detail-link" href="/place/${encodeURIComponent(place.slug)}" aria-label="${escapeHtml(place.name)} 상세보기">상세보기 →</a><a class="detail-link" href="/map?place=${encodeURIComponent(place.slug)}">지도에서 보기</a></div></div></article>`;
+    return `<article class="compact-place-card">${visual(place,'compact-place-visual')}<div class="compact-place-body">${status.html(place)}<p class="compact-place-meta">${escapeHtml(region)} · ${escapeHtml(place.category)}</p><h3>${escapeHtml(place.name)}</h3>${highlights}${menu}<p class="compact-place-reason">${escapeHtml(place.one_line||'')}</p><div class="card-actions"><a class="detail-link" href="/place/${encodeURIComponent(place.slug)}" aria-label="${escapeHtml(place.name)} 상세보기">상세보기 →</a><a class="detail-link" href="/map?place=${encodeURIComponent(place.slug)}" aria-label="${escapeHtml(place.name)} 지도에서 보기">지도에서 보기</a></div></div></article>`;
   }
   function pickCard(place,region){
     const tags=[...new Set([...(place.features_public||place.features||[]),...(place.companions||[])])].slice(0,4);
