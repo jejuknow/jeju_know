@@ -146,9 +146,11 @@
       sending=true;busy();feedback.textContent='사진과 지도 위치를 확인하고 있어요.';
       try {
         await Promise.all(states.map(s=>s.promise));
+        await form.prepareGallery?.();
         await form.prepareLocation?.();
         if(!form.reportValidity())return;
         const data=new FormData(form);
+        form.appendGallery?.(data);
         if(event.submitter?.name)data.set(event.submitter.name,event.submitter.value);
         states.forEach(s=>{if(s.file&&!s.remove.checked)data.set(s.input.name,s.file,s.file.name);});
         feedback.textContent=form.hasAttribute('data-member-place-form')?'장소 등록 중...':'사진과 내용을 저장 중...';

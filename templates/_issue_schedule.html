@@ -1,11 +1,21 @@
 {% set p = item or {} %}
+{% set clock_mode = issue_time_mode(p) %}
+<link rel="stylesheet" href="/static/issue-gallery.css?v=20261124">
 <section class="form-card"><h2>일정</h2>
   <div class="form-grid two">
     <label>시작일<input type="date" name="event_start" value="{{ p.get('event_start','') }}" {% if member_form %}required{% endif %}></label>
     <label>종료일<input type="date" name="event_end" value="{{ p.get('event_end','') }}" {% if member_form %}required{% endif %}></label>
-    <label>시작시간 <small>선택</small><input type="time" name="start_time" value="{{ p.get('start_time','') }}"></label>
-    <label>종료시간 <small>선택</small><input type="time" name="end_time" value="{{ p.get('end_time','') }}"></label>
   </div>
+  <fieldset class="issue-time-modes"><legend>시간</legend>{% for value,label in [('specified','시간 지정'),('all_day','종일'),('unknown','시간 미정')] %}<label><input type="radio" name="time_mode" value="{{ value }}" {% if clock_mode==value %}checked{% endif %}>{{ label }}</label>{% endfor %}</fieldset>
+  <div class="form-grid two" data-issue-times {% if clock_mode!='specified' %}hidden{% endif %}>
+    {% for key,label in [('start_time','시작시간'),('end_time','종료시간')] %}{% set saved = p.get(key) or '' %}
+    <label>{{ label }}<select name="{{ key }}" data-legacy-empty="{{ '1' if p.get('id') and not saved and clock_mode=='specified' else '0' }}" {% if clock_mode!='specified' %}disabled{% endif %}>
+      <option value="">{{ '기존값 없음' if p.get('id') and not saved and clock_mode=='specified' else '시간 선택' }}</option>
+      {% if saved and saved not in issue_time_options %}<option value="{{ saved }}" selected>{{ saved }} (기존값)</option>{% endif %}
+      {% for value in issue_time_options %}<option value="{{ value }}" {% if value==saved %}selected{% endif %}>{{ value }}</option>{% endfor %}
+    </select></label>{% endfor %}
+  </div>
+  <p class="form-help">30분 단위로 선택하세요. 여러 날 행사에서 날짜별 운영시간이 다르면 상세 내용에 안내해주세요.</p>
   <p class="form-help">하루 행사라면 같은 날짜를 선택하세요. 종료일 당일까지 탐색 목록에 표시됩니다.</p>
   <p role="status" id="issueScheduleStatus" data-today="{{ issue_today }}" {% for key,value in user_status.SCHEDULE.items() %}data-{{ key }}="{{ value.label }}"{% endfor %}>현재 상태 · {{ p.get('event_status',user_status.SCHEDULE.undated.label) }}</p>
 </section>

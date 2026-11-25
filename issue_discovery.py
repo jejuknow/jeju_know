@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 from community_migrations import KST, today
 from user_status import SCHEDULE
+from issue_times import format_issue_time
 
 # Keep stable keys and read existing records without rewriting their categories.
 LABELS = {"events": "행사•축제", "exhibitions": "전시•팝업", "activities": "교육·체험",
@@ -107,7 +108,7 @@ def schedule(item, moment=None):
             raise ValueError
     except (ValueError, TypeError):
         missing = SCHEDULE["undated"].label
-        return {"schedule_key": "undated", "event_status": missing, "date_badge": missing, "date_label": missing}
+        return {"schedule_key": "undated", "event_status": missing, "date_badge": missing, "date_label": missing, "time_label": format_issue_time(item)}
     fmt = "%Y.%m.%d" if start.year != end.year or start.year != day.year else "%m.%d"
     label = start.strftime(fmt)
     if start != end:
@@ -119,7 +120,7 @@ def schedule(item, moment=None):
     else:
         key = "ongoing"
         badge = "오늘까지" if end == day else "오늘 시작" if start == day else SCHEDULE[key].label
-    return {"schedule_key": key, "event_status": SCHEDULE[key].label, "date_badge": badge, "date_label": label}
+    return {"schedule_key": key, "event_status": SCHEDULE[key].label, "date_badge": badge, "date_label": label, "time_label": format_issue_time(item)}
 
 
 def browse(conn, query, moment):

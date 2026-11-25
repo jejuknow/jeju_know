@@ -6,6 +6,14 @@
   const memberDatesRequired = start.required;
   const today = status.dataset.today;
   function update() {
+    const mode = form.elements.time_mode.value;
+    form.querySelector('[data-issue-times]').hidden = mode !== 'specified';
+    for (const name of ['start_time','end_time']) {
+      const field = form.elements[name];
+      field.disabled = mode !== 'specified';
+      field.required = mode === 'specified' && field.dataset.legacyEmpty !== '1';
+    }
+    form.elements.end_time.setCustomValidity(mode === 'specified' && start.value === end.value && form.elements.start_time.value && form.elements.end_time.value && form.elements.end_time.value < form.elements.start_time.value ? '같은 날짜의 종료시간은 시작시간보다 빠를 수 없습니다.' : '');
     start.required = end.required = memberDatesRequired || Boolean(form.elements.published?.checked);
     const a = start.value, b = end.value;
     const invalid = a && b && b < a;

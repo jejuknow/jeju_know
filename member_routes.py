@@ -17,6 +17,7 @@ from member_activity import register_activity_routes
 from user_status import WAITING
 from fastapi import HTTPException
 from image_uploads import ImagePlan, ImageError
+from issue_times import time_error
 
 
 SIGNUP_PASSWORD_MIN_LENGTH = 8
@@ -46,9 +47,8 @@ def validate_news(data, categories, *, require_dates=True):
         return "종료일은 시작일 이후 날짜를 선택해주세요."
     if (require_dates or data.get("event_start") or data.get("event_end")) and not (data.get("event_start") and data.get("event_end")):
         return "시작일과 종료일을 모두 선택해주세요."
-    for key in ("start_time", "end_time"):
-        if data.get(key) and not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", data[key]):
-            return "시간은 00:00부터 23:59 사이로 입력해주세요."
+    if error := time_error(data):
+        return error
     try:
         data["latitude"], data["longitude"] = coordinates(data.get("latitude"), data.get("longitude"))
     except ValueError as exc:
@@ -279,7 +279,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return csrf_error()
         if limited(request, "publish", str(current_user(request)["id"]), limit=30, window=3600):
             return throttled()
-        error = validate_news(data, categories)
+        error = request.state.issue_time_error or validate_news(data, categories)
         with closing(connect_db()) as conn:
             error = error or submission_error(conn, data)
             similar = [] if error else candidates(conn, {**data, "id": news_id}, public_only=True)
@@ -297,7 +297,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return problem(str(exc))
         # Visibility, source, review and map flags never come from the member.
         fields = ("title", "category", "summary", "body", "venue", "event_start", "event_end", "start_time",
-                  "end_time", "region", "address", "latitude", "longitude", "external_url", "show_on_map")
+                  "end_time", "time_mode", "region", "address", "latitude", "longitude", "external_url", "show_on_map")
         if not data["address"]:
             data["latitude"] = data["longitude"] = None
         data["show_on_map"] = int(data["latitude"] is not None and data["longitude"] is not None)

@@ -173,6 +173,8 @@ class ImageStore:
                 if safe_external_url(row["image_url"]):
                     item["merged_images"].append({"url": row["image_url"], "is_primary": False})
         else:
+            from issue_gallery import gallery
+            item["additional_images"] = gallery(self, item["id"])
             item["merged_images"] = []
         primary = next((image for image in item["images"] if image["is_primary"]), None)
         if primary:
@@ -222,6 +224,8 @@ class ImageStore:
                 relative = row[0]
                 if conn.execute("SELECT 1 FROM images WHERE file_path=?", (relative,)).fetchone():
                     continue
+                if conn.execute("SELECT 1 FROM issue_images WHERE file_path=?", (relative,)).fetchone():
+                    continue
                 if relative.startswith("ads/") and conn.execute("SELECT 1 FROM ads WHERE image_path=?", (relative,)).fetchone():
                     continue
                 # An editor may have reused an uploaded file through the legacy URL field.
@@ -252,7 +256,10 @@ class ImageStore:
                 n.author_id,n.deleted_at FROM images i
                 LEFT JOIN places p ON p.id=i.place_id LEFT JOIN places c ON c.id=p.merged_into_id
                 LEFT JOIN news_posts n ON n.id=i.issue_id
-                WHERE i.file_path=?""", (f"{kind}/{filename}",)).fetchall()
+                WHERE i.file_path=?
+                UNION ALL SELECT 0,NULL,NULL,(n.published=1 AND n.approval_status='approved'),n.author_id,n.deleted_at
+                FROM issue_images i JOIN news_posts n ON n.id=i.issue_id WHERE i.file_path=?""",
+                (f"{kind}/{filename}",f"{kind}/{filename}")).fetchall()
         member = request.scope.get("member")
         admin = request.session.get("admin_id") or (member and member["role"] == "admin")
         allowed = any(admin or (row["published"] and row["deleted_at"] is None) for row in covers) or any(admin or row["place_public"] or

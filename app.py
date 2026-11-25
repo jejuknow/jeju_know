@@ -32,6 +32,8 @@ from restaurant_migrations import backup_before_restaurants, migrate_restaurants
 from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, form_values, validate_parent, usage_count
 from image_migrations import backup_before_image_migration, migrate_images
 from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedFormRoute
+from issue_gallery import migrate as migrate_issue_gallery, prepare as prepare_issue_images
+from issue_times import parse_time_state, TIME_OPTIONS, time_mode
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
 from cafe_focus import parse_focus, validate_focus, save_focus, decorate_focus
 from cafe_focus_migrations import backup_before_cafe_focus, migrate_cafe_focus
@@ -381,6 +383,7 @@ def create_app(test_config=None):
         migrate_cafe_photo_spot(app.state.database)
         migrate_issue_calendar(app.state.database)
         migrate_issue_review(app.state.database)
+        migrate_issue_gallery(app.state.database)
         migrate_ads(app.state.database)
         migrate_contact(app.state.database)
         migrate_member_inquiries(app.state.database)
@@ -400,6 +403,7 @@ def create_app(test_config=None):
         from operational_health import migrate as migrate_operational_health
         migrate_operational_health(app.state.database)
 
+    templates.env.globals.update(issue_time_options=TIME_OPTIONS, issue_time_mode=time_mode)
     init_db()
     image_store = ImageStore(database_path.parent / "uploads", connect_db)
     app.state.image_store = image_store
@@ -601,7 +605,8 @@ def create_app(test_config=None):
         }
 
     async def parse_news_form(request: Request, existing=None):
-        form = await request.form(max_files=1, max_fields=40, max_part_size=FORM_BYTES)
+        form = await request.form(max_files=6 if request.url.path.startswith('/admin/') else 1, max_fields=45, max_part_size=FORM_BYTES)
+        times, request.state.issue_time_error = parse_time_state(form, existing)
         slug = unique_news_slug(form.get("slug"), existing["id"] if existing else None)
         category = str(form.get("category", "")).strip()
         return form, {
@@ -615,7 +620,8 @@ def create_app(test_config=None):
             "event_start": str(form.get("event_start", existing["event_start"] if existing else "")).strip(),
             "event_end": str(form.get("event_end", existing["event_end"] if existing else "")).strip(),
             **{key: str(form.get(key, existing[key] if existing and existing[key] is not None else "")).strip()
-               for key in ("start_time", "end_time", "region", "address", "latitude", "longitude")},
+               for key in ("region", "address", "latitude", "longitude")},
+            **times,
             "show_on_map": int(form.get("show_on_map") == "1"),
             "external_url": str(form.get("external_url", "")).strip(),
             "source_name": str(form.get("source_name", "")).strip(),
@@ -979,7 +985,7 @@ def create_app(test_config=None):
         form, data = await parse_news_form(request)
         if not require_csrf(request, form):
             return HTMLResponse("CSRF 검증에 실패했습니다.", status_code=400)
-        if error := validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"])):
+        if error := request.state.issue_time_error or validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"])):
             flash(request, error, "error")
             images = []
             return templates.TemplateResponse(request=request, name="admin_news_form.html", context={
@@ -987,18 +993,22 @@ def create_app(test_config=None):
                          "legacy_image_url": data["image_url"], "images": images},
                 "mode": "new", **form_options()}, status_code=400)
         try:
-            plan = await image_store.prepare(form, "issues")
+            plan = await prepare_issue_images(image_store, form)
         except ImageError as exc:
             flash(request, str(exc), "error")
             return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": None, "legacy_image_url": data["image_url"], "images": []}, "mode": "new", **form_options()}, status_code=400)
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        with plan.transaction() as conn:
-            values = {**data, "updated_at": now}
-            columns = ",".join(values)
-            placeholders = ",".join("?" for _ in values)
-            cursor = conn.execute(f"INSERT INTO news_posts ({columns}) VALUES ({placeholders})", tuple(values.values()))
-            plan.apply(conn, cursor.lastrowid)
-            audit(conn,request,"ISSUE 등록","ISSUE",cursor.lastrowid,data["title"])
+        try:
+            with plan.transaction() as conn:
+                values = {**data, "updated_at": now}
+                columns = ",".join(values)
+                placeholders = ",".join("?" for _ in values)
+                cursor = conn.execute(f"INSERT INTO news_posts ({columns}) VALUES ({placeholders})", tuple(values.values()))
+                plan.apply(conn, cursor.lastrowid)
+                audit(conn,request,"ISSUE 등록","ISSUE",cursor.lastrowid,data["title"])
+        except ImageError as exc:
+            flash(request, str(exc), "error")
+            return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": None, "images": []}, "mode": "new", **form_options()}, status_code=400)
         flash(request, "제주 소식을 저장했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 
@@ -1050,14 +1060,14 @@ def create_app(test_config=None):
             return HTMLResponse("검토 대기 중인 ISSUE만 승인할 수 있습니다.", status_code=409)
         if member_post and existing["approval_status"] != "approved":
             data["published"] = int(approve)
-        error = validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"]))
+        error = request.state.issue_time_error or validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"]))
         if approve and not error:
             with closing(connect_db()) as conn:
                 error = submission_error(conn, data)
         if error:
             return review_screen(request, existing, data=data, error=error)
         try:
-            plan = await image_store.prepare(form, "issues")
+            plan = await prepare_issue_images(image_store, form)
             with plan.transaction() as conn:
                 values = {**data, "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
                 if approve:

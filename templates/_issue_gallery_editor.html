@@ -1,0 +1,13 @@
+<section class="form-card" data-issue-gallery-editor>
+  <h2>추가 이미지 (선택)</h2>
+  <p class="form-help">프로그램표, 상세 포스터, 행사장 안내도 등 추가 정보를 최대 5장까지 등록할 수 있습니다.</p>
+  <p class="form-help">대표 포스터와 별도로 상세페이지에 표시됩니다. 지원 형식: JPG, PNG, WebP, HEIC·HEIF · 한 장당 32MB, 5,000만 화소 이하</p>
+  <input type="hidden" name="gallery_order" value="[]"><input type="hidden" name="gallery_original" value="[]">
+  <ol class="issue-gallery-editor-list" data-gallery-list>
+  {% for image in (item.additional_images if item and item.additional_images else []) %}
+    <li data-gallery-key="saved:{{ image.id }}" data-url="{{ image.url }}" data-name="추가 이미지 {{ loop.index }}"><img src="{{ image.url }}" alt="추가 이미지 {{ loop.index }} 미리보기"></li>
+  {% endfor %}</ol>
+  <label class="secondary-btn image-file-button"><span>+ 이미지 추가</span><input type="file" multiple accept="image/*" data-gallery-picker aria-label="추가 이미지 선택"></label>
+  <p class="form-help" data-gallery-status role="status" aria-live="polite"></p>
+  <p class="form-help">☰ 손잡이를 끌거나 ↑ ↓ 버튼으로 순서를 바꿀 수 있습니다. 추가·순서·삭제는 저장하기를 눌러야 반영됩니다.</p>
+</section>

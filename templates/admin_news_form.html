@@ -17,6 +17,7 @@
   </section>{% endif %}
   <section class="form-card"><h2>기본 정보</h2><div class="form-grid two"><label class="span-2">제목 *<input name="title" required value="{{ item.title if item else '' }}"></label><label>카테고리 *<select name="category" required>{% if item and item.category not in news_categories %}<option value="" disabled selected>새 카테고리를 선택하세요</option>{% endif %}{% for category in news_categories %}<option value="{{ category }}" {% if item and item.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select>{% if item and item.stored_category != item.category %}<small>기존 분류 ‘{{ item.stored_category }}’는 저장 시 선택한 분류로 변경됩니다.</small>{% elif item and item.category not in news_categories %}<small>기존 분류: {{ item.stored_category }}. 내용을 확인한 후 새 분류를 선택해 주세요.</small>{% endif %}</label><label>URL용 영문 주소 <input name="slug" value="{{ item.slug if item else '' }}" placeholder="비우면 자동 생성"></label></div></section>
   {{ image_uploads(item, "issues") }}
+  {% include '_issue_gallery_editor.html' %}
 
   {% include "_issue_schedule.html" %}
   <section class="form-card"><h2>내용과 출처</h2><div class="form-grid two"><label class="span-2">한줄 요약<textarea name="summary" rows="3">{{ item.summary if item else '' }}</textarea></label><label class="span-2">상세 내용<textarea name="body" rows="8">{{ item.body if item else '' }}</textarea></label><label>출처명<input name="source_name" value="{{ item.source_name if item else '' }}"></label><label>정보 확인일<input type="date" name="checked_at" value="{{ item.checked_at if item else '' }}"></label><label class="span-2">공식 정보/신청 URL<input type="url" name="external_url" value="{{ item.external_url if item else '' }}" placeholder="https://…"></label></div></section>
@@ -30,4 +31,4 @@
  <button class="mini-btn danger" type="submit">반려</button></form>{% endif %}
 {% endblock %}
 
-{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/admin-location.js"></script><script src="/static/issue-schedule.js?v=20261103-labels"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/admin-location.js"></script><script src="/static/issue-schedule.js?v=20261124"></script><script src="/static/issue-gallery-editor.js?v=20261124"></script>{% endblock %}

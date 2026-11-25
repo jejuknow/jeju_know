@@ -478,6 +478,7 @@ class AdminUI:
             return self.render(request, "best_form.html", collection=c, best_state=state, best_filters=options)
 
         @app.post("/admin/best/image-preview")
+        @app.post("/admin/news/image-preview")
         async def best_image_preview(request: Request):
             if response := self.guard(request): return response
             form = await request.form(max_files=1, max_fields=5, max_part_size=FORM_BYTES)
