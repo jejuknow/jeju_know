@@ -3,9 +3,9 @@ from contextlib import closing
 from datetime import date
 
 from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, Response
 
-from admin_ui import page_rows
+from admin_ui import page_rows, admin_save_response
 from auth_security import current_user, safe_external_url
 from community_migrations import today
 from image_limits import FORM_BYTES
@@ -183,4 +183,4 @@ def register_ad_routes(app, templates, connect_db, admin_guard, require_csrf, fl
         except ImageError as exc:
             return invalid(str(exc))
         flash(request, "광고를 저장했습니다.")
-        return RedirectResponse("/admin/ads", status_code=303)
+        return admin_save_response(request, "/admin/ads")

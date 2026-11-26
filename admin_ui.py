@@ -51,6 +51,13 @@ def admin_return(form, default="/admin"):
     return default
 
 
+def admin_save_response(request, target):
+    """AJAX saves navigate once, so the destination GET consumes the success flash."""
+    if request.headers.get("x-requested-with") == "fetch":
+        return JSONResponse({"redirect": target})
+    return RedirectResponse(target, status_code=303)
+
+
 def paginate(request, total):
     size = integer(request.query_params.get("per_page"), 10, 10, 50)
     if size not in (10, 30, 50):

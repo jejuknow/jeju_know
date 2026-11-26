@@ -22,8 +22,17 @@
     document.getElementById('newVisibilityHelp').hidden=!!(form.elements.opened_year.value&&form.elements.opened_month.value);
   }
   ['opened_year','opened_month'].forEach(name=>form.elements[name].addEventListener('input',newHelp));newHelp();
-  document.querySelector('.place-form')?.addEventListener('invalid',event=>{
+  let firstInvalid=null;
+  form.addEventListener('invalid',event=>{
     let parent=event.target.parentElement;
     while(parent){if(parent.tagName==='DETAILS')parent.open=true;parent=parent.parentElement;}
+    if(firstInvalid)return;
+    firstInvalid=event.target;
+    requestAnimationFrame(()=>{
+      const field=firstInvalid;firstInvalid=null;
+      field.scrollIntoView({block:'center'});field.focus({preventScroll:true});
+      const feedback=form.querySelector('[data-submit-status]');
+      if(feedback){feedback.textContent='저장하지 못했습니다. '+field.validationMessage;feedback.setAttribute('role','alert');}
+    });
   },true);
 })();

@@ -4,7 +4,7 @@
     const names=['name','address','phone','region','category_id','latitude','longitude'];
     const status=form.querySelector('[data-duplicate-status]');
     const box=()=>form.querySelector('[data-duplicate-warning]');
-    let timer,revision=0,checkedKey='',pending,pass=false,submitting=false;
+    let timer,checkedKey='',pending,pass=false,submitting=false;
     function values(){return names.map(name=>String(form.elements.namedItem(name)?.value||''));}
     function key(){return JSON.stringify(values());}
     function render(items){
@@ -23,7 +23,7 @@
       });
     }
     async function check(){
-      const signature=key(), version=revision;
+      const signature=key();
       if(signature===checkedKey)return true;
       if(pending?.key===signature)return pending.promise;
       const promise=(async()=>{
@@ -35,7 +35,9 @@
           const response=await fetch(form.dataset.duplicateCheck,{method:'POST',body:data,credentials:'same-origin',headers:{Accept:'application/json'}});
           if(!response.ok)throw new Error('check failed');
           const result=await response.json();
-          if(version!==revision||signature!==key())return false;
+          // A blur/change after input can report the same value while this is pending.
+          // Only different field values make the response stale.
+          if(signature!==key())return false;
           render(result.candidates);checkedKey=signature;
           status.textContent=result.candidates.length?'기존 후보를 확인해주세요.':'현재 입력과 겹치는 공개 장소 후보가 없습니다.';
           if(form.dataset.duplicateAudience==='admin'&&!result.candidates.length)status.textContent='현재 입력과 겹치는 장소 후보가 없습니다.';
@@ -47,7 +49,7 @@
     }
     function changed(event){
       if(!names.includes(event.target.name))return;
-      revision++;checkedKey='';clearTimeout(timer);
+      checkedKey='';clearTimeout(timer);
       const warning=box();if(warning)warning.querySelector('[name=duplicate_ack]').checked=false;
       if(form.elements.namedItem('name')?.value&&form.elements.namedItem('address')?.value)timer=setTimeout(check,500);
     }
@@ -59,7 +61,7 @@
       event.preventDefault();event.stopImmediatePropagation();clearTimeout(timer);
       if(submitting)return;
       submitting=true;
-      try{await form.prepareLocation?.();if(!await check())return;}
+      try{await form.prepareLocation?.();while(!await check()){/* Recheck edits made while waiting. */}}
       catch(_){status.textContent='지도 위치를 확인한 뒤 다시 등록해주세요.';return;}
       finally{submitting=false;}
       const warning=box();
@@ -68,7 +70,14 @@
         warning.scrollIntoView({block:'center',behavior:'smooth'});return;
       }
       if(!form.reportValidity())return;
-      pass=true;form.requestSubmit(event.submitter||undefined);
+      // A cached check resolves in the original submit's microtask checkpoint.
+      // Browsers ignore requestSubmit while that submission is still dispatching.
+      // Resume on the next task; never leave `pass` set by an ignored resubmit.
+      setTimeout(()=>{
+        pass=true;
+        try{form.requestSubmit(event.submitter||undefined);}
+        finally{pass=false;}
+      },0);
     },true);
     // A server warning rendered after final validation has already been checked.
     if(box()&&!box().hidden)checkedKey=key();

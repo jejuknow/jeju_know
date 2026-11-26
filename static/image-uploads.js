@@ -73,9 +73,25 @@
       return new File([blob],'optimized-photo.webp',{type:'image/webp'});
     }
     const feedback=form.querySelector('[data-submit-status]')||form.appendChild(Object.assign(document.createElement('p'),{className:'form-help'}));
+    feedback.dataset.submitStatus='';
     feedback.setAttribute('role','status');
-    let sending=false;
-    function busy(){buttons.forEach(b=>{b.disabled=sending||states.some(s=>s.busy);});}
+    const labels=buttons.map(b=>b.textContent);
+    let sending=false,navigating=false;
+    function busy(){
+      form.setAttribute('aria-busy',String(sending));
+      buttons.forEach((b,i)=>{
+        b.disabled=sending;
+        b.textContent=sending?(states.some(s=>s.busy)?'사진 처리 대기 중...':'저장 중...'):labels[i];
+      });
+    }
+    async function waitPhotos(){
+      // A replacement selected while waiting must also finish before FormData is read.
+      while(states.some(s=>s.busy))await Promise.all(states.map(s=>s.promise));
+    }
+    function showError(message){
+      feedback.textContent=message;feedback.setAttribute('role','alert');
+      feedback.scrollIntoView({block:'nearest'});
+    }
     slots.forEach(slot=>{
       const input=slot.querySelector('input[type=file]'),remove=slot.querySelector('input[type=checkbox]');
       const preview=slot.querySelector('.image-preview'),image=preview.querySelector('img'),placeholder=preview.querySelector('.image-placeholder');
@@ -143,11 +159,13 @@
     }
     form.addEventListener('submit',async event=>{
       event.preventDefault();if(sending)return;
-      sending=true;busy();feedback.textContent='사진과 지도 위치를 확인하고 있어요.';
+      sending=true;busy();feedback.setAttribute('role','status');
+      feedback.textContent='사진과 지도 위치를 확인한 뒤 저장합니다. 잠시 기다려주세요.';
       try {
-        await Promise.all(states.map(s=>s.promise));
+        await waitPhotos();
         await form.prepareGallery?.();
         await form.prepareLocation?.();
+        await waitPhotos();
         if(!form.reportValidity())return;
         const data=new FormData(form);
         form.appendGallery?.(data);
@@ -155,24 +173,29 @@
         states.forEach(s=>{if(s.file&&!s.remove.checked)data.set(s.input.name,s.file,s.file.name);});
         feedback.textContent=form.hasAttribute('data-member-place-form')?'장소 등록 중...':'사진과 내용을 저장 중...';
         const response=await fetch(form.action||location.href,{method:'POST',body:data,credentials:'same-origin',
-          headers:form.hasAttribute('data-member-place-form')?{'X-Requested-With':'fetch'}:{}});
-        if(response.ok&&form.hasAttribute('data-member-place-form')&&response.headers.get('content-type')?.includes('application/json')){
+          headers:{'X-Requested-With':'fetch'}});
+        if(response.ok&&response.headers.get('content-type')?.includes('application/json')){
           const result=await response.json();
-          if(typeof result.redirect==='string'&&/^\/(?:place\/|account\/places#)/.test(result.redirect)){location.assign(result.redirect);return;}
-          throw new Error('Invalid registration response');
+          if(typeof result.redirect==='string'&&result.redirect.startsWith('/')&&!result.redirect.startsWith('//')&&new URL(result.redirect,location.href).origin===location.origin){
+            navigating=true;location.assign(result.redirect);return;
+          }
+          showError('저장 결과를 확인하지 못했습니다. 목록에서 반영 여부를 확인해주세요.');return;
         }
-        if(response.redirected&&response.ok){location.assign(response.url);return;}
+        if(response.redirected&&response.ok){
+          if(/\/(?:admin\/)?login\/?$/.test(new URL(response.url).pathname)){
+            showError('로그인이 만료되어 저장하지 못했습니다. 다른 탭에서 다시 로그인한 뒤 저장해주세요. 입력 내용은 유지됩니다.');return;
+          }
+          navigating=true;location.assign(response.url);return;
+        }
         const text=await response.text(),doc=new DOMParser().parseFromString(text,'text/html');
         if(response.status===409)showDuplicate(doc);
         const message=doc.querySelector('.member-error,.flash.error,[role=alert]')?.textContent?.trim();
         const apiError=response.headers.get('content-type')?.includes('application/json')?JSON.parse(text).detail:null;
-        feedback.textContent=message||apiError||(!/<(?:html|body)/i.test(text)&&text.length<500?text:'사진 업로드 중 문제가 발생했습니다. 입력 내용을 확인하고 다시 시도해주세요.');
-        feedback.setAttribute('role','alert');feedback.scrollIntoView({block:'nearest'});
+        showError(message||(typeof apiError==='string'?apiError:'')||(!/<(?:html|body)/i.test(text)&&text.length<500&&!response.headers.get('content-type')?.includes('application/json')?text:'저장하지 못했습니다. 입력 내용을 확인하고 다시 시도해주세요.'));
       } catch (_) {
-        feedback.textContent='사진 업로드 중 연결 문제가 발생했습니다. 내 장소에서 등록 여부를 확인한 뒤 다시 시도해주세요.';
-        feedback.setAttribute('role','alert');
-      } finally {sending=false;busy();}
+        showError('저장 결과를 확인하지 못했습니다. 연결 상태와 목록의 반영 여부를 확인한 뒤 다시 시도해주세요. 입력 내용은 유지됩니다.');
+      } finally {if(!navigating){sending=false;busy();}}
     });
-    root.addEventListener('pageshow',()=>{sending=false;busy();});
+    root.addEventListener('pageshow',()=>{sending=false;navigating=false;busy();});
   });
 })(typeof window==='undefined'?globalThis:window);

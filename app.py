@@ -45,7 +45,7 @@ from member_routes import register_member_routes, validate_news
 from community_migrations import backup_before_community_migration, migrate_community, today as community_today
 from community_places import decorate_facts, opening, save_admin_facts, VERIFICATION_LABELS
 from community_routes import register_community_routes
-from admin_ui import AdminUI, admin_context, admin_return
+from admin_ui import AdminUI, admin_context, admin_return, admin_save_response
 from admin_settings import read_settings, catalog
 from admin_ui_migrations import backup_before_admin_ui, migrate_admin_ui
 from basic_place_info_migrations import backup_before_basic_place_info, migrate_basic_place_info
@@ -1010,7 +1010,7 @@ def create_app(test_config=None):
             flash(request, str(exc), "error")
             return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": None, "images": []}, "mode": "new", **form_options()}, status_code=400)
         flash(request, "제주 소식을 저장했습니다.", "success")
-        return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
+        return admin_save_response(request, admin_return(form, "/admin/issues"))
 
     def review_screen(request, existing, *, data=None, error=None):
         item = row_to_news(existing)
@@ -1089,7 +1089,7 @@ def create_app(test_config=None):
         except ImageError as exc:
             return review_screen(request, existing, data=data, error=str(exc))
         flash(request, "ISSUE를 승인했습니다." if approve else "제주 소식을 수정했습니다.", "success")
-        return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
+        return admin_save_response(request, admin_return(form, "/admin/issues"))
 
     @app.post("/admin/news/{news_id}/reject")
     async def reject_issue(request: Request, news_id: int):
@@ -1362,7 +1362,7 @@ def create_app(test_config=None):
             save_admin_facts(conn, cursor.lastrowid, data, ("admin:" + str(request.session["admin_id"]) if request.session.get("admin_id") else "user:" + str(current_user(request)["id"])))
             audit(conn,request,"장소 등록","장소",cursor.lastrowid,data["name"])
         flash(request, "장소를 저장했습니다. 공개 상태라면 즉시 사이트에 반영됩니다.", "success")
-        return RedirectResponse(url=admin_return(form), status_code=303)
+        return admin_save_response(request, admin_return(form))
 
     @app.get("/admin/places/{place_id}/edit", response_class=HTMLResponse)
     async def admin_place_edit_get(request: Request, place_id: int):
@@ -1440,7 +1440,7 @@ def create_app(test_config=None):
             if bool(existing["published"]) != bool(data["published"]):
                 audit(conn,request,"장소 공개" if data["published"] else "장소 숨김","장소",place_id,data["name"])
         flash(request, "수정사항을 저장했습니다. 승인 절차 없이 즉시 반영됩니다.", "success")
-        return RedirectResponse(url=admin_return(form), status_code=303)
+        return admin_save_response(request, admin_return(form))
 
     @app.post("/admin/places/{place_id}/toggle-published")
     async def admin_place_toggle_published(request: Request, place_id: int):
