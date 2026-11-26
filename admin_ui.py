@@ -8,10 +8,8 @@ from contextlib import closing
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import Request, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from starlette.concurrency import run_in_threadpool
-from starlette.datastructures import UploadFile
-from image_uploads import ImageError, FORM_BYTES, optimize_upload
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from image_uploads import ImageError, FORM_BYTES, image_preview
 from issue_discovery import VALID_DATES
 from admin_settings import catalog, catalog_usage, read_settings, write_setting, DEFAULTS
 from auth_security import current_user, safe_external_url
@@ -492,15 +490,7 @@ class AdminUI:
             form = await request.form(max_files=1, max_fields=5, max_part_size=FORM_BYTES)
             if not self.csrf(request, form):
                 return JSONResponse({"detail": "CSRF 검증에 실패했습니다."}, status_code=400)
-            photo = form.get("image_0")
-            if not isinstance(photo, UploadFile) or not photo.filename:
-                return JSONResponse({"detail": "이미지를 선택해주세요."}, status_code=400)
-            try:
-                pixels, _, _ = await run_in_threadpool(optimize_upload, photo.file, photo.filename, photo.content_type or "")
-            except ImageError as error:
-                return JSONResponse({"detail": str(error)}, status_code=400)
-            # Preview bytes are returned to the browser, never stored on disk or in DB.
-            return Response(pixels, media_type="image/webp", headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+            return await image_preview(form)
 
         @app.post("/admin/best/new")
         @app.post("/admin/best/{collection_id}/edit")

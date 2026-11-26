@@ -11,7 +11,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException
 from starlette.formparsers import MultiPartException
@@ -34,6 +34,26 @@ logger = logging.getLogger(__name__)
 
 class ImageError(ValueError):
     pass
+
+
+def upload_error(filename, error):
+    # Show a bounded basename to its uploader; never log the original filename.
+    name = re.sub(r'[\x00-\x1f\x7f]', '', str(filename or '').replace('\\', '/').rsplit('/', 1)[-1])[:120]
+    return ImageError(f'“{name or "선택한 파일"}” — {error}')
+
+
+async def image_preview(form):
+    photo = form.get('image_0')
+    if not isinstance(photo, UploadFile) or not photo.filename:
+        return JSONResponse({'detail':'이미지를 선택해주세요.'}, status_code=400)
+    try:
+        pixels, _, _ = await run_in_threadpool(optimize_upload, photo.file, photo.filename, photo.content_type or '')
+    except ImageError as error:
+        return JSONResponse({'detail':str(upload_error(photo.filename, error))}, status_code=400)
+    finally:
+        await photo.close()
+    # Transient preview only: no file or metadata is persisted before submission.
+    return Response(pixels, media_type='image/webp', headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'})
 
 
 class ClosedFormRoute(APIRoute):
@@ -197,7 +217,10 @@ class ImageStore:
                 upload = form.get(f"image_{slot}")
                 if not isinstance(upload, UploadFile) or not upload.filename:
                     continue
-                output, width, height = await run_in_threadpool(optimize_upload, upload.file, upload.filename, upload.content_type or "")
+                try:
+                    output, width, height = await run_in_threadpool(optimize_upload, upload.file, upload.filename, upload.content_type or "")
+                except ImageError as error:
+                    raise upload_error(upload.filename, error) from error
                 relative = f"{kind}/{uuid.uuid4().hex}.webp"
                 plan.new[slot] = {"file_path": relative, "width": width, "height": height, "byte_size": len(output)}
                 await run_in_threadpool(self.write, relative, output)

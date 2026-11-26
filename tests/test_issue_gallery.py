@@ -57,7 +57,7 @@ class IssueGalleryTests(unittest.TestCase):
         self.assertEqual(self.rows('SELECT * FROM issue_images'),before)
         self.assertEqual(len(list(self.app.state.image_store.root.joinpath('issues').glob('*'))),5)
 
-    def test_private_access_and_member_cannot_upload_gallery(self):
+    def test_private_access_and_malformed_member_gallery_rejected(self):
         self.assertEqual(self.save(count=1).status_code,303)
         url='/uploads/'+self.rows('SELECT file_path FROM issue_images')[0]['file_path']
         self.assertEqual(self.admin.get(url).status_code,200)

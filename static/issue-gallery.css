@@ -4,3 +4,5 @@
 @media(max-width:640px){.issue-gallery-editor-list li{flex-wrap:wrap}.issue-gallery-editor-list img{width:80px;height:70px}.issue-gallery-actions{flex-basis:100%;justify-content:flex-end}.issue-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.issue-time-modes{gap:12px}}
 .event-benefit-detail{margin-block:24px}.event-benefit-detail dd{white-space:pre-wrap}
 [data-event-benefits][hidden]{display:none}
+[data-gallery-clear-error][hidden]{display:none}.image-file-button.is-disabled{opacity:.55;cursor:default}
+@media(max-width:640px){[data-reorder=false] .issue-gallery-editor-list{grid-template-columns:repeat(2,minmax(0,1fr))}[data-reorder=false] .issue-gallery-editor-list li{display:flex;flex-direction:column;align-items:stretch}[data-reorder=false] .issue-gallery-editor-list img{width:100%;height:110px}[data-reorder=false] .issue-gallery-actions{flex-basis:auto}[data-reorder=false] .issue-gallery-actions button{width:100%}}

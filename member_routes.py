@@ -16,7 +16,8 @@ from issue_review import candidates, submission_error, has_poster
 from member_activity import register_activity_routes
 from user_status import WAITING
 from fastapi import HTTPException
-from image_uploads import ImagePlan, ImageError
+from image_uploads import ImagePlan, ImageError, image_preview, FORM_BYTES
+from issue_gallery import prepare as prepare_issue_images, gallery
 from issue_times import time_error
 from event_details import validate as validate_event, FIELDS as EVENT_FIELDS
 from issue_discovery import allowed_categories
@@ -261,6 +262,17 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return response
         return render(request, "member_issue_form.html", item=None, kakao_map_key=app.state.kakao_map_key)
 
+    @app.post("/issues/image-preview")
+    async def user_issue_image_preview(request: Request):
+        if response := guard(request):
+            return response
+        form = await request.form(max_files=1, max_fields=5, max_part_size=FORM_BYTES)
+        if not require_csrf(request, form):
+            return csrf_error()
+        if limited(request, "issue_image_preview", str(current_user(request)["id"]), limit=90, window=900):
+            return throttled()
+        return await image_preview(form)
+
     @app.get("/issues/{news_id}/edit", response_class=HTMLResponse)
     async def user_issue_edit_get(request: Request, news_id: int):
         if response := guard(request):
@@ -289,14 +301,15 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             similar = [] if error else candidates(conn, {**data, "id": news_id}, public_only=True)
         def problem(message, status=400):
             return render(request, "member_issue_form.html", status=status, item={**data, "id": news_id,
-                "images": image_store.list("issues", news_id) if news_id else []},
+                "images": image_store.list("issues", news_id) if news_id else [],
+                "additional_images": gallery(image_store, news_id) if news_id else []},
                 error=message, duplicates=similar, kakao_map_key=app.state.kakao_map_key)
         if error:
             return problem(error)
         if similar and form.get("duplicate_ack") != "1":
             return problem("비슷한 EVENT가 이미 등록되어 있습니다.", 409)
         try:
-            plan = await image_store.prepare(form, "issues")
+            plan = await prepare_issue_images(image_store, form)
         except ImageError as exc:
             return problem(str(exc))
         # Publication, authorship, review and map flags never come from the member.

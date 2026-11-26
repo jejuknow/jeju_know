@@ -58,14 +58,14 @@
     const prepareUrl=form.dataset.photoPrepare;
     async function preparePhoto(file){
       if(!prepareUrl)return optimizePhoto(file);
-      const data=new FormData();data.set('csrf_token',form.elements.csrf_token.value);data.set('photo',file,file.name);
+      const data=new FormData();data.set('csrf_token',form.elements.csrf_token.value);data.set(form.dataset.photoField||'photo',file,file.name);
       let response;
       try{response=await fetch(prepareUrl,{method:'POST',body:data,credentials:'same-origin'});}
       catch(_){throw new Error('사진 업로드 중 문제가 발생했습니다. 다시 시도해주세요.');}
       if(!response.ok){
         let message='사진을 처리하지 못했습니다. 다시 시도해주세요.';
         if(response.status===413)message='사진 파일이 너무 큽니다. 한 장당 32MB까지 처리할 수 있어요.';
-        else {try{message=(await response.json()).error||message;}catch(_){}}
+        else {try{const result=await response.json();message=result.error||result.detail||message;}catch(_){}}
         throw new Error(message);
       }
       const blob=await response.blob();
@@ -81,7 +81,7 @@
       form.setAttribute('aria-busy',String(sending));
       buttons.forEach((b,i)=>{
         b.disabled=sending;
-        b.textContent=sending?(states.some(s=>s.busy)?'사진 처리 대기 중...':'저장 중...'):labels[i];
+        b.textContent=sending?(states.some(s=>s.busy)?'사진 처리 대기 중...':form.hasAttribute('data-member-issue-form')?'등록 중...':'저장 중...'):labels[i];
       });
     }
     async function waitPhotos(){

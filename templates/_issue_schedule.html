@@ -1,6 +1,6 @@
 {% set p = item or {} %}
 {% set clock_mode = issue_time_mode(p) %}
-<link rel="stylesheet" href="/static/issue-gallery.css?v=20261126-event">
+<link rel="stylesheet" href="/static/issue-gallery.css?v=20261126-member-gallery">
 <section class="form-card"><h2>일정</h2>
   <div class="form-grid two">
     <label>시작일<input type="date" name="event_start" value="{{ p.get('event_start','') }}" {% if member_form %}required{% endif %}></label>

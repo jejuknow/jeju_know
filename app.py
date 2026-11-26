@@ -610,7 +610,7 @@ def create_app(test_config=None):
         }
 
     async def parse_news_form(request: Request, existing=None):
-        form = await request.form(max_files=6 if request.url.path.startswith('/admin/') else 1, max_fields=64, max_part_size=FORM_BYTES)
+        form = await request.form(max_files=6, max_fields=64, max_part_size=FORM_BYTES)
         times, request.state.issue_time_error = parse_time_state(form, existing)
         slug = unique_news_slug(form.get("slug"), existing["id"] if existing else None)
         category = str(form.get("category", "")).strip()

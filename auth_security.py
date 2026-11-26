@@ -164,10 +164,11 @@ class ServerSessionMiddleware:
                     limit += MEMBER_PLACE_SLOTS * MAX_FILE_BYTES
                 elif member and scope["path"] == "/api/place-photos/prepare":
                     limit += MAX_FILE_BYTES
-                elif (data.get("admin_id") or (member and member["role"] == "admin")) and re.fullmatch(r"/admin/news/(?:new|\d+/edit)", scope["path"]):
+                elif (((data.get("admin_id") or (member and member["role"] == "admin")) and re.fullmatch(r"/admin/news/(?:new|\d+/edit)", scope["path"]))
+                      or (member and re.fullmatch(r"/issues/(?:new|\d+/edit)", scope["path"]))):
                     limit += 6 * MAX_FILE_BYTES
                 elif (((data.get("admin_id") or (member and member["role"] == "admin")) and re.fullmatch(r"/admin/(?:news|ads|best)/(?:new|\d+/edit|image-preview)", scope["path"]))
-                      or (member and re.fullmatch(r"/issues/(?:new|\d+/edit)", scope["path"]))):
+                      or (member and scope["path"] == "/issues/image-preview")):
                     limit += MAX_FILE_BYTES
             length = connection.headers.get("content-length", "")
             if length.isdigit() and int(length) > limit:
