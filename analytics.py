@@ -24,7 +24,7 @@ VISITOR_AGE = 90 * 86400
 SESSION_AGE = 30 * 60
 RETENTION = 365 * 86400
 FEATURE_EVENTS = {'/map':'map_view','/new':'new_view','/news':'issue_view','/best':'best_view'}
-FEATURE_NAMES = [('find_search','FIND'),('map_view','MAP'),('new_view','NEW'),('issue_view','ISSUE'),('best_view','BEST')]
+FEATURE_NAMES = [('find_search','FIND'),('map_view','MAP'),('new_view','NEW'),('issue_view','EVENT'),('best_view','BEST')]
 BOT = re.compile(r'bot\b|crawler|spider|slurp|bingpreview|facebookexternalhit|headless|lighthouse|pagespeed|monitor|uptime|curl/|wget/', re.I)
 
 

@@ -24,7 +24,7 @@
     <p class="member-help">행사 기간 · {{ i.date_label }}</p>
     {% if i.approval_status=='rejected' and i.rejection_reason %}<p class="activity-note">반려 사유 · {{ i.rejection_reason }}</p>{% endif %}
     {% if i.approval_status=='pending' %}<div class="row-actions"><a class="mini-btn" href="/issues/{{ i.id }}/edit">수정</a>
-      <form method="post" action="/issues/{{ i.id }}/delete" onsubmit="return confirm('ISSUE 등록을 취소할까요?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="mini-btn danger">등록 취소</button></form></div>
+      <form method="post" action="/issues/{{ i.id }}/delete" onsubmit="return confirm('EVENT 등록을 취소할까요?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="mini-btn danger">등록 취소</button></form></div>
     {% elif i.approval_status=='approved' %}<a class="mini-btn" href="/contact?issue_id={{ i.id }}">수정·삭제 문의</a>{% endif %}
   {% elif tab=='suggestions' %}
     {% if i.status_help %}<p class="member-help">{{ i.status_help }}</p>{% endif %}

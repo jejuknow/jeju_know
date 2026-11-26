@@ -33,6 +33,7 @@ from restaurant_taxonomy import FIELDS as RESTAURANT_FIELDS, parse_selection, fo
 from image_migrations import backup_before_image_migration, migrate_images
 from image_uploads import ImageStore, ImagePlan, ImageError, FORM_BYTES, ClosedFormRoute
 from issue_gallery import migrate as migrate_issue_gallery, prepare as prepare_issue_images
+from event_details import migrate as migrate_event, parse_fields as parse_event_fields, decorate as decorate_event
 from issue_times import parse_time_state, TIME_OPTIONS, time_mode
 from place_taxonomy import taxonomy, navigation_order, linked_ids, validate_terms, save_links, public_search
 from cafe_focus import parse_focus, validate_focus, save_focus, decorate_focus
@@ -58,6 +59,7 @@ from admin_roles import SUPER, audit, migrate as migrate_admin_roles, require_ad
 from admin_accounts import register_admin_accounts, password_error, valid_username
 from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES, RENAMED_CATEGORIES
 from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule, highlights, now as issue_now
+from issue_discovery import allowed_categories, sections as event_sections, as_moment
 from ad_banners import active_banners, banner_image, migrate as migrate_ads, register_ad_routes
 from contact_inquiries import migrate as migrate_contact, migrate_member_inquiries, register_contact_routes
 from issue_calendar_migration import migrate as migrate_issue_calendar
@@ -78,7 +80,7 @@ REGIONS = [
 COMPANIONS = ["혼자", "연인", "친구", "부모님", "아이", "반려동물", "단체"]
 FEATURES = ["감성", "뷰", "비오는날", "사진", "힐링", "로컬", "전통", "이색", "가성비", "포장", "예약"]
 STATUS_OPTIONS = ["미확인", "가능", "불가", "제한"]
-NEWS_CATEGORIES = list(NEWS_CATEGORY_LABELS.values())
+NEWS_CATEGORIES = list(PUBLIC_CATEGORIES.values())
 
 SEED_PLACES = [
     {
@@ -241,6 +243,7 @@ def create_app(test_config=None):
             "active_regions": active_regions, "active_companions": active_companions,
             "csrf_token": request.session["csrf_token"], "flashes": flashes,
             "news_categories": NEWS_CATEGORIES, "news_category_labels": NEWS_CATEGORY_LABELS,
+            "news_filter_categories": list(NEWS_CATEGORY_LABELS.values()),
             "public_issue_categories": list(PUBLIC_CATEGORIES.values()), "issue_today": community_today().isoformat(),
             "member": current_user(request),
             "verification_labels": VERIFICATION_LABELS,
@@ -384,6 +387,7 @@ def create_app(test_config=None):
         migrate_issue_calendar(app.state.database)
         migrate_issue_review(app.state.database)
         migrate_issue_gallery(app.state.database)
+        migrate_event(app.state.database)
         migrate_ads(app.state.database)
         migrate_contact(app.state.database)
         migrate_member_inquiries(app.state.database)
@@ -510,6 +514,7 @@ def create_app(test_config=None):
         item.update(schedule(item, day or community_today()))
         item["review_label"] = review_label(item)
         item["category_label"] = item["category"].replace("•", "·")
+        decorate_event(item, as_moment(day or community_today()).date())
         item["mappable"] = bool(item.get("show_on_map") and item.get("latitude") is not None
                                 and item.get("longitude") is not None)
         return image_store.decorate(item, "issues")
@@ -605,7 +610,7 @@ def create_app(test_config=None):
         }
 
     async def parse_news_form(request: Request, existing=None):
-        form = await request.form(max_files=6 if request.url.path.startswith('/admin/') else 1, max_fields=45, max_part_size=FORM_BYTES)
+        form = await request.form(max_files=6 if request.url.path.startswith('/admin/') else 1, max_fields=64, max_part_size=FORM_BYTES)
         times, request.state.issue_time_error = parse_time_state(form, existing)
         slug = unique_news_slug(form.get("slug"), existing["id"] if existing else None)
         category = str(form.get("category", "")).strip()
@@ -622,6 +627,7 @@ def create_app(test_config=None):
             **{key: str(form.get(key, existing[key] if existing and existing[key] is not None else "")).strip()
                for key in ("region", "address", "latitude", "longitude")},
             **times,
+            **parse_event_fields(form, existing),
             "show_on_map": int(form.get("show_on_map") == "1"),
             "external_url": str(form.get("external_url", "")).strip(),
             "source_name": str(form.get("source_name", "")).strip(),
@@ -831,11 +837,13 @@ def create_app(test_config=None):
         moment = issue_now()
         with closing(connect_db()) as conn:
             rows, selected, link = browse(conn, request.query_params, moment)
+            featured = event_sections(conn, moment) if not any(selected[k] for k in ('category','region','q','free','closing')) and selected['period']=='all' else []
         items = [row_to_news(row, moment) for row in rows]
         return templates.TemplateResponse(request=request, name="news_list.html", context={
             "news_items": items, "selected": selected, "active_category": selected["category"],
             "issue_link": link, "periods": PERIODS, "map_count": sum(item["mappable"] for item in items),
             "kakao_map_key": app.state.kakao_map_key,
+            "event_sections": [(title, [row_to_news(row,moment) for row in entries], href) for title,entries,href in featured],
         })
 
     @app.get("/news/{slug}", response_class=HTMLResponse)
@@ -848,7 +856,7 @@ def create_app(test_config=None):
         if not row:
             return HTMLResponse("소식을 찾을 수 없습니다.", status_code=404)
         item = row_to_news(row, moment)
-        return templates.TemplateResponse(request=request, name="news_detail.html", context={"item": item, "seo": issue_metadata(item)})
+        return templates.TemplateResponse(request=request, name="news_detail.html", context={"item": item, "seo": issue_metadata(item), "kakao_map_key":app.state.kakao_map_key})
 
     @app.get("/partnership", response_class=HTMLResponse)
     async def partnership(request: Request):
@@ -1005,7 +1013,7 @@ def create_app(test_config=None):
                 placeholders = ",".join("?" for _ in values)
                 cursor = conn.execute(f"INSERT INTO news_posts ({columns}) VALUES ({placeholders})", tuple(values.values()))
                 plan.apply(conn, cursor.lastrowid)
-                audit(conn,request,"ISSUE 등록","ISSUE",cursor.lastrowid,data["title"])
+                audit(conn,request,"EVENT 등록","ISSUE",cursor.lastrowid,data["title"])
         except ImageError as exc:
             flash(request, str(exc), "error")
             return templates.TemplateResponse(request=request, name="admin_news_form.html", context={"item": {**data, "id": None, "images": []}, "mode": "new", **form_options()}, status_code=400)
@@ -1057,13 +1065,13 @@ def create_app(test_config=None):
         member_post = existing["author_type"] == "user"
         approve = form.get("review_action") == "approve"
         if approve and (not member_post or existing["approval_status"] != "pending"):
-            return HTMLResponse("검토 대기 중인 ISSUE만 승인할 수 있습니다.", status_code=409)
+            return HTMLResponse("검토 대기 중인 EVENT만 승인할 수 있습니다.", status_code=409)
         if member_post and existing["approval_status"] != "approved":
             data["published"] = int(approve)
-        error = request.state.issue_time_error or validate_news(data, NEWS_CATEGORIES, require_dates=bool(data["published"]))
+        error = request.state.issue_time_error or validate_news(data, allowed_categories(existing), require_dates=bool(data["published"]))
         if approve and not error:
             with closing(connect_db()) as conn:
-                error = submission_error(conn, data)
+                error = submission_error(conn, data, existing)
         if error:
             return review_screen(request, existing, data=data, error=error)
         try:
@@ -1085,10 +1093,10 @@ def create_app(test_config=None):
                 if not conn.execute(f"UPDATE news_posts SET {assignments} WHERE {condition}", (*values.values(), *args)).rowcount:
                     raise HTTPException(409, "내용이나 검토 상태가 변경되었습니다. 화면을 새로 열고 다시 검토해주세요.")
                 plan.apply(conn, news_id)
-                audit(conn,request,"ISSUE 승인" if approve else "ISSUE 수정","ISSUE",news_id,data["title"])
+                audit(conn,request,"EVENT 승인" if approve else "EVENT 수정","ISSUE",news_id,data["title"])
         except ImageError as exc:
             return review_screen(request, existing, data=data, error=str(exc))
-        flash(request, "ISSUE를 승인했습니다." if approve else "제주 소식을 수정했습니다.", "success")
+        flash(request, "EVENT를 승인했습니다." if approve else "제주 소식을 수정했습니다.", "success")
         return admin_save_response(request, admin_return(form, "/admin/issues"))
 
     @app.post("/admin/news/{news_id}/reject")
@@ -1108,8 +1116,8 @@ def create_app(test_config=None):
                 AND deleted_at IS NULL AND review_version=?""", (reason, reviewer(request), news_id, form.get("review_version")))
             if not changed.rowcount:
                 return HTMLResponse("내용이나 검토 상태가 변경되었습니다. 다시 확인해주세요.", status_code=409)
-            audit(conn,request,"ISSUE 반려","ISSUE",news_id)
-        flash(request, "ISSUE를 반려했습니다.")
+            audit(conn,request,"EVENT 반려","ISSUE",news_id)
+        flash(request, "EVENT를 반려했습니다.")
         return RedirectResponse("/admin/issues?status=pending", status_code=303)
 
     @app.post("/admin/news/{news_id}/toggle-published")
@@ -1133,7 +1141,7 @@ def create_app(test_config=None):
             "UPDATE news_posts SET published=?, updated_at=?,review_version=review_version+1 WHERE id=? AND approval_status='approved' AND deleted_at IS NULL",
             (new_value, datetime.now(timezone.utc).isoformat(timespec="seconds"), news_id),
         )
-        audit(conn,request,"ISSUE 공개" if new_value else "ISSUE 숨김","ISSUE",news_id,row["title"])
+        audit(conn,request,"EVENT 공개" if new_value else "EVENT 숨김","ISSUE",news_id,row["title"])
         conn.commit()
         conn.close()
         flash(request, f"소식을 {'공개' if new_value else '비공개'}로 변경했습니다.", "success")
@@ -1157,7 +1165,7 @@ def create_app(test_config=None):
         with plan.transaction() as conn:
             plan.delete_owner(conn, news_id)
             conn.execute("DELETE FROM news_posts WHERE id=?", (news_id,))
-            audit(conn,request,"ISSUE 삭제","ISSUE",news_id,row["title"])
+            audit(conn,request,"EVENT 삭제","ISSUE",news_id,row["title"])
         flash(request, f"‘{row['title']}’ 소식을 삭제했습니다.", "success")
         return RedirectResponse(url=admin_return(form, "/admin/issues"), status_code=303)
 

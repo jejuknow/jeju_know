@@ -87,7 +87,7 @@ def owned_issue(conn, user_id, issue_id):
     issue = conn.execute("""SELECT id,title FROM news_posts WHERE id=? AND author_id=? AND author_type='user'
                             AND approval_status='approved' AND deleted_at IS NULL""", (issue_id,user_id)).fetchone()
     if not issue:
-        raise HTTPException(404, "문의를 연결할 ISSUE를 찾을 수 없습니다.")
+        raise HTTPException(404, "문의를 연결할 EVENT를 찾을 수 없습니다.")
     return dict(issue)
 
 
@@ -98,7 +98,7 @@ def related_issue(conn, row, item):
     issue = conn.execute(f"""SELECT id,title,slug,deleted_at,({where}) AS visible FROM news_posts
                              WHERE id=? AND author_id=? AND author_type='user'""",
                          [*args, row["related_content_id"], row["user_id"]]).fetchone()
-    return dict(id=row["related_content_id"], title=issue["title"] if issue else item.get("issue_title", "ISSUE"),
+    return dict(id=row["related_content_id"], title=issue["title"] if issue else item.get("issue_title", "EVENT"),
                 slug=issue["slug"] if issue and issue["visible"] else None, editable=bool(issue and not issue["deleted_at"]))
 
 
@@ -116,7 +116,7 @@ def register_contact_routes(app, templates, connect_db, guard, csrf, flash, secr
             user = current_user(request)
             values = {"name": user["nickname"] if user else ""}
             if issue:
-                values.update(inquiry_type=CONTENT_REQUEST, title="[ISSUE 수정·삭제 요청] " + issue["title"])
+                values.update(inquiry_type=CONTENT_REQUEST, title="[EVENT 수정·삭제 요청] " + issue["title"])
         return render(request, "contact.html", status, values=values, issue=issue, error=error, form_token=token,
                       title_limit=220 if issue else LIMITS["title"])
 

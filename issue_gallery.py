@@ -53,7 +53,7 @@ class IssueImagePlan(ImagePlan):
                 raise ImageError('추가 이미지가 다른 화면에서 변경되었습니다. 새로고침 후 다시 시도해주세요.')
             saved = {f"saved:{r['id']}": dict(r) for r in rows}
             if any(token.startswith('saved:') and token not in saved for token in self.order):
-                raise ImageError('이 ISSUE에 등록된 추가 이미지만 사용할 수 있습니다.')
+                raise ImageError('이 EVENT에 등록된 추가 이미지만 사용할 수 있습니다.')
             # Reinsert retained IDs in one transaction to avoid UNIQUE order collisions.
             # Removed file bytes are retained: legacy/shared references may still use them.
             conn.execute('DELETE FROM issue_images WHERE issue_id=?', (owner_id,))

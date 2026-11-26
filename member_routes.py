@@ -18,6 +18,8 @@ from user_status import WAITING
 from fastapi import HTTPException
 from image_uploads import ImagePlan, ImageError
 from issue_times import time_error
+from event_details import validate as validate_event, FIELDS as EVENT_FIELDS
+from issue_discovery import allowed_categories
 
 
 SIGNUP_PASSWORD_MIN_LENGTH = 8
@@ -48,6 +50,8 @@ def validate_news(data, categories, *, require_dates=True):
     if (require_dates or data.get("event_start") or data.get("event_end")) and not (data.get("event_start") and data.get("event_end")):
         return "시작일과 종료일을 모두 선택해주세요."
     if error := time_error(data):
+        return error
+    if error := validate_event(data):
         return error
     try:
         data["latitude"], data["longitude"] = coordinates(data.get("latitude"), data.get("longitude"))
@@ -248,7 +252,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         if post["author_type"] != "user" or post["author_id"] != current_user(request)["id"]:
             return None, HTMLResponse("본인의 게시물만 관리할 수 있습니다.", status_code=403)
         if post["approval_status"] != "pending":
-            return None, HTMLResponse(f"{WAITING.label} 중인 ISSUE만 수정하거나 취소할 수 있습니다.", status_code=403)
+            return None, HTMLResponse(f"{WAITING.label} 중인 EVENT만 수정하거나 취소할 수 있습니다.", status_code=403)
         return post, None
 
     @app.get("/issues/new", response_class=HTMLResponse)
@@ -279,9 +283,9 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             return csrf_error()
         if limited(request, "publish", str(current_user(request)["id"]), limit=30, window=3600):
             return throttled()
-        error = request.state.issue_time_error or validate_news(data, categories)
+        error = request.state.issue_time_error or validate_news(data, allowed_categories(post))
         with closing(connect_db()) as conn:
-            error = error or submission_error(conn, data)
+            error = error or submission_error(conn, data, post)
             similar = [] if error else candidates(conn, {**data, "id": news_id}, public_only=True)
         def problem(message, status=400):
             return render(request, "member_issue_form.html", status=status, item={**data, "id": news_id,
@@ -290,14 +294,14 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         if error:
             return problem(error)
         if similar and form.get("duplicate_ack") != "1":
-            return problem("비슷한 ISSUE가 이미 등록되어 있습니다.", 409)
+            return problem("비슷한 EVENT가 이미 등록되어 있습니다.", 409)
         try:
             plan = await image_store.prepare(form, "issues")
         except ImageError as exc:
             return problem(str(exc))
-        # Visibility, source, review and map flags never come from the member.
+        # Publication, authorship, review and map flags never come from the member.
         fields = ("title", "category", "summary", "body", "venue", "event_start", "event_end", "start_time",
-                  "end_time", "time_mode", "region", "address", "latitude", "longitude", "external_url", "show_on_map")
+                  "end_time", "time_mode", "region", "address", "latitude", "longitude", "external_url", "source_name", "show_on_map", *EVENT_FIELDS)
         if not data["address"]:
             data["latitude"] = data["longitude"] = None
         data["show_on_map"] = int(data["latitude"] is not None and data["longitude"] is not None)
@@ -326,7 +330,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
         except ImageError as exc:
             return problem(str(exc))
         if post:
-            flash(request, f"{WAITING.label} 중인 ISSUE를 수정했습니다.")
+            flash(request, f"{WAITING.label} 중인 EVENT를 수정했습니다.")
             return redirect("/account/issues")
         return redirect("/issues/submitted")
 
@@ -358,7 +362,7 @@ def register_member_routes(app, templates, connect_db, require_csrf, flash,
             updated = conn.execute("UPDATE news_posts SET deleted_at=CURRENT_TIMESTAMP,published=0,updated_at=CURRENT_TIMESTAMP "
                 "WHERE id=? AND author_id=? AND author_type='user' AND deleted_at IS NULL AND approval_status='pending'", (news_id, current_user(request)["id"]))
             if not updated.rowcount:
-                raise HTTPException(409, "이미 검토되었거나 취소된 ISSUE입니다.")
+                raise HTTPException(409, "이미 검토되었거나 취소된 EVENT입니다.")
             plan.delete_owner(conn, news_id)
         flash(request, "게시물을 삭제했습니다.")
         return redirect("/account/issues")

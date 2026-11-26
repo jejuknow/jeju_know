@@ -1,6 +1,6 @@
 {% set p = item or {} %}
 {% set clock_mode = issue_time_mode(p) %}
-<link rel="stylesheet" href="/static/issue-gallery.css?v=20261124">
+<link rel="stylesheet" href="/static/issue-gallery.css?v=20261126-event">
 <section class="form-card"><h2>일정</h2>
   <div class="form-grid two">
     <label>시작일<input type="date" name="event_start" value="{{ p.get('event_start','') }}" {% if member_form %}required{% endif %}></label>
@@ -30,11 +30,11 @@
   <details id="locationPicker" data-auto-address><summary>지도 위치 확인 / 수정</summary>
     <button type="button" class="secondary-btn" id="addressLocate" data-kakao-key="{{ kakao_map_key }}">주소로 위치 찾기</button>
     <button type="button" class="secondary-btn" id="locationClear">위치 지우기</button>
-    <div id="placeLocationMap" class="place-location-map" aria-label="ISSUE 위치 선택 지도"></div>
+    <div id="placeLocationMap" class="place-location-map" aria-label="EVENT 위치 선택 지도"></div>
     <div class="form-grid two"><label>위도<input type="number" step="any" min="-90" max="90" name="latitude" value="{{ p.latitude if p.get('latitude') is not none else '' }}"></label>
     <label>경도<input type="number" step="any" min="-180" max="180" name="longitude" value="{{ p.longitude if p.get('longitude') is not none else '' }}"></label></div>
   </details>
-  <p class="form-help">주소나 좌표 없이 저장할 수 있습니다. 위치가 없는 ISSUE는 목록에서만 보입니다.</p>
+  <p class="form-help">주소나 좌표 없이 저장할 수 있습니다. 위치가 없는 EVENT는 목록에서만 보입니다.</p>
   {% else %}</div>
   <div id="locationPicker" data-auto-address><input type="hidden" name="latitude" value="{{ p.latitude if p.get('latitude') is not none else '' }}"><input type="hidden" name="longitude" value="{{ p.longitude if p.get('longitude') is not none else '' }}">
   <button type="button" class="secondary-btn" id="addressLocate" data-kakao-key="{{ kakao_map_key }}">주소 위치 확인</button>

@@ -26,9 +26,9 @@ SCOPES = {
                     "p.user_id=?", "COALESCE(p.reviewed_at,p.created_at)"),
     "inquiries": ("contact_inquiries p", "p.user_id=?", "p.updated_at"),
 }
-TABS = {"all": "전체 활동", "places": "내 장소", "issues": "내 ISSUE", "suggestions": "수정 제안", "inquiries": "내 문의"}
-CARDS = {"places": "등록 장소", "issues": "제주 ISSUE", "suggestions": "수정 제안", "inquiries": "내 문의"}
-KINDS = {"places": "장소 등록", "issues": "ISSUE 등록", "suggestions": "수정 제안", "inquiries": "문의"}
+TABS = {"all": "전체 활동", "places": "내 장소", "issues": "내 EVENT", "suggestions": "수정 제안", "inquiries": "내 문의"}
+CARDS = {"places": "등록 장소", "issues": "제주 EVENT", "suggestions": "수정 제안", "inquiries": "내 문의"}
+KINDS = {"places": "장소 등록", "issues": "EVENT 등록", "suggestions": "수정 제안", "inquiries": "문의"}
 PAGE_SIZE = 10
 RECENT_LIMIT = 8
 

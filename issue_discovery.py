@@ -9,15 +9,27 @@ from user_status import SCHEDULE
 from issue_times import format_issue_time
 
 # Keep stable keys and read existing records without rewriting their categories.
-LABELS = {"events": "행사•축제", "exhibitions": "전시•팝업", "activities": "교육·체험",
+LABELS = {"events": "행사•축제", "exhibitions": "전시•팝업", "performance": "공연",
+          "activities": "교육·체험", "benefit-discount": "혜택·할인",
           "local": "지역소식", "opportunities": "공모•지원"}
-PUBLIC_CATEGORIES = {key: label for key, label in LABELS.items() if key != "opportunities"}
+PUBLIC_CATEGORIES = {key: label for key, label in LABELS.items() if key not in ("local", "opportunities")}
+# Keep previously public regional news visible without offering it for new submissions.
+VISIBLE_CATEGORIES = {**PUBLIC_CATEGORIES, 'local':LABELS['local']}
 RENAMED_CATEGORIES = {old: LABELS["activities"] for old in ("체험•교육", "체험·교육", "교육•체험")}
 ALIASES = {label.replace("•", "·"): label for label in LABELS.values() if "•" in label}
 ALIASES.update(RENAMED_CATEGORIES)
 ALIASES.update({"전시": LABELS["exhibitions"], "지원·공모": LABELS["opportunities"],
                 "지원사업": LABELS["opportunities"]})
 PERIODS = {"all": "전체", "today": "오늘", "week": "이번 주", "weekend": "이번 주말", "month": "이번 달"}
+
+
+def allowed_categories(existing=None):
+    values = list(PUBLIC_CATEGORIES.values())
+    if existing:
+        category = ALIASES.get(existing['category'], existing['category'])
+        if category not in values:
+            values.append(category)
+    return values
 
 
 def stored_names(label):
@@ -74,7 +86,7 @@ def moment_sql(moment):
 
 def public_where(moment=None):
     moment = as_moment(moment)
-    names = [name for label in PUBLIC_CATEGORIES.values() for name in stored_names(label)]
+    names = [name for label in VISIBLE_CATEGORIES.values() for name in stored_names(label)]
     placeholders = ",".join("?" for _ in names)
     return (f"approval_status='approved' AND published=1 AND deleted_at IS NULL AND {VALID_DATES} "
             f"AND event_end>=? AND ({END_SQL})>=({START_SQL}) AND ({END_SQL})>=? "
@@ -129,7 +141,7 @@ def browse(conn, query, moment):
     period = query.get("period", "all")
     period = period if period in PERIODS else "all"
     category = query.get("category", "").strip()
-    category = PUBLIC_CATEGORIES.get(category, ALIASES.get(category, category))
+    category = LABELS.get(category, ALIASES.get(category, category))
     region, keyword = query.get("region", "").strip()[:100], query.get("q", "").strip()[:200]
     clause, params = public_where(moment)
     where = [clause]
@@ -146,10 +158,19 @@ def browse(conn, query, moment):
     if bounds := period_bounds(period, day):
         where.append("event_start<=? AND event_end>=?")
         params.extend([bounds[1].isoformat(), bounds[0].isoformat()])
+    free, closing = query.get('free') == '1', query.get('closing') == '1'
+    if free:
+        where.append("fee_status='free'")
+    if closing:
+        where.append('event_end<=?')
+        params.append((day+timedelta(days=3)).isoformat())
     order, order_params = schedule_order(moment)
+    if closing:
+        order = 'event_end ASC, ' + order
     rows = conn.execute("SELECT * FROM news_posts WHERE " + " AND ".join(where) + " ORDER BY " + order,
                         [*params, *order_params]).fetchall()
     selected = {"period": period, "category": category, "region": region, "q": keyword,
+                "free": '1' if free else '', "closing": '1' if closing else '',
                 "view": "map" if query.get("view") == "map" else "list"}
 
     def link(**changes):
@@ -158,3 +179,16 @@ def browse(conn, query, moment):
                    and not (k == "view" and v == "list")}
         return "/news" + ("?" + urlencode(cleaned) if cleaned else "")
     return rows, selected, link
+
+
+def sections(conn, moment):
+    """Small, date-ranked selections; no new publication or ordering policy."""
+    moment = as_moment(moment)
+    closing, _, _ = browse(conn, {'closing':'1'}, moment)
+    benefits, _, _ = browse(conn, {'category':'benefit-discount','period':'today'}, moment)
+    week, _, _ = browse(conn, {'period':'week'}, moment)
+    week = [row for row in week if ALIASES.get(row['category'],row['category']) in
+            [label for key,label in PUBLIC_CATEGORIES.items() if key!='benefit-discount']]
+    return [('곧 끝나요',closing[:2],'/news?closing=1'),
+            ('지금 받을 수 있는 혜택',benefits[:2],'/news?category=benefit-discount&period=today'),
+            ('이번 주 제주',week[:2],'/news?period=week')]

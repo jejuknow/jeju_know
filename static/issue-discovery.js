@@ -26,6 +26,7 @@
 
   function renderResults(focusLocation = false) {
     const {active, point, radius} = locationState;
+    root.querySelector('#eventHighlights').hidden=active;
     // Radius filters membership; retain the server's schedule order, not distance order.
     const inRange = active ? new Map(nearby.within(entries, point, radius).map(entry => [entry.card, entry])) : null;
     const shown = active ? entries.filter(entry => inRange.has(entry.card)).map(entry => inRange.get(entry.card)) : entries;
@@ -35,7 +36,7 @@
     const normalEmpty = results.querySelector('.issue-empty');
     if (normalEmpty) normalEmpty.hidden = active;
     nearbyEmpty.hidden = !active || shown.length > 0;
-    results.querySelector('[data-results-title]').textContent = active ? '내 주변 ISSUE' : '제주 ISSUE';
+    results.querySelector('[data-results-title]').textContent = active ? '내 주변 EVENT' : '전체 EVENT';
     results.querySelector('h2 span').textContent = shown.length + '건';
     results.querySelector('[data-map-count]').textContent = active ? radius + 'km · 일정 임박순' : '지도 위치 ' + mapped.length + '곳';
     for (const {card} of entries) {
@@ -52,7 +53,7 @@
     popup?.setMap(null);
     locator.mark(point);
     notice.hidden = mapped.length > 0 || (!!point && !active);
-    notice.textContent = active ? '반경 안에 ISSUE가 없습니다.' : '지도에 표시할 수 있는 ISSUE가 없습니다.';
+    notice.textContent = active ? '반경 안에 EVENT가 없습니다.' : '지도에 표시할 수 있는 EVENT가 없습니다.';
     if (point && (active || focusLocation)) locator.frame(point, active ? mapped : []);
     else if (mapped.length === 1) {
       map.setCenter(new sdk.LatLng(mapped[0].latitude, mapped[0].longitude));
@@ -69,7 +70,7 @@
     const box = document.createElement('div');
     box.className = 'issue-popup';
     box.setAttribute('role', 'group');
-    box.setAttribute('aria-label', 'ISSUE 정보');
+    box.setAttribute('aria-label', 'EVENT 정보');
     const close = document.createElement('button');
     close.type = 'button';
     close.textContent = '×';
@@ -114,7 +115,7 @@
       const kind = card.querySelector('[data-category]').textContent;
       button.dataset.kind = kind;
       button.textContent = kind.split('·')[0];
-      button.setAttribute('aria-label', card.querySelector('h3').textContent + ' ISSUE 지도 마커');
+      button.setAttribute('aria-label', card.querySelector('h3').textContent + ' EVENT 지도 마커');
       const marker = new sdk.CustomOverlay({map, position, content:button, yAnchor:1, clickable:true});
       markers.set(card, marker);
       const highlight = on => { button.classList.toggle('is-highlighted',on); marker.setZIndex(on ? 3 : 1); };
@@ -150,7 +151,7 @@
       loading = initMap().catch(() => { notice.hidden = false; notice.textContent = '지도를 불러오지 못했습니다.'; });
     }
   }
-  // Keep a permissioned location in this document while the server applies its normal ISSUE filters.
+  // Keep a permissioned location in this document while the server applies its normal EVENT filters.
   let filterRequest;
   async function changeFilters(url, push) {
     filterRequest?.abort();
@@ -173,6 +174,7 @@
       markers.forEach(marker => marker.setMap(null));
       markers.clear();
       results.replaceChildren(...nextResults.children);
+      root.querySelector('#eventHighlights').replaceChildren(...doc.querySelector('#eventHighlights').children);
       entries = readEntries();
       if (map) createMarkers();
       if (push) history.pushState(null, '', url);

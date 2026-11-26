@@ -15,7 +15,7 @@ PAGES = {
     '/find': ('제주 취향 장소 찾기 | JEJU_KNOW', '제주 지역, 장소 종류, 동행과 카페·맛집 특징을 선택해 취향에 맞는 장소를 찾아보세요. 검색한 장소는 지도에서도 확인할 수 있습니다.'),
     '/map': ('제주 맛집·카페 지도 | JEJU_KNOW', '제주 맛집과 카페, 가볼 곳의 위치를 지도에서 살펴보세요. 지역과 카테고리로 탐색하고 장소별 정보와 추천 이유를 확인하세요.'),
     '/new': ('제주 신상 맛집·카페 NEW | JEJU_KNOW', '최근 6개월 사이에 문을 연 제주 맛집·카페와 새 소식으로 소개하는 장소를 모았습니다. 오픈 정보와 확인 상태를 함께 살펴보세요.'),
-    '/news': ('제주 행사·축제·팝업·이슈 | JEJU_KNOW', '제주 행사·축제, 전시·팝업, 교육·체험과 지역소식을 날짜별로 찾아보세요. 일정, 장소와 공식 출처를 확인할 수 있습니다.'),
+    '/news': ('제주 행사·공연·팝업·혜택 EVENT | JEJU_KNOW 제주노', '제주에서 열리는 행사, 축제, 공연, 팝업, 체험과 할인·혜택 정보를 확인하세요.'),
     '/best': ('제주 상황별 추천 BEST | JEJU_KNOW', '제주 여행의 동행과 상황에 맞춘 장소 추천 모음을 만나보세요. 모음별 소개와 장소 정보를 확인하고 다음 제주 일정을 준비하세요.'),
     '/places': ('제주 장소 검색 결과 | JEJU_KNOW', '선택한 조건에 맞는 제주 맛집·카페·가볼 곳의 전체 검색 결과입니다. 장소별 소개와 상세 정보를 확인하세요.'),
     '/partnership': ('JEJU_KNOW 광고·협업 | 제주노 광고·제휴 안내', '제주노 JEJU_KNOW의 인스타그램 릴스·피드 및 홈페이지 배너 광고 상품과 단가, 광고·제휴 문의 방법을 확인하세요.'),
@@ -171,12 +171,12 @@ def issue_metadata(item):
     return {'title':item['title']+' - 제주 '+(item.get('category_label') or item['category'])+' | JEJU_KNOW',
             'description':description, 'canonical':url, 'image':absolute_image(item.get('image_url')),
             'robots':'index,follow', 'json_ld':event_schema(item, url, description),
-            'breadcrumbs': breadcrumbs('ISSUE', '/news', item['title'], url)}
+            'breadcrumbs': breadcrumbs('EVENT', '/news', item['title'], url)}
 
 
 def event_schema(item, url, description):
     from issue_discovery import LABELS, stored_names
-    if item.get('category') not in {name for key in ('events', 'exhibitions', 'activities') for name in stored_names(LABELS[key])}:
+    if item.get('category') not in {name for key in ('events', 'exhibitions', 'performance', 'activities') for name in stored_names(LABELS[key])}:
         return None
     if not all(str(item.get(key) or '').strip() for key in ('title', 'venue', 'address')):
         return None
@@ -199,6 +199,8 @@ def event_schema(item, url, description):
     image = absolute_image(item.get('image_url'))
     if image != DEFAULT_IMAGE:
         data['image'] = image
+    if item.get('fee_status') in ('free','paid'):
+        data['isAccessibleForFree'] = item['fee_status']=='free'
     return data
 
 

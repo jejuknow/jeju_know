@@ -19,7 +19,7 @@
     <form class="admin-form contact-form" method="post" action="/contact{% if issue %}?issue_id={{ issue.id }}{% endif %}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="form_token" value="{{ form_token }}">
       {% if issue %}<label>문의 유형<input name="inquiry_type" readonly value="콘텐츠 수정·삭제"></label>
-        <p class="inquiry-related">관련 ISSUE: <strong>{{ issue.title }}</strong></p>
+        <p class="inquiry-related">관련 EVENT: <strong>{{ issue.title }}</strong></p>
       {% else %}<label>문의 유형 (필수)<select name="inquiry_type" required><option value="">선택해주세요</option>
         {% for kind in types %}<option {% if values.inquiry_type == kind %}selected{% endif %}>{{ kind }}</option>{% endfor %}</select></label>
         <div class="contact-partnership-hint" hidden role="status">
@@ -32,7 +32,7 @@
       <label>제목 (필수)<input name="title" required maxlength="{{ title_limit }}" value="{{ values.title }}"></label>
       <label>문의 내용 (필수)<textarea name="content" required rows="6" maxlength="{{ limits.content }}" {% if issue %}placeholder="수정하거나 삭제가 필요한 내용을 알려주세요."{% endif %}>{{ values.content }}</textarea></label>
       <p class="contact-privacy">입력한 내용은 공개되지 않습니다. {% if member %}내 활동의 ‘내 문의’에서 처리 상태와 답변을 확인할 수 있습니다.{% else %}담당자가 문의를 확인하고 필요한 경우 입력한 이메일로 연락드립니다.{% endif %}</p>
-      <p class="contact-privacy">수집항목: 이름 또는 닉네임, 이메일, 문의 유형·제목·내용, 선택 입력한 연락처. 회원 문의는 회원 ID와 연결되며, ISSUE 문의는 해당 글과 연결됩니다. 문의 확인과 답변을 위해 보관합니다. 현재 자동 파기 기간은 정해져 있지 않습니다. 삭제 요청은 이 문의폼으로 접수할 수 있습니다. <a href="/privacy">개인정보처리방침 보기</a></p>
+      <p class="contact-privacy">수집항목: 이름 또는 닉네임, 이메일, 문의 유형·제목·내용, 선택 입력한 연락처. 회원 문의는 회원 ID와 연결되며, EVENT 문의는 해당 글과 연결됩니다. 문의 확인과 답변을 위해 보관합니다. 현재 자동 파기 기간은 정해져 있지 않습니다. 삭제 요청은 이 문의폼으로 접수할 수 있습니다. <a href="/privacy">개인정보처리방침 보기</a></p>
       <button class="primary-inline" type="submit">문의 등록하기</button>
     </form>
   {% endif %}

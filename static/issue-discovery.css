@@ -45,7 +45,7 @@
   .issue-results{overflow:visible}
   .issue-discovery[data-view="list"] .issue-map-panel,.issue-discovery[data-view="map"] .issue-results{display:none}
   .issue-map-panel{height:68vh;height:68svh;min-height:290px}
-  .issue-filters{padding:12px}.issue-query label:first-child{width:100%}
+  .issue-filters{padding:12px}.issue-query>label:first-of-type{width:100%}
   .issue-search span{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
   .issue-filter-row a,.issue-switch button{min-height:44px;display:inline-flex;align-items:center}
   .issue-results{padding:12px}
@@ -56,3 +56,27 @@
 .issue-submit-link { flex:none; white-space:nowrap; }
 .issue-empty .secondary-btn { margin-top:6px; }
 @media(max-width:760px){.issue-intro{align-items:stretch;flex-direction:column}.issue-submit-link{text-align:center}}
+
+/* EVENT uses the existing palette and card rhythm, with short curated selections. */
+.event-highlights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0}
+.event-highlights:empty,.event-highlights[hidden]{display:none}
+.event-selection{min-width:0;border:1px solid #e1e6f3;border-radius:18px;padding:16px}
+.event-selection-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.event-selection-heading h2{font-size:1rem;margin:0;word-break:keep-all}.event-selection-heading>a{font-size:.78rem;white-space:nowrap;color:var(--primary,#4864ef)}
+.event-teaser>a{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:start;color:inherit;padding:12px 0}
+.event-teaser+.event-teaser{border-top:1px solid #e8ebf4}.event-teaser h3{font-size:.95rem}
+.event-summary,.event-teaser h3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.issue-copy .event-benefit{font-size:1rem;font-weight:700;color:var(--primary,#4864ef)}
+.event-card-action{display:block;margin-top:8px;color:var(--primary,#4864ef);font-size:.85rem;font-weight:700}
+@media(max-width:760px){
+ .issue-intro h1{font-size:clamp(1.6rem,7vw,2rem);line-height:1.25}.issue-intro>div>p:last-child{font-size:.9rem;line-height:1.6}
+ .issue-filter-row{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:4px}
+ .issue-filter-row>*{flex:none}.issue-filter-row strong{min-width:28px}
+ .event-highlights{grid-template-columns:minmax(0,1fr);gap:12px}.event-selection{padding:12px}
+ .event-selection-cards{display:grid;grid-auto-flow:column;grid-auto-columns:calc(100% - 24px);gap:14px;overflow-x:auto;scroll-snap-type:x proximity}
+ .event-teaser{scroll-snap-align:start}.event-teaser+.event-teaser{border-top:0}
+ .issue-card>a{display:block;padding:18px 0}.issue-card .issue-poster{aspect-ratio:16/10;margin-bottom:12px}
+ .issue-card .issue-poster>img{object-fit:contain}.issue-copy h3{word-break:keep-all;overflow-wrap:break-word}
+ .issue-card .issue-copy p{font-size:.9rem;line-height:1.6}.issue-card .issue-tags{gap:6px}
+ .issue-discovery[data-view="map"] .event-highlights{display:none}
+}

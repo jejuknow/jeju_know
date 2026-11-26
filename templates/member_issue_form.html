@@ -1,27 +1,29 @@
 {% extends "base.html" %}
 {% from "_image_uploads.html" import image_uploads %}
-{% block title %}제주 이슈 {{ '수정' if item and item.id else '등록' }} | JEJU_KNOW{% endblock %}
+{% block title %}제주 EVENT {{ '수정' if item and item.id else '등록' }} | JEJU_KNOW{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block body %}
-<main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU ISSUE</p><h1>{{ user_status.WAITING.label ~ ' ISSUE 수정' if item and item.id else '제주 ISSUE 알려주기' }}</h1><p>제주에서 열리는 행사·축제·전시·팝업·체험 또는 지역소식을 알려주세요. 등록된 내용은 JEJU_KNOW 확인 후 공개됩니다.</p></div></div>
+<main class="admin-main narrow member-issue"><div class="admin-title-row"><div><p class="kicker">JEJU EVENT</p><h1>{{ user_status.WAITING.label ~ ' EVENT 수정' if item and item.id else '제주 EVENT 알려주기' }}</h1><p>제주의 행사·축제, 전시·팝업, 공연, 교육·체험과 혜택·할인을 알려주세요. 등록된 내용은 JEJU_KNOW 확인 후 공개됩니다.</p></div></div>
 {% if error %}<p class="member-error" role="alert">{{ error }}</p>{% endif %}
-{% if duplicates %}<aside class="form-card duplicate-warning"><strong>비슷한 ISSUE가 이미 등록되어 있습니다.</strong>{% for d in duplicates %}<p><a href="/news/{{ d.slug }}" target="_blank" rel="noopener">{{ d.title }} · {{ d.event_start }} ~ {{ d.event_end }}</a></p>{% endfor %}</aside>{% endif %}
+{% if duplicates %}<aside class="form-card duplicate-warning"><strong>비슷한 EVENT가 이미 등록되어 있습니다.</strong>{% for d in duplicates %}<p><a href="/news/{{ d.slug }}" target="_blank" rel="noopener">{{ d.title }} · {{ d.event_start }} ~ {{ d.event_end }}</a></p>{% endfor %}</aside>{% endif %}
 <form class="admin-form place-form" data-member-issue-form method="post" enctype="multipart/form-data" action="{{ '/issues/' ~ item.id ~ '/edit' if item and item.id else '/issues/new' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 <section class="form-card"><h2>기본 정보</h2><div class="form-grid two">
 <label class="span-2">제목 *<input name="title" required maxlength="200" value="{{ item.title if item else '' }}"></label>
-<label class="span-2">카테고리 *<select name="category" required>{% for category in public_issue_categories %}<option value="{{ category }}" {% if item and item.category == category %}selected{% endif %}>{{ category.replace("•","·") }}</option>{% endfor %}</select></label>
+<label class="span-2">카테고리 *<select name="category" required>{% for category in public_issue_categories %}<option value="{{ category }}" {% if item and item.category == category %}selected{% endif %}>{{ category.replace("•","·") }}</option>{% endfor %}{% if item and item.category not in public_issue_categories %}<option value="{{ item.category }}" selected>{{ item.category }} (기존 분류)</option>{% endif %}</select></label>
 </div></section>
   {{ image_uploads(item, "issues", legacy=false, required_primary=true) }}
   <p class="form-help">직접 촬영했거나 사용 권한이 있는 이미지, 또는 주최 측이 공개 사용을 허용한 이미지만 등록해주세요.</p>
 {% set member_form = true %}{% include "_issue_schedule.html" %}
+{% include "_event_fields.html" %}
 <section class="form-card"><h2>내용과 출처</h2><div class="form-grid two">
 <label class="span-2">한줄 소개 *<textarea name="summary" required rows="2" maxlength="600">{{ item.summary if item else '' }}</textarea></label>
 <label class="span-2">상세 내용<textarea name="body" rows="6" maxlength="20000">{{ item.body if item else '' }}</textarea></label>
+<label class="span-2">출처명<input name="source_name" maxlength="100" value="{{ item.source_name if item else '' }}"></label>
 <label class="span-2">공식/참고 링크<input type="url" name="external_url" maxlength="2048" value="{{ item.external_url if item else '' }}" placeholder="https://…"><small>행사 정보를 확인할 수 있는 공식 페이지나 SNS 링크를 입력해주세요.</small></label>
 </div></section>
-{% if duplicates %}<label class="member-check"><input type="checkbox" name="duplicate_ack" value="1" required>기존 ISSUE를 확인했으며 다른 소식입니다.</label>{% endif %}
+{% if duplicates %}<label class="member-check"><input type="checkbox" name="duplicate_ack" value="1" required>기존 EVENT를 확인했으며 다른 소식입니다.</label>{% endif %}
 <div class="form-actions"><a class="secondary-btn" href="/news">취소</a><button type="submit" class="primary-inline">{{ '수정 저장' if item and item.id else '검토 요청하기' }}</button></div>
 </form></main>
 {% endblock %}
 
-{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/admin-location.js"></script><script src="/static/issue-schedule.js?v=20261124"></script>{% endblock %}
+{% block scripts %}<script src="/static/event-form.js?v=20261126"></script><script src="/static/kakao-loader.js"></script><script src="/static/admin-location.js"></script><script src="/static/issue-schedule.js?v=20261126-event"></script>{% endblock %}

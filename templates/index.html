@@ -26,7 +26,7 @@
           </a>{% endif %}
           {% if site_settings.home_issue %}<a href="{{ url_for('news_list') }}" class="hero-board-card green">
             {{ navigation_icon('issue', 'hero-board-icon', 80) }}
-            <strong>제주 이슈</strong><p>지금 알아두면 좋은 제주 소식</p><small>행사 · 팝업 · 지역소식 →</small>
+            <strong>제주 EVENT</strong><p>지금 제주에서 만나는 행사와 혜택</p><small>행사 · 공연 · 혜택 →</small>
           </a>{% endif %}
           <a href="/map" class="hero-board-card orange">
             {{ navigation_icon('map', 'hero-board-icon', 80) }}
@@ -52,8 +52,8 @@
 
   {% if site_settings.home_issue %}<section class="section wrap news-home" id="today">
     <div class="section-head editorial-section-head">
-      <div class="news-home-intro"><p class="kicker">JEJU_KNOW TODAY</p><h2>제주 이슈</h2><p class="section-copy">제주의 행사·축제부터 전시·팝업, 교육·체험, 지역소식까지 모아 전합니다.</p></div>
-      <a class="text-btn news-home-more" href="{{ url_for('news_list') }}" aria-label="제주 이슈 전체보기"><span class="news-home-more-prefix">제주 이슈 </span>전체보기 →</a>
+      <div class="news-home-intro"><p class="kicker">JEJU_KNOW EVENT</p><h2>제주 EVENT</h2><p class="section-copy">행사·팝업부터 공연과 체험, 혜택·할인까지 모았습니다.</p></div>
+      <a class="text-btn news-home-more" href="{{ url_for('news_list') }}" aria-label="제주 EVENT 전체보기"><span class="news-home-more-prefix">제주 EVENT </span>전체보기 →</a>
     </div>
     {% if news_items %}
     <div class="news-grid home-news-grid">
@@ -62,7 +62,7 @@
         <a href="{{ url_for('news_detail', slug=item.slug) }}" class="news-card-link">
           <div class="news-thumb {% if item.image_url %}has-image{% endif %}">
             {% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.title }} 대표 포스터" loading="lazy" width="480" height="320" style="width:100%;height:100%;object-fit:cover">{% else %}<span>{{ '🎪' if item.category == news_category_labels.events else '📰' }}</span>{% endif %}
-            <div class="news-overlay-badges">{{ schedule_badge(item) }}<span class="news-category">{{ item.category_label }}</span>{% if item.is_promoted %}<span class="sponsor-badge">홍보·제휴</span>{% elif item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% endif %}</div>
+            <div class="news-overlay-badges">{{ schedule_badge(item) }}<span class="news-category">{{ item.category_label }}</span>{% if item.is_sponsored %}<span class="sponsor-badge">광고·협찬</span>{% elif item.is_promoted %}<span class="sponsor-badge">홍보·제휴</span>{% endif %}</div>
           </div>
           <div class="news-card-body">
             <p class="issue-author">{% if item.author_type == 'user' %}사용자 등록 · {% endif %}{{ item.author_name }}</p><div class="news-date">{{ item.date_label if item.event_start else '등록 ' ~ item.created_at[:10] }}{% if item.event_start %} · {{ item.time_label }}{% endif %}{% if item.venue %} · {{ item.venue }}{% endif %}</div>
@@ -74,7 +74,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="news-empty-public"><span>🗓️</span><div><strong>제주 이슈를 준비하고 있어요.</strong><p>새로운 행사와 지역 소식을 곧 만나보세요.</p></div></div>
+    <div class="news-empty-public"><span>🗓️</span><div><strong>제주 EVENT를 준비하고 있어요.</strong><p>새로운 행사와 혜택을 곧 만나보세요.</p></div></div>
     {% endif %}
   </section>{% endif %}
 

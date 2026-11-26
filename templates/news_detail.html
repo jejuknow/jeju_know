@@ -2,19 +2,25 @@
 {% block title %}{{ item.title }} | JEJU_KNOW{% endblock %}
 {% from '_user_status.html' import schedule_badge %}
 {% block body %}
-<link rel="stylesheet" href="/static/issue-gallery.css?v=20261124">
+<link rel="stylesheet" href="/static/issue-gallery.css?v=20261126-event">
 <main class="article-page wrap">
-  <a class="article-back" href="{{ url_for('news_list') }}">← 제주 이슈로</a>
+  <a class="article-back" href="{{ url_for('news_list') }}">← 제주 EVENT로</a>
   <article class="article-shell">
     <div class="article-hero {% if item.image_url %}uploaded-poster{% endif %}">{% if item.image_url %}<a href="{{ item.image_url }}" class="issue-poster-link" data-issue-photo><img src="{{ item.image_url }}" alt="{{ item.title }} 대표 포스터"></a>{% else %}<span>🗓️</span>{% endif %}</div>
     <div class="article-content">
-      <div class="article-badges"><span class="news-category">{{ item.category_label }}</span>{{ schedule_badge(item) }}{% if item.is_promoted or item.is_sponsored %}<span class="sponsor-badge">{{ '홍보·제휴' if item.is_promoted else '광고·협찬' }}{% if item.sponsor_name %} · {{ item.sponsor_name }}{% endif %}</span>{% endif %}</div>
+      <div class="article-badges"><span class="news-category">{{ item.category_label }}</span>{{ schedule_badge(item) }}{% if item.is_promoted or item.is_sponsored %}<span class="sponsor-badge">{{ '광고·협찬' if item.is_sponsored else '홍보·제휴' }}{% if item.sponsor_name %} · {{ item.sponsor_name }}{% endif %}</span>{% endif %}</div>
       <h1>{{ item.title }}</h1><p class="article-summary">{{ item.summary }}</p>
       <dl class="article-facts"><div><dt>일정</dt><dd>{{ item.date_label }}</dd></div><div><dt>시간</dt><dd>{{ item.time_label }}</dd></div>{% if item.region %}<div><dt>지역</dt><dd>{{ region_labels.get(item.region,item.region) }}</dd></div>{% endif %}{% if item.address %}<div><dt>주소</dt><dd>{{ item.address }}</dd></div>{% endif %}{% if item.venue %}<div><dt>장소</dt><dd>{{ item.venue }}</dd></div>{% endif %}{% if item.source_name %}<div><dt>정보 출처</dt><dd>{{ item.source_name }}</dd></div>{% endif %}{% if item.checked_at %}<div><dt>확인일</dt><dd>{{ item.checked_at }}</dd></div>{% endif %}</dl>
       <p class="issue-author">{% if item.author_type == 'user' %}사용자 등록 · {% endif %}{{ item.author_name }}</p>
       {% if member and item.author_type == 'user' and item.author_id == member.id %}<a class="mini-btn" href="/issues/{{ item.id }}/edit">내 게시물 수정</a>{% endif %}
       {% if item.additional_images %}<section class="issue-gallery"><h2>행사 이미지</h2><div class="issue-gallery-grid">{% for image in item.additional_images %}<a href="{{ image.url }}" data-issue-photo><img src="{{ image.url }}" alt="{{ item.title }} 추가 이미지 {{ loop.index }}" loading="lazy"></a>{% endfor %}</div></section>{% endif %}
       {% if item.body %}<div class="article-body issue-text">{{ item.body }}</div>{% endif %}
+      {% if item.is_benefit %}<section class="event-benefit-detail"><h2>혜택 안내</h2><dl class="article-facts">
+        {% for key,label in [('benefit_summary','혜택 내용'),('benefit_audience','대상'),('benefit_conditions','이용 조건'),('promo_code','쿠폰·프로모션 코드'),('benefit_howto','이용 방법'),('benefit_quantity','선착순·수량 안내')] %}{% if item.get(key) %}<div><dt>{{ label }}</dt><dd>{{ item[key] }}</dd></div>{% endif %}{% endfor %}
+        {% for key,label in [('regular_price','정상가'),('benefit_price','혜택가')] %}{% if item.get(key) is not none %}<div><dt>{{ label }}</dt><dd>{{ '{:,}'.format(item[key]) }}원</dd></div>{% endif %}{% endfor %}
+      </dl></section>{% endif %}
+      {% if item.fee_status %}<p>참가비 · {{ '무료' if item.fee_status=='free' else '유료' }}</p>{% endif %}
+      {% if item.mappable %}<section class="event-location"><h2>위치</h2><div id="eventDetailMap" data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}" data-kakao-key="{{ kakao_map_key }}" aria-label="EVENT 위치 지도" style="height:280px;max-width:100%"></div><a href="https://map.kakao.com/link/map/{{ item.title|urlencode }},{{ item.latitude }},{{ item.longitude }}" target="_blank" rel="noopener noreferrer">카카오맵에서 위치 보기 ↗</a></section>{% endif %}
       <div class="article-actions">{% if item.external_url %}<a class="hero-primary" href="{{ item.external_url }}" target="_blank" rel="noreferrer">공식 정보/신청 페이지 →</a>{% endif %}<button class="hero-secondary" type="button" onclick="navigator.clipboard.writeText(location.href).then(()=>alert('링크를 복사했습니다.'))">링크 공유</button></div>
       <p class="article-disclaimer">일정·운영 정보는 변경될 수 있습니다. 신청·방문 전 연결된 공식 출처에서 최종 확인해 주세요.</p>
     </div>
@@ -22,4 +28,4 @@
 </main>
 {% endblock %}
 
-{% block scripts %}<script src="/static/issue-gallery.js?v=20261124"></script>{% endblock %}
+{% block scripts %}<script src="/static/issue-gallery.js?v=20261124"></script>{% if item.mappable %}<script src="/static/kakao-loader.js"></script><script src="/static/event-detail.js?v=20261126"></script>{% endif %}{% endblock %}

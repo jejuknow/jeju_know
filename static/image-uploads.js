@@ -154,7 +154,7 @@
       if(form.hasAttribute('data-member-issue-form')&&!form.querySelector('[name=duplicate_ack]')){
         const label=document.createElement('label');label.className='member-check';
         const check=document.createElement('input');check.type='checkbox';check.name='duplicate_ack';check.value='1';check.required=true;
-        label.append(check,document.createTextNode(form.hasAttribute('data-member-issue-form')?'기존 ISSUE를 확인했으며 다른 소식입니다.':'기존 장소를 확인했으며 서로 다른 장소입니다.'));feedback.before(label);
+        label.append(check,document.createTextNode(form.hasAttribute('data-member-issue-form')?'기존 EVENT를 확인했으며 다른 소식입니다.':'기존 장소를 확인했으며 서로 다른 장소입니다.'));feedback.before(label);
       }
     }
     form.addEventListener('submit',async event=>{

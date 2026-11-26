@@ -175,6 +175,6 @@ class IssueBrowserTest(unittest.TestCase):
               "event_start":"2099-01-01","event_end":"2099-01-01","show_on_map":"1","latitude":"33.4","longitude":"126.5"}
         self.assertEqual(self.member.post("/issues/new",data=data).status_code,400)
         from test_images import picture
-        data.update(category="지역소식", region="애월", summary="소식")
+        data.update(category="공연", region="애월", summary="소식")
         self.assertEqual(self.member.post("/issues/new",data=data,files={"image_0":("poster.png", picture(),"image/png")},follow_redirects=False).status_code,303)
         self.assertEqual(self.rows("SELECT published,show_on_map,latitude FROM news_posts"),[{"published":0,"show_on_map":0,"latitude":None}])

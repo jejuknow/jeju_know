@@ -109,7 +109,7 @@ def admin_context(request, conn):
         key = path.rsplit("/", 1)[-1] if "/classifications/" in path else request.query_params.get("type", "place")
         title, active = KINDS.get(key, "장소 카테고리"), "class-" + key
     elif path.startswith("/admin/news") or path in ("/admin/issues", "/admin/user-posts"):
-        section, title, active = "콘텐츠 관리", "ISSUE", "issues"
+        section, title, active = "콘텐츠 관리", "EVENT", "issues"
     elif path.startswith("/admin/ads"):
         section, title, active = "콘텐츠 관리", "광고 관리", "ads"
     elif path.startswith("/admin/inquiries"):
@@ -143,7 +143,7 @@ def admin_context(request, conn):
     if path.startswith("/admin/places/duplicates/compare/"):
         detail = "중복 비교"
     if path.startswith("/admin/news/"):
-        detail = "ISSUE 등록" if path.endswith("/new") else "ISSUE 수정"
+        detail = "EVENT 등록" if path.endswith("/new") else "EVENT 수정"
     if path.startswith("/admin/ads/"):
         detail = "광고 등록" if path.endswith("/new") else "광고 수정"
     if path.startswith("/admin/inquiries/"):
@@ -339,7 +339,8 @@ class AdminUI:
             where.append("published=0")
         with closing(self.db()) as conn:
             rows, page = page_rows(conn, request, "*", "FROM news_posts", " AND ".join(where), args, "id DESC")
-        return self.render(request, "issues.html", issues=[self.news(row, calendar_day) for row in rows], pagination=page, user_only=user_only, filters=f)
+            legacy_local_count = conn.execute("SELECT count(*) FROM news_posts WHERE category='지역소식' AND deleted_at IS NULL").fetchone()[0]
+        return self.render(request, "issues.html", issues=[self.news(row, calendar_day) for row in rows], pagination=page, user_only=user_only, filters=f, legacy_local_count=legacy_local_count)
 
     def users(self, request):
         if response := self.guard(request): return response

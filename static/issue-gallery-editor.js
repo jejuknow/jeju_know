@@ -49,7 +49,7 @@
     const button=e.target.closest('button');if(!button||processing)return;
     const i=entries.findIndex(x=>x.key===button.closest('li').dataset.galleryKey),action=button.dataset.action;
     if(action==='up'||action==='down')move(i,i+(action==='up'?-1:1));
-    if(action==='remove'&&confirm('추가 이미지를 삭제할까요? 대표 포스터와 ISSUE는 유지되며 저장하기를 눌러야 반영됩니다.')){
+    if(action==='remove'&&confirm('추가 이미지를 삭제할까요? 대표 포스터와 EVENT는 유지되며 저장하기를 눌러야 반영됩니다.')){
       const [removed]=entries.splice(i,1);if(removed.file)URL.revokeObjectURL(removed.url);render();
     }
   });

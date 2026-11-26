@@ -12,7 +12,7 @@
     </div>
     <div class="row-actions">
       {% if tab in ('all','places') %}<a class="primary-inline" href="/map/register">+ 장소 알려주기</a>{% endif %}
-      {% if tab in ('all','issues') %}<a class="primary-inline" href="/issues/new">+ 제주 ISSUE 등록</a>{% endif %}
+      {% if tab in ('all','issues') %}<a class="primary-inline" href="/issues/new">+ 제주 EVENT 등록</a>{% endif %}
     </div>
   </header>
   {% include '_flashes.html' %}
@@ -35,12 +35,12 @@
       {% if recent %}<ol class="activity-feed">{% for item in recent %}
         <li><div><p class="issue-author">{{ item.kind }} · <time>{{ item.activity_date }}</time></p>
           <h3><a href="{{ item.href }}">{{ item.title }}</a></h3></div>{{ badges(item.labels) }}</li>
-      {% endfor %}</ol>{% else %}<p class="member-help">아직 활동 기록이 없습니다. 장소를 알려주거나 제주 ISSUE를 등록해 보세요.</p>{% endif %}
+      {% endfor %}</ol>{% else %}<p class="member-help">아직 활동 기록이 없습니다. 장소를 알려주거나 제주 EVENT를 등록해 보세요.</p>{% endif %}
     </section>
   {% else %}
-    <section class="form-card activity-panel"><h2>{{ {'places':'내가 등록한 장소','issues':'내가 등록한 제주 ISSUE','suggestions':'내 수정 제안','inquiries':'내 문의'}[tab] }} <small>{{ count }}</small></h2>
+    <section class="form-card activity-panel"><h2>{{ {'places':'내가 등록한 장소','issues':'내가 등록한 제주 EVENT','suggestions':'내 수정 제안','inquiries':'내 문의'}[tab] }} <small>{{ count }}</small></h2>
       {% for item in items %}{{ activity_card(item,tab) }}{% else %}
-        <p class="member-help">{{ {'places':'아직 알려주신 장소가 없습니다.','issues':'아직 등록한 제주 ISSUE가 없습니다.','suggestions':'아직 보낸 수정 제안이 없습니다.','inquiries':'아직 등록한 문의가 없습니다.'}[tab] }}</p>
+        <p class="member-help">{{ {'places':'아직 알려주신 장소가 없습니다.','issues':'아직 등록한 제주 EVENT가 없습니다.','suggestions':'아직 보낸 수정 제안이 없습니다.','inquiries':'아직 등록한 문의가 없습니다.'}[tab] }}</p>
         {% if tab=='inquiries' %}<p class="member-help">궁금한 점이나 수정 요청이 있다면 문의를 남겨주세요.</p>{% endif %}
       {% endfor %}
       {% if tab=='inquiries' %}<a class="mini-btn new-inquiry" href="/contact">{{ '+ 새 문의하기' if items else '+ 문의하기' }}</a>{% endif %}

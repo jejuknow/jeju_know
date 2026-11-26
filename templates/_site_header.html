@@ -2,7 +2,7 @@
 <header class="site-header community-header"><div class="wrap header-inner">
   {{ brand_logo('') }}
   <div class="nav" id="siteNav"><nav class="primary-nav" aria-label="주요 메뉴">
-    {% for label, href in [('FIND','/find'),('NEW','/new'),('ISSUE','/news'),('MAP','/map'),('BEST','/best')] %}
+    {% for label, href in [('FIND','/find'),('NEW','/new'),('EVENT','/news'),('MAP','/map'),('BEST','/best')] %}
     <a href="{{ href }}" {% if request.url.path == href or (href == '/best' and request.url.path.startswith('/best/')) %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>

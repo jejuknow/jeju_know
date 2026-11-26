@@ -1,0 +1,11 @@
+{% set e = item or {} %}
+<section class="form-card"><h2>참가비</h2><label>참가비 정보<select name="fee_status"><option value="" {% if not e.get('fee_status') %}selected{% endif %}>미확인</option><option value="free" {% if e.get('fee_status')=='free' %}selected{% endif %}>무료</option><option value="paid" {% if e.get('fee_status')=='paid' %}selected{% endif %}>유료</option></select><small>공식 안내에서 무료로 확인한 경우에만 ‘무료’를 선택해주세요.</small></label></section>
+<section class="form-card" data-event-benefits data-category="{{ news_category_labels['benefit-discount'] }}" {% if e.get('category')!=news_category_labels['benefit-discount'] %}hidden{% endif %}>
+  <h2>혜택·할인 정보 <small>선택 입력</small></h2><p class="form-help">확인된 내용만 입력하세요. 가격을 모르면 비워두세요.</p>
+  <div class="form-grid two">
+    {% for key,label,limit in [('benefit_summary','혜택 요약',600),('benefit_audience','혜택 대상',200),('benefit_conditions','이용 조건',1000),('promo_code','쿠폰·프로모션 코드',80),('benefit_howto','이용 방법',1000),('benefit_quantity','선착순·수량 안내',200)] %}
+    <label {% if key in ('benefit_summary','benefit_conditions','benefit_howto') %}class="span-2"{% endif %}>{{ label }}<input name="{{ key }}" maxlength="{{ limit }}" value="{{ e.get(key) or '' }}" {% if e.get('category')!=news_category_labels['benefit-discount'] %}disabled{% endif %}></label>
+    {% endfor %}
+    {% for key,label in [('regular_price','정상가'),('benefit_price','혜택가')] %}<label>{{ label }} (원)<input type="number" name="{{ key }}" min="0" max="1000000000" step="1" inputmode="numeric" value="{{ e.get(key) if e.get(key) is not none else '' }}" {% if e.get('category')!=news_category_labels['benefit-discount'] %}disabled{% endif %}></label>{% endfor %}
+  </div>
+</section>

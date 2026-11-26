@@ -20,8 +20,13 @@ class SeoTest(unittest.TestCase):
     csrf = test_community.CommunityTest.csrf
     post = test_community.CommunityTest.post
     form = test_community.CommunityTest.form
-    create = test_community.CommunityTest.create
     place = test_community.CommunityTest.place
+
+    def create(self, client=None, **data):
+        # SEO fixtures must be explicitly public. Member submissions can now be held,
+        # and these deliberately colocated fixtures acknowledge duplicate warnings.
+        return self.post(client or self.admin, '/admin/places/new',
+                         **self.form(published='1', duplicate_ack='1', **data))
 
     @classmethod
     def setUpClass(cls):
@@ -131,7 +136,7 @@ class SeoTest(unittest.TestCase):
         self.assertIsNone(entries[ORIGIN + '/best/seo-best'])
         self.assertNotIn('/place/' + example['slug'], response.text)
         self.assertNotIn('seo-pending', response.text)
-        self.assertIn('content="noindex,follow"', self.visitor.get('/place/' + example['slug']).text)
+        self.assertEqual(self.visitor.get('/place/' + example['slug']).status_code, 404)
         for url in entries:
             self.assertTrue(url.startswith(ORIGIN + '/'))
             self.assertFalse(urlsplit(url).query)

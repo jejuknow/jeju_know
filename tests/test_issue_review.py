@@ -123,7 +123,7 @@ class IssueReviewTest(unittest.TestCase):
             self.assertEqual(self.submit(**changes).status_code,400,changes)
         self.assertIn("대표이미지",self.submit(photo=False).text)
         yesterday=(today()-timedelta(days=1)).isoformat()
-        self.assertIn("이미 종료된 ISSUE",self.submit(event_start=yesterday,event_end=yesterday).text)
+        self.assertIn("이미 종료된 EVENT",self.submit(event_start=yesterday,event_end=yesterday).text)
         self.assertEqual(self.submit(latitude="",longitude="").status_code,303)
         row=self.rows("SELECT * FROM news_posts")[0]
         self.assertIsNone(row["latitude"])
