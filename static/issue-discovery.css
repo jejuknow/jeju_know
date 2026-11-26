@@ -57,24 +57,35 @@
 .issue-empty .secondary-btn { margin-top:6px; }
 @media(max-width:760px){.issue-intro{align-items:stretch;flex-direction:column}.issue-submit-link{text-align:center}}
 
-/* EVENT uses the existing palette and card rhythm, with short curated selections. */
-.event-highlights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0}
+/* A short closing summary leads directly into the existing map/list. */
+.event-highlights{margin:16px 0}
 .event-highlights:empty,.event-highlights[hidden]{display:none}
-.event-selection{min-width:0;border:1px solid #e1e6f3;border-radius:18px;padding:16px}
+.event-selection{min-width:0}
 .event-selection-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .event-selection-heading h2{font-size:1rem;margin:0;word-break:keep-all}.event-selection-heading>a{font-size:.78rem;white-space:nowrap;color:var(--primary,#4864ef)}
-.event-teaser>a{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:start;color:inherit;padding:12px 0}
-.event-teaser+.event-teaser{border-top:1px solid #e8ebf4}.event-teaser h3{font-size:.95rem}
-.event-summary,.event-teaser h3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.event-ending-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.event-ending-card{min-width:0}
+.event-ending-card>a{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:center;height:100%;padding:12px;border:1px solid #e1e6f3;border-radius:14px;color:inherit;background:#fff}
+.event-ending-card>a:hover{background:#f6f8ff}
+.event-ending-card>a:focus-visible{outline:3px solid var(--primary,#4864ef);outline-offset:2px}
+.event-ending-card .issue-poster{width:64px;height:80px;border-radius:9px}
+.event-ending-copy{min-width:0}
+.event-ending-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:.72rem;color:#53617b}
+.event-ending-meta>*{white-space:nowrap}
+.event-ending-meta strong{color:var(--primary,#4864ef)}
+.event-ending-meta .event-disclosure{padding:2px 5px;border-radius:5px;background:#edf1ff;color:#3448a6}
+.event-ending-copy h3{font-size:.94rem;line-height:1.4;margin:5px 0;word-break:keep-all;overflow-wrap:break-word}
+.event-ending-copy p{font-size:.78rem;line-height:1.5;color:#53617b;margin:0;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.event-summary,.event-ending-copy h3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .issue-copy .event-benefit{font-size:1rem;font-weight:700;color:var(--primary,#4864ef)}
 .event-card-action{display:block;margin-top:8px;color:var(--primary,#4864ef);font-size:.85rem;font-weight:700}
+@media(min-width:761px) and (max-width:1099px){.event-ending-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){
  .issue-intro h1{font-size:clamp(1.6rem,7vw,2rem);line-height:1.25}.issue-intro>div>p:last-child{font-size:.9rem;line-height:1.6}
  .issue-filter-row{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:4px}
  .issue-filter-row>*{flex:none}.issue-filter-row strong{min-width:28px}
- .event-highlights{grid-template-columns:minmax(0,1fr);gap:12px}.event-selection{padding:12px}
- .event-selection-cards{display:grid;grid-auto-flow:column;grid-auto-columns:calc(100% - 24px);gap:14px;overflow-x:auto;scroll-snap-type:x proximity}
- .event-teaser{scroll-snap-align:start}.event-teaser+.event-teaser{border-top:0}
+ .event-ending-cards{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:min(80vw,360px);overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;scrollbar-width:thin;padding:3px;margin:-3px}
+ .event-ending-card{scroll-snap-align:start}
  .issue-card>a{display:block;padding:18px 0}.issue-card .issue-poster{aspect-ratio:16/10;margin-bottom:12px}
  .issue-card .issue-poster>img{object-fit:contain}.issue-copy h3{word-break:keep-all;overflow-wrap:break-word}
  .issue-card .issue-copy p{font-size:.9rem;line-height:1.6}.issue-card .issue-tags{gap:6px}

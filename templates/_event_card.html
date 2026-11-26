@@ -1,7 +1,7 @@
 {% from '_user_status.html' import schedule_badge %}
 {% from '_navigation_icon.html' import navigation_icon %}
-{% macro event_card(item, compact=false) %}
-<article class="{{ 'event-teaser' if compact else 'issue-card' }}" data-issue-id="{{ item.id }}" {% if item.mappable %}data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}"{% endif %}>
+{% macro event_card(item) %}
+<article class="issue-card" data-issue-id="{{ item.id }}" {% if item.mappable %}data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}"{% endif %}>
   <a href="{{ url_for('news_detail',slug=item.slug) }}"><div class="issue-poster">{% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.title }} 대표 포스터" loading="lazy" width="480" height="640">{% else %}{{ navigation_icon('issue') }}{% endif %}</div>
     <div class="issue-copy"><div class="issue-tags">{{ schedule_badge(item) }}<span data-category>{{ item.category_label }}</span>{% if item.end_badge %}<span>{{ item.end_badge }}</span>{% endif %}{% if item.fee_status=='free' %}<span>무료</span>{% endif %}{% if item.is_sponsored %}<span>광고·협찬</span>{% elif item.is_promoted %}<span>홍보·제휴</span>{% endif %}</div>
       <p data-dates>{{ item.date_label }} · {{ item.time_label }}</p>
@@ -10,6 +10,20 @@
       {% if item.region or item.venue %}<p>{{ region_labels.get(item.region,item.region) }}{% if item.region and item.venue %} · {% endif %}{{ item.venue }}</p>{% endif %}
       {% if item.is_benefit and item.benefit_conditions %}<p class="event-summary">{{ item.benefit_conditions }}</p>{% elif item.summary %}<p class="event-summary">{{ item.summary }}</p>{% endif %}
       <span class="nearby-distance" data-distance hidden></span><small>{% if item.author_type == 'user' %}사용자 등록 · {% endif %}{{ item.author_name }}</small><span class="event-card-action">{{ '혜택 확인' if item.is_benefit else '상세보기' }} →</span>
+    </div>
+  </a>
+</article>
+{% endmacro %}
+
+{% macro ending_card(item) %}
+<article class="event-ending-card" data-issue-id="{{ item.id }}">
+  <a href="{{ url_for('news_detail',slug=item.slug) }}">
+    <div class="issue-poster">{% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.title }}" loading="lazy" width="64" height="80">{% else %}{{ navigation_icon('issue') }}{% endif %}</div>
+    <div class="event-ending-copy">
+      <div class="event-ending-meta"><strong aria-label="{{ item.end_badge }}">{{ item.end_badge.replace('종료 ', '') }}</strong><span>{{ item.category_label }}</span>{% if item.is_sponsored %}<span class="event-disclosure">광고·협찬</span>{% elif item.is_promoted %}<span class="event-disclosure">홍보·제휴</span>{% endif %}</div>
+      <h3>{{ item.title }}</h3>
+      <p>{{ item.date_label }}</p>
+      <p>{{ item.venue or region_labels.get(item.region,item.region) or '장소 미정' }}</p>
     </div>
   </a>
 </article>

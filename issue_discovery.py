@@ -181,6 +181,25 @@ def browse(conn, query, moment):
     return rows, selected, link
 
 
+def ending_soon(items, moment, limit=4):
+    """Reuse filtered public results; rank by KST end instant before limiting.
+
+    Stable ties keep the existing list order. No extra database query or changes
+    to the main list's ongoing/upcoming ordering are needed.
+    """
+    moment = as_moment(moment)
+    last_day = moment.date() + timedelta(days=3)
+    eligible = []
+    for item in items:
+        if ALIASES.get(item['category'], item['category']) not in PUBLIC_CATEGORIES.values():
+            continue
+        end = date.fromisoformat(item['event_end'])
+        ends = datetime.combine(end, clock_time(item.get('end_time'), time.max), KST)
+        if moment <= ends and end <= last_day:
+            eligible.append((ends, item))
+    return [item for _, item in sorted(eligible, key=lambda pair: pair[0])[:limit]]
+
+
 def sections(conn, moment):
     """Small, date-ranked selections; no new publication or ordering policy."""
     moment = as_moment(moment)

@@ -147,9 +147,8 @@ class EventFlowTest(unittest.TestCase):
             self.assertEqual([x['slug'] for x in self.visitor.get('/news?closing=1').context['news_items']],
                              ['today-free','unknown','benefit','weekend-free'])
             all_page=self.visitor.get('/news')
-            featured={title:items for title,items,href in all_page.context['event_sections']}
-            self.assertEqual([x['slug'] for x in featured['지금 받을 수 있는 혜택']],['benefit'])
-            self.assertTrue(all(len(items)<=2 and len({x['id'] for x in items})==len(items) for items in featured.values()))
+            self.assertEqual([x['slug'] for x in all_page.context['ending_items']],
+                             ['today-free','unknown','benefit','weekend-free'])
             self.assertIn('legacy',[x['slug'] for x in all_page.context['news_items']])
             for slug in ('ended','private','pending'):self.assertEqual(self.visitor.get('/news/'+slug).status_code,404)
             self.assertEqual(self.visitor.get('/news?period=weekend&category=activities').context['news_items'],[])

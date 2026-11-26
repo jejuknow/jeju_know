@@ -59,7 +59,7 @@ from admin_roles import SUPER, audit, migrate as migrate_admin_roles, require_ad
 from admin_accounts import register_admin_accounts, password_error, valid_username
 from issue_discovery import LABELS as NEWS_CATEGORY_LABELS, ALIASES as NEWS_CATEGORY_ALIASES, RENAMED_CATEGORIES
 from issue_discovery import PUBLIC_CATEGORIES, PERIODS, public_where, browse, schedule, highlights, now as issue_now
-from issue_discovery import allowed_categories, sections as event_sections, as_moment
+from issue_discovery import allowed_categories, ending_soon, as_moment
 from ad_banners import active_banners, banner_image, migrate as migrate_ads, register_ad_routes
 from contact_inquiries import migrate as migrate_contact, migrate_member_inquiries, register_contact_routes
 from issue_calendar_migration import migrate as migrate_issue_calendar
@@ -837,13 +837,12 @@ def create_app(test_config=None):
         moment = issue_now()
         with closing(connect_db()) as conn:
             rows, selected, link = browse(conn, request.query_params, moment)
-            featured = event_sections(conn, moment) if not any(selected[k] for k in ('category','region','q','free','closing')) and selected['period']=='all' else []
         items = [row_to_news(row, moment) for row in rows]
         return templates.TemplateResponse(request=request, name="news_list.html", context={
             "news_items": items, "selected": selected, "active_category": selected["category"],
             "issue_link": link, "periods": PERIODS, "map_count": sum(item["mappable"] for item in items),
             "kakao_map_key": app.state.kakao_map_key,
-            "event_sections": [(title, [row_to_news(row,moment) for row in entries], href) for title,entries,href in featured],
+            "ending_items": ending_soon(items, moment),
         })
 
     @app.get("/news/{slug}", response_class=HTMLResponse)

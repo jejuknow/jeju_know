@@ -1,14 +1,13 @@
 {% extends "base.html" %}
 {% block title %}제주 EVENT | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261126-event"><link rel="stylesheet" href="/static/nearby.css?v=20261104">{% endblock %}
-{% from '_event_card.html' import event_card with context %}
+{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261126-compact"><link rel="stylesheet" href="/static/nearby.css?v=20261104">{% endblock %}
+{% from '_event_card.html' import event_card, ending_card with context %}
 {% block body %}
 <main class="issue-discovery wrap" data-view="{{ selected.view }}" data-kakao-key="{{ kakao_map_key }}">
   <header class="issue-intro"><div><p class="kicker">EVENT</p><h1>지금 제주에서<br>놓치면 아쉬운 것들</h1><p>행사·팝업부터 공연과 체험,<br>혜택·할인까지 모았습니다.</p></div><a class="secondary-btn issue-submit-link" href="/issues/new">+ EVENT 등록하기</a></header>
   <section class="issue-filters" aria-label="EVENT 탐색 조건">
     <nav class="issue-filter-row" aria-label="기간"><strong>기간</strong>{% for key,label in periods.items() %}<a data-filter href="{{ issue_link(period=key) }}" {% if selected.period==key %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>
     <nav class="issue-filter-row" aria-label="카테고리"><strong>종류</strong>{% for value in ['']+public_issue_categories %}<a data-filter href="{{ issue_link(category=value) }}" {% if selected.category==value %}aria-current="true"{% endif %}>{{ value.replace('•','·') or '전체' }}</a>{% endfor %}</nav>
-    <nav class="issue-filter-row" aria-label="빠른 조건"><strong>조건</strong><a data-filter href="{{ issue_link(closing='' if selected.closing else '1') }}" {% if selected.closing %}aria-current="true"{% endif %}>마감임박</a><a data-filter href="{{ issue_link(free='' if selected.free else '1') }}" {% if selected.free %}aria-current="true"{% endif %}>무료</a></nav>
     <form class="issue-query" action="/news" method="get">
       <input type="hidden" name="period" value="{{ selected.period }}"><input type="hidden" name="category" value="{{ selected.category }}"><input type="hidden" name="view" value="{{ selected.view }}">
       <input type="hidden" name="free" value="{{ selected.free }}"><input type="hidden" name="closing" value="{{ selected.closing }}">
@@ -17,7 +16,7 @@
     </form>
     {% include "_nearby.html" %}
   </section>
-  <div class="event-highlights" id="eventHighlights">{% for title,items,href in event_sections %}{% if items %}<section class="event-selection"><div class="event-selection-heading"><h2>{{ title }}</h2><a data-filter href="{{ href }}">더보기 →</a></div><div class="event-selection-cards">{% for item in items %}{{ event_card(item,true) }}{% endfor %}</div></section>{% endif %}{% endfor %}</div>
+  <div class="event-highlights" id="eventHighlights">{% if ending_items %}<section class="event-selection" aria-labelledby="endingSoonTitle"><div class="event-selection-heading"><h2 id="endingSoonTitle">곧 끝나요</h2><a data-filter href="{{ issue_link(closing='1') }}#issueResults">더보기 →</a></div><div class="event-ending-cards">{% for item in ending_items %}{{ ending_card(item) }}{% endfor %}</div></section>{% endif %}</div>
   <div class="issue-switch" role="group" aria-label="보기 방식"><button type="button" data-view-choice="list" aria-controls="issueResults">목록 보기</button><button type="button" data-view-choice="map" aria-controls="issueMapPanel">지도 보기</button></div>
   <div class="issue-layout">
     <section class="issue-map-panel" id="issueMapPanel" aria-label="제주 EVENT 지도"><div id="issueMap" aria-label="행사 위치 지도"></div>
