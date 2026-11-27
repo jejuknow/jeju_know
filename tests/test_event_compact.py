@@ -50,8 +50,8 @@ class EventCompactTest(unittest.TestCase):
         self.issue('benefit', '2026-11-26', '2026-11-27', category='혜택·할인',fee_status='free')
         for params, expected in [({'category':'performance','period':'weekend','region':'애월','q':'weekend','view':'map'},['performance-weekend']),
                                  ({'category':'benefit-discount'},['benefit']),
-                                 ({'period':'today','free':'1'},['benefit']),
-                                 ({'period':'week','closing':'1'},['performance-today','benefit','performance-weekend'])]:
+                                 ({'period':'today','free':'1','group':'benefit'},['benefit']),
+                                 ({'period':'week','closing':'1'},['performance-today','performance-weekend'])]:
             page = self.page(**params)
             self.assertEqual([x['slug'] for x in page.context['ending_items']], expected)
             self.assertEqual(page.context['map_count'], len(expected))
@@ -69,7 +69,7 @@ class EventCompactTest(unittest.TestCase):
         self.issue('sponsor', '2026-11-26', '2026-11-27', category='공연',title='공연 <안내>',
                    image_url='https://www.jeju-know.com/static/images/icons/icon-issue.webp',venue='제주 공연장',
                    summary='긴 소개문을 표시하지 않습니다',source_name='주최 측 이름',is_sponsored=1)
-        self.issue('promoted', '2026-11-26', '2026-11-28', category='혜택·할인',is_promoted=1)
+        self.issue('promoted', '2026-11-26', '2026-11-28', category='공연',is_promoted=1)
         page = self.page()
         section = re.search(r'<section class="event-selection".*?</section>', page.text, re.S)[0]
         for value in ('광고·협찬','홍보·제휴','D-1','제주 공연장','alt="공연 &lt;안내&gt;"','/news/sponsor'):

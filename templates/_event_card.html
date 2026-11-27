@@ -1,13 +1,16 @@
 {% from '_user_status.html' import schedule_badge %}
 {% from '_navigation_icon.html' import navigation_icon %}
 {% macro event_card(item) %}
-<article class="issue-card" data-issue-id="{{ item.id }}" {% if item.mappable %}data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}"{% endif %}>
+{% set marker = issue_markers[item.category] %}
+<article data-marker-text="{{ marker.text }}" data-marker-color="{{ marker.color }}" class="issue-card" data-issue-id="{{ item.id }}" {% if item.mappable %}data-lat="{{ item.latitude }}" data-lng="{{ item.longitude }}"{% endif %}>
   <a href="{{ url_for('news_detail',slug=item.slug) }}"><div class="issue-poster">{% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.title }} 대표 포스터" loading="lazy" width="480" height="640">{% else %}{{ navigation_icon('issue') }}{% endif %}</div>
-    <div class="issue-copy"><div class="issue-tags">{{ schedule_badge(item) }}<span data-category>{{ item.category_label }}</span>{% if item.end_badge %}<span>{{ item.end_badge }}</span>{% endif %}{% if item.fee_status=='free' %}<span>무료</span>{% endif %}{% if item.is_sponsored %}<span>광고·협찬</span>{% elif item.is_promoted %}<span>홍보·제휴</span>{% endif %}</div>
+    <div class="issue-copy"><div class="issue-tags">{{ schedule_badge(item) }}<span data-category>{{ item.category_label }}</span>{% if item.end_badge %}<span>{{ item.end_badge }}</span>{% endif %}{% if item.fee_status=='free' %}<span>무료</span>{% endif %}{% if item.is_sponsored %}<span data-disclosure>광고·협찬</span>{% elif item.is_promoted %}<span data-disclosure>홍보·제휴</span>{% endif %}</div>
+      {% if item.is_benefit %}<h3>{{ item.title }}</h3>{% endif %}
       <p data-dates>{{ item.date_label }} · {{ item.time_label }}</p>
       {% if item.is_benefit and item.benefit_summary %}<p class="event-benefit">{{ item.benefit_summary }}</p>{% endif %}
-      <h3>{{ item.title }}</h3>
-      {% if item.region or item.venue %}<p>{{ region_labels.get(item.region,item.region) }}{% if item.region and item.venue %} · {% endif %}{{ item.venue }}</p>{% endif %}
+      {% if not item.is_benefit %}<h3>{{ item.title }}</h3>{% endif %}
+      {% if item.region or item.venue %}<p data-venue>{{ region_labels.get(item.region,item.region) }}{% if item.region and item.venue %} · {% endif %}{{ item.venue }}</p>{% endif %}
+      {% if item.is_benefit and item.benefit_audience %}<p>대상: {{ item.benefit_audience }}</p>{% endif %}
       {% if item.is_benefit and item.benefit_conditions %}<p class="event-summary">{{ item.benefit_conditions }}</p>{% elif item.summary %}<p class="event-summary">{{ item.summary }}</p>{% endif %}
       <span class="nearby-distance" data-distance hidden></span><small>{% if item.author_type == 'user' %}사용자 등록 · {% endif %}{{ item.author_name }}</small><span class="event-card-action">{{ '혜택 확인' if item.is_benefit else '상세보기' }} →</span>
     </div>

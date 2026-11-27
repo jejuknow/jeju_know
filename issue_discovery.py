@@ -13,6 +13,16 @@ LABELS = {"events": "행사•축제", "exhibitions": "전시•팝업", "perfor
           "activities": "교육·체험", "benefit-discount": "혜택·할인",
           "local": "지역소식", "opportunities": "공모•지원"}
 PUBLIC_CATEGORIES = {key: label for key, label in LABELS.items() if key not in ("local", "opportunities")}
+EVENT_CATEGORIES = {key: label for key, label in PUBLIC_CATEGORIES.items() if key != "benefit-discount"}
+# One presentation definition drives both markers and their legend. White text
+# has at least 4.5:1 contrast on each of these category colors.
+ISSUE_MARKERS = {
+    LABELS["events"]: {"text": "행사", "color": "#3759c7"},
+    LABELS["exhibitions"]: {"text": "전시", "color": "#7543a8"},
+    LABELS["performance"]: {"text": "공연", "color": "#bf3062"},
+    LABELS["activities"]: {"text": "체험", "color": "#19745e"},
+    LABELS["benefit-discount"]: {"text": "혜택", "color": "#b65308"},
+}
 # Keep previously public regional news visible without offering it for new submissions.
 VISIBLE_CATEGORIES = {**PUBLIC_CATEGORIES, 'local':LABELS['local']}
 RENAMED_CATEGORIES = {old: LABELS["activities"] for old in ("체험•교육", "체험·교육", "교육•체험")}
@@ -142,9 +152,23 @@ def browse(conn, query, moment):
     period = period if period in PERIODS else "all"
     category = query.get("category", "").strip()
     category = LABELS.get(category, ALIASES.get(category, category))
+    # `view` remains the existing list/map mode. Category-only bookmarked links
+    # take precedence over grouping, so both legacy labels and slugs still work.
+    group = query.get("group", query.get("view", "event"))
+    group = "benefit" if group == "benefit" else "event"
+    if category == LABELS["benefit-discount"]:
+        group = "benefit"
+    elif category in EVENT_CATEGORIES.values():
+        group = "event"
+    if group == "benefit":
+        category = LABELS["benefit-discount"]
     region, keyword = query.get("region", "").strip()[:100], query.get("q", "").strip()[:200]
     clause, params = public_where(moment)
     where = [clause]
+    group_labels = [LABELS["benefit-discount"]] if group == "benefit" else EVENT_CATEGORIES.values()
+    group_names = [name for label in group_labels for name in stored_names(label)]
+    where.append("category IN (" + ",".join("?" for _ in group_names) + ")")
+    params.extend(group_names)
     if category:
         names = stored_names(category)
         where.append("category IN (" + ",".join("?" for _ in names) + ")")
@@ -169,7 +193,7 @@ def browse(conn, query, moment):
         order = 'event_end ASC, ' + order
     rows = conn.execute("SELECT * FROM news_posts WHERE " + " AND ".join(where) + " ORDER BY " + order,
                         [*params, *order_params]).fetchall()
-    selected = {"period": period, "category": category, "region": region, "q": keyword,
+    selected = {"group": group, "period": period, "category": category, "region": region, "q": keyword,
                 "free": '1' if free else '', "closing": '1' if closing else '',
                 "view": "map" if query.get("view") == "map" else "list"}
 
@@ -177,6 +201,8 @@ def browse(conn, query, moment):
         values = {**selected, **changes}
         cleaned = {k: v for k, v in values.items() if v and not (k == "period" and v == "all")
                    and not (k == "view" and v == "list")}
+        if cleaned.get("group") == "event":
+            cleaned.pop("group")
         return "/news" + ("?" + urlencode(cleaned) if cleaned else "")
     return rows, selected, link
 

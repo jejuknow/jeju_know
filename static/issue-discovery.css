@@ -2,6 +2,10 @@
 .issue-intro h1{font-size:clamp(1.9rem,4vw,3rem);letter-spacing:-.055em;margin:.2em 0}
 .issue-intro>div>p:last-child,.issue-copy p,.issue-results-heading small{color:#53617b}
 .issue-filters{margin:24px 0 16px;padding:16px 20px;background:#f6f8ff;border:1px solid #e1e6f3;border-radius:18px}
+.issue-group-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;max-width:420px;padding:4px;margin-bottom:16px;border:1px solid #d5ddef;border-radius:14px;background:white}
+.issue-group-tabs a{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 12px;border-radius:10px;font-weight:800;white-space:nowrap;color:#394963}
+.issue-group-tabs a[aria-current]{background:var(--primary,#4864ef);color:white}
+.issue-group-tabs a:focus-visible{outline:3px solid #182b77;outline-offset:2px}
 .issue-filter-row,.issue-query,.issue-tags,.issue-switch{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .issue-filter-row+.issue-filter-row,.issue-query{margin-top:12px}
 .issue-filter-row strong,.issue-query label{font-weight:700;font-size:.87rem}
@@ -16,9 +20,12 @@
 .issue-switch{display:none}
 .issue-layout{display:grid;grid-template-columns:minmax(0,58fr) minmax(0,42fr);gap:16px;height:70vh;min-height:340px}
 .issue-map-panel,.issue-results{min-width:0;min-height:0;border:1px solid #e1e6f3;border-radius:18px;overflow:hidden}
-.issue-map-panel{position:relative;background:#eef3f8}
+.issue-map-panel{position:relative;background:#eef3f8;display:grid;grid-template-rows:auto minmax(0,1fr)}
+.issue-map-legend{display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 8px;background:#fff;border-bottom:1px solid #e1e6f3;font-size:.78rem;font-weight:700}
+.issue-map-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.issue-map-legend i{width:10px;height:10px;border-radius:50%;background:var(--issue-marker);flex:none}
 #issueMap{width:100%;height:100%}
-.issue-map-notice{position:absolute;z-index:4;left:12px;top:12px;background:white;color:#394963;padding:10px 14px;border-radius:12px;max-width:calc(100% - 24px)}
+.issue-map-notice{position:absolute;z-index:4;left:12px;top:52px;background:white;color:#394963;padding:10px 14px;border-radius:12px;max-width:calc(100% - 24px)}
 .issue-map-notice[hidden]{display:none}
 .issue-results{overflow:auto;padding:16px}
 .issue-results-heading{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:12px}
@@ -34,11 +41,12 @@
 .issue-copy p,.issue-copy small{font-size:.85rem;line-height:1.5}
 .issue-tags span,.issue-tags strong{font-size:.75rem;color:#3448a6;background:#edf1ff;border-radius:8px;padding:3px 7px}
 .issue-empty{text-align:center;padding:40px 5px}.issue-empty h3{font-size:1rem;margin:0 0 12px}
-.issue-pin{background:#4a60db;color:white;border:2px solid white;border-radius:18px 18px 18px 2px;padding:7px 10px;font:inherit;font-weight:700;box-shadow:0 2px 6px #19233933}
-.issue-pin[data-kind="전시·팝업"]{background:#8559ae}.issue-pin[data-kind="교육·체험"]{background:#19745e}.issue-pin[data-kind="지역소식"]{background:#4c6178}
+.issue-pin{background:var(--issue-marker,#3759c7);color:white;border:2px solid white;border-radius:18px 18px 18px 2px;padding:7px 10px;font:inherit;font-size:.87rem;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px #19233933}
 .issue-pin.is-highlighted,.issue-pin:focus-visible{outline:3px solid #182b77;outline-offset:2px}
 .issue-popup{background:white;color:#192339;border:1px solid #d5ddef;border-radius:12px;padding:12px;width:min(210px,62vw);white-space:normal;overflow-wrap:anywhere;box-shadow:0 3px 14px #19233930}
 .issue-popup strong,.issue-popup small,.issue-popup a{display:block}.issue-popup button{float:right;background:white;border:0;font-size:1.1rem}.issue-popup a{margin-top:6px;color:#374bc3}
+.issue-popup .issue-popup-category,.issue-popup .issue-popup-disclosure{display:inline-block;border-radius:6px;padding:3px 6px;margin:0 4px 6px 0;font-size:.75rem;font-weight:700}
+.issue-popup-category{background:var(--issue-marker);color:white}.issue-popup-disclosure{background:#edf1ff;color:#3448a6}
 @media(max-width:760px){
   .issue-switch{display:flex;margin:14px 0}
   .issue-layout{display:block;height:auto;min-height:0}

@@ -1,33 +1,41 @@
 {% extends "base.html" %}
 {% block title %}제주 EVENT | JEJU_KNOW{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261126-compact"><link rel="stylesheet" href="/static/nearby.css?v=20261104">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/issue-discovery.css?v=20261127-groups"><link rel="stylesheet" href="/static/nearby.css?v=20261104">{% endblock %}
 {% from '_event_card.html' import event_card, ending_card with context %}
 {% block body %}
-<main class="issue-discovery wrap" data-view="{{ selected.view }}" data-kakao-key="{{ kakao_map_key }}">
+{% set benefit = selected.group == 'benefit' %}
+{% set result_label = '혜택·할인' if benefit else '전체 EVENT' %}
+<main class="issue-discovery wrap" data-group="{{ selected.group }}" data-view="{{ selected.view }}" data-kakao-key="{{ kakao_map_key }}">
   <header class="issue-intro"><div><p class="kicker">EVENT</p><h1>지금 제주에서<br>놓치면 아쉬운 것들</h1><p>행사·팝업부터 공연과 체험,<br>혜택·할인까지 모았습니다.</p></div><a class="secondary-btn issue-submit-link" href="/issues/new">+ EVENT 등록하기</a></header>
   <section class="issue-filters" aria-label="EVENT 탐색 조건">
+    <nav class="issue-group-tabs" aria-label="콘텐츠 탐색">
+      <a data-filter href="{{ issue_link(group='event',category='') }}" {% if not benefit %}aria-current="page"{% endif %}>EVENT</a>
+      <a data-filter href="{{ issue_link(group='benefit',category='') }}" {% if benefit %}aria-current="page"{% endif %}><span aria-hidden="true">🎁</span> 혜택·할인</a>
+    </nav>
     <nav class="issue-filter-row" aria-label="기간"><strong>기간</strong>{% for key,label in periods.items() %}<a data-filter href="{{ issue_link(period=key) }}" {% if selected.period==key %}aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}</nav>
-    <nav class="issue-filter-row" aria-label="카테고리"><strong>종류</strong>{% for value in ['']+public_issue_categories %}<a data-filter href="{{ issue_link(category=value) }}" {% if selected.category==value %}aria-current="true"{% endif %}>{{ value.replace('•','·') or '전체' }}</a>{% endfor %}</nav>
+    {% if not benefit %}<nav class="issue-filter-row" aria-label="카테고리"><strong>종류</strong>{% for value in ['']+event_categories %}<a data-filter href="{{ issue_link(category=value) }}" {% if selected.category==value %}aria-current="true"{% endif %}>{{ value.replace('•','·') or '전체' }}</a>{% endfor %}</nav>{% endif %}
     <form class="issue-query" action="/news" method="get">
-      <input type="hidden" name="period" value="{{ selected.period }}"><input type="hidden" name="category" value="{{ selected.category }}"><input type="hidden" name="view" value="{{ selected.view }}">
+      <input type="hidden" name="group" value="{{ selected.group }}"><input type="hidden" name="period" value="{{ selected.period }}"><input type="hidden" name="category" value="{{ selected.category }}"><input type="hidden" name="view" value="{{ selected.view }}">
       <input type="hidden" name="free" value="{{ selected.free }}"><input type="hidden" name="closing" value="{{ selected.closing }}">
       <label>지역 <select name="region"><option value="">전체 제주</option>{% for value in active_regions %}<option value="{{ value }}" {% if selected.region==value %}selected{% endif %}>{{ region_labels.get(value,value) }}</option>{% endfor %}</select></label>
-      <label class="issue-search"><span>검색어</span><input type="search" name="q" value="{{ selected.q }}" placeholder="행사명·장소·키워드 검색" maxlength="200"></label><button type="submit">검색</button>
+      <label class="issue-search"><span>검색어</span><input type="search" name="q" value="{{ selected.q }}" placeholder="{{ '혜택명·장소·키워드 검색' if benefit else '행사명·장소·키워드 검색' }}" maxlength="200"></label><button type="submit">검색</button>
     </form>
     {% include "_nearby.html" %}
   </section>
-  <div class="event-highlights" id="eventHighlights">{% if ending_items %}<section class="event-selection" aria-labelledby="endingSoonTitle"><div class="event-selection-heading"><h2 id="endingSoonTitle">곧 끝나요</h2><a data-filter href="{{ issue_link(closing='1') }}#issueResults">더보기 →</a></div><div class="event-ending-cards">{% for item in ending_items %}{{ ending_card(item) }}{% endfor %}</div></section>{% endif %}</div>
+  <div class="event-highlights" id="eventHighlights">{% if ending_items %}<section class="event-selection" aria-labelledby="endingSoonTitle"><div class="event-selection-heading"><h2 id="endingSoonTitle">{{ '곧 끝나는 혜택' if benefit else '곧 끝나요' }}</h2><a data-filter href="{{ issue_link(closing='1') }}#issueResults">더보기 →</a></div><div class="event-ending-cards">{% for item in ending_items %}{{ ending_card(item) }}{% endfor %}</div></section>{% endif %}</div>
   <div class="issue-switch" role="group" aria-label="보기 방식"><button type="button" data-view-choice="list" aria-controls="issueResults">목록 보기</button><button type="button" data-view-choice="map" aria-controls="issueMapPanel">지도 보기</button></div>
   <div class="issue-layout">
-    <section class="issue-map-panel" id="issueMapPanel" aria-label="제주 EVENT 지도"><div id="issueMap" aria-label="행사 위치 지도"></div>
-      <div id="issueMapNotice" class="issue-map-notice" role="status">{% if not map_count %}지도에 표시할 수 있는 EVENT가 없습니다.{% else %}지도를 불러오고 있습니다.{% endif %}</div>
+    <section class="issue-map-panel" id="issueMapPanel" aria-label="{{ result_label }} 지도">
+      <div class="issue-map-legend" id="issueMapLegend" role="group" aria-label="지도 마커 범례">{% for category,marker in issue_markers.items() %}{% if (category=='혜택·할인') == benefit %}<span style="--issue-marker:{{ marker.color }}"><i aria-hidden="true"></i>{{ marker.text }}</span>{% endif %}{% endfor %}</div>
+      <div id="issueMap" aria-label="{{ result_label }} 위치 지도"></div>
+      <div id="issueMapNotice" class="issue-map-notice" role="status">{% if not map_count %}지도에 표시할 수 있는 {{ '혜택이' if benefit else 'EVENT가' }} 없습니다.{% else %}지도를 불러오고 있습니다.{% endif %}</div>
     </section>
-    <section class="issue-results" id="issueResults" aria-label="EVENT 목록">
-      <div class="issue-results-heading"><h2><b data-results-title>전체 EVENT</b> <span>{{ news_items|length }}건</span></h2><small data-map-count>지도 위치 {{ map_count }}곳</small></div>
-      {% for item in news_items %}{{ event_card(item) }}{% else %}<div class="issue-empty"><h3>{{ (periods[selected.period] ~ '에 ') if selected.period!='all' else '' }}조건에 맞는 {{ (selected.category.replace('•','·') ~ ' EVENT') if selected.category else 'EVENT' }}가 없습니다.</h3>{% if selected.period!='all' %}<a data-filter href="{{ issue_link(period='all') }}">기간 전체 보기 →</a>{% else %}<a href="/news">전체 보기 →</a>{% endif %}<p>제주에서 열리는 EVENT를 알고 계신가요?</p><a class="secondary-btn" href="/issues/new">EVENT 등록하기</a></div>{% endfor %}
-      <p class="nearby-empty" data-near-empty hidden>반경 안에 EVENT가 없습니다. 반경을 넓히거나 내 주변을 해제해 보세요.</p>
+    <section class="issue-results" id="issueResults" aria-label="{{ result_label }} 목록">
+      <div class="issue-results-heading"><h2><b data-results-title>{{ result_label }}</b> <span>{{ news_items|length }}건</span></h2><small data-map-count>지도 위치 {{ map_count }}곳</small></div>
+      {% for item in news_items %}{{ event_card(item) }}{% else %}<div class="issue-empty"><h3>{{ (periods[selected.period] ~ '에 ') if selected.period!='all' else '' }}조건에 맞는 {{ '혜택이' if benefit else ((selected.category.replace('•','·') ~ ' EVENT') if selected.category else 'EVENT') ~ '가' }} 없습니다.</h3>{% if selected.period!='all' %}<a data-filter href="{{ issue_link(period='all') }}">기간 전체 보기 →</a>{% else %}<a data-filter href="{{ issue_link(category='',region='',q='',free='',closing='') }}">전체 보기 →</a>{% endif %}<p>제주에서 열리는 EVENT를 알고 계신가요?</p><a class="secondary-btn" href="/issues/new">EVENT 등록하기</a></div>{% endfor %}
+      <p class="nearby-empty" data-near-empty hidden>반경 안에 {{ '혜택이' if benefit else 'EVENT가' }} 없습니다. 반경을 넓히거나 내 주변을 해제해 보세요.</p>
     </section>
   </div>
 </main>
 {% endblock %}
-{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/issue-discovery.js?v=20261126-event"></script>{% endblock %}
+{% block scripts %}<script src="/static/kakao-loader.js"></script><script src="/static/nearby.js?v=20261104"></script><script src="/static/issue-discovery.js?v=20261127-groups"></script>{% endblock %}

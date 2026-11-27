@@ -145,11 +145,12 @@ class EventFlowTest(unittest.TestCase):
             for part in ('free=1','closing=1','q=free','category='):self.assertIn(part,link)
             self.assertEqual(self.visitor.get('/news?free=1').context['map_count'],2)
             self.assertEqual([x['slug'] for x in self.visitor.get('/news?closing=1').context['news_items']],
-                             ['today-free','unknown','benefit','weekend-free'])
+                             ['today-free','unknown','weekend-free'])
             all_page=self.visitor.get('/news')
             self.assertEqual([x['slug'] for x in all_page.context['ending_items']],
-                             ['today-free','unknown','benefit','weekend-free'])
-            self.assertIn('legacy',[x['slug'] for x in all_page.context['news_items']])
+                             ['today-free','unknown','weekend-free'])
+            self.assertNotIn('legacy',[x['slug'] for x in all_page.context['news_items']])
+            self.assertEqual(self.visitor.get('/news/legacy').status_code,200)
             for slug in ('ended','private','pending'):self.assertEqual(self.visitor.get('/news/'+slug).status_code,404)
             self.assertEqual(self.visitor.get('/news?period=weekend&category=activities').context['news_items'],[])
             self.assertIn('기간 전체 보기',self.visitor.get('/news?period=weekend&category=activities').text)

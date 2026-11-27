@@ -125,9 +125,9 @@ class IssueBrowserTest(unittest.TestCase):
             self.issue(slug,a,b,cat,public,1,(33.4,126.5))
         day = date(2026,11,2)
         with patch("app.issue_now",return_value=day), patch("issue_discovery.today",return_value=day):
-            for period,expected in {"all":["day-only","running","weekend","later-month"],
+            for period,expected in {"all":["day-only","running","weekend"],
                       "today":["day-only","running"], "week":["day-only","running","weekend"],
-                      "weekend":["running","weekend"],"month":["day-only","running","weekend","later-month"]}.items():
+                      "weekend":["running","weekend"],"month":["day-only","running","weekend"]}.items():
                 page = self.visitor.get("/news",params={"period":period})
                 self.assertEqual([x["slug"] for x in page.context["news_items"]],expected)
                 self.assertEqual(page.context["map_count"],1)
